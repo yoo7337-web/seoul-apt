@@ -84,6 +84,73 @@ button, input, select { font: inherit; color: inherit; }
   box-shadow: var(--shadow);
 }
 
+.nav-spacer { flex: 1; }
+a.nav-link { text-decoration: none; display: inline-flex; align-items: center; }
+a.nav-link.active { color: var(--accent); font-weight: 700; }
+.count.hidden { display: none; }
+
+/* ── 필터 패널 ─────────────────────────────────────────────────────── */
+.filter-panel {
+  position: absolute; top: 62px; left: 12px; z-index: 40;
+  width: 520px; max-width: calc(100vw - 24px);
+  background: var(--surface); border-radius: 14px; box-shadow: var(--shadow-lg);
+  padding: 16px;
+}
+.filter-panel.hidden { display: none; }
+.fp-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.fp-item { display: flex; flex-direction: column; gap: 4px; }
+.fp-item.fp-wide { grid-column: span 3; }
+.fp-item label { font-size: 11.5px; color: var(--muted); }
+.fp-item select, .fp-range input {
+  height: 32px; border-radius: 8px; border: 1px solid var(--border);
+  background: var(--bg); padding: 0 8px; font-size: 12.5px;
+}
+.fp-range { display: flex; align-items: center; gap: 6px; }
+.fp-range input { flex: 1; min-width: 0; }
+.fp-item.fp-check { justify-content: flex-end; }
+.fp-item.fp-check label {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 12.5px; color: var(--text); cursor: pointer;
+}
+.fp-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
+.fp-actions button {
+  padding: 7px 16px; border-radius: 8px; cursor: pointer; font-size: 12.5px;
+  border: 1px solid var(--border); background: var(--surface);
+}
+.fp-actions button.filled { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+/* ── 대시보드/개발일지 페이지 ───────────────────────────────────────── */
+body.page { overflow: auto; }
+.page-wrap {
+  max-width: 960px; margin: 0 auto; padding: 76px 16px 40px;
+}
+.page-section {
+  background: var(--surface); border-radius: 16px; box-shadow: var(--shadow);
+  padding: 20px; margin-bottom: 16px;
+}
+.page-section h2 { font-size: 16px; font-weight: 800; margin-bottom: 12px; }
+.page-section .desc { color: var(--muted); font-size: 12px; margin: -6px 0 12px; }
+.chart-tall { position: relative; height: 320px; }
+.chip-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+.d-chip {
+  padding: 4px 11px; border-radius: 15px; font-size: 12px; cursor: pointer;
+  border: 1px solid var(--border); background: var(--surface); color: var(--muted);
+}
+.d-chip.on { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+.table-scroll { max-height: 420px; overflow-y: auto; }
+
+/* 개발일지 마크다운 */
+.md-body { line-height: 1.7; font-size: 14px; }
+.md-body h1 { font-size: 20px; margin: 18px 0 10px; }
+.md-body h2 { font-size: 16px; margin: 18px 0 8px; border-bottom: 1px solid var(--border); padding-bottom: 5px; }
+.md-body h3 { font-size: 14px; margin: 14px 0 6px; }
+.md-body ul, .md-body ol { padding-left: 22px; margin: 6px 0; }
+.md-body li { margin: 3px 0; }
+.md-body code { background: var(--bg); border-radius: 4px; padding: 1px 5px; font-size: 12.5px; }
+.md-body table { border-collapse: collapse; margin: 8px 0; }
+.md-body th, .md-body td { border: 1px solid var(--border); padding: 5px 9px; font-size: 12.5px; }
+.md-body blockquote { border-left: 3px solid var(--accent); padding-left: 10px; color: var(--muted); margin: 8px 0; }
+
 /* ── 가격 버블 마커 (호갱노노 스타일) ──────────────────────────────── */
 .price-bubble {
   position: relative; transform: translateY(-6px);

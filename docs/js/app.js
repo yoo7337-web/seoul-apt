@@ -28,6 +28,9 @@
     meta: null, markers: [], map: null,
     overlays: [], selectedId: null, district: "", search: "", area: "",
     dealType: "sale",   // 지도 말풍선 기준: 'sale'(매매) | 'jeonse'(전세)
+    // 상세 필터(8종). null/""/false = 미적용
+    filters: { min: null, max: null, jr: "", drop: "", age: "",
+               hh: "", far: "", n1y: "", peak: false },
     favorites: loadFavorites(), currentDetail: null, chartMode: "sale",
   };
 
@@ -69,6 +72,7 @@
     });
     $("btn-rankings").addEventListener("click", showRankings);
     $("btn-favorites").addEventListener("click", showFavorites);
+    bindFilterUI();
     $("panel-close").addEventListener("click", () => $("panel").classList.add("hidden"));
     $("modal-close").addEventListener("click", () => $("modal").classList.add("hidden"));
     $("modal").addEventListener("click", (e) => {
@@ -145,10 +149,10 @@
     clearOverlays();
 
     // 축소 상태 + 필터 없음 → 구 단위 요약 버블
-    // 구 요약 버블은 매매·전체평형·필터없음일 때만(전세/평형 선택 시 단지 버블로 전환)
+    // 구 요약 버블은 매매·전체평형·필터없음일 때만(전세/평형/상세필터 시 단지 버블로 전환)
     const zoomedOut = state.map.getLevel() >= REGION_LEVEL;
     if (zoomedOut && !state.district && !state.search && !state.area
-        && state.dealType === "sale") {
+        && state.dealType === "sale" && activeFilterCount() === 0) {
       renderRegionBubbles();
       hideNotice();
       return;
@@ -244,11 +248,86 @@
   }
 
   function filteredMarkers() {
+    const f = state.filters;
+    const nowYear = new Date().getFullYear();
     return state.markers.filter((m) => {
       if (state.district && m.lawd_cd !== state.district) return false;
       if (state.search && !m.apt.includes(state.search)) return false;
+
+      // ── 상세 필터 (값 없는 단지는 해당 필터 사용 시 제외) ──
+      if (f.min != null || f.max != null) {
+        const p = markerPrice(m);            // 현재 매매/전세×평형 기준 가격(만원)
+        if (!p) return false;
+        if (f.min != null && p < f.min * 10000) return false;
+        if (f.max != null && p > f.max * 10000) return false;
+      }
+      if (f.jr && !(m.jeonse_ratio >= +f.jr)) return false;
+      if (f.drop && !(m.drop != null && m.drop <= -f.drop)) return false;
+      if (f.peak && !m.is_peak) return false;
+      if (f.age) {
+        if (!m.by) return false;
+        const age = nowYear - m.by;
+        if (f.age === "new5" && age > 5) return false;
+        if (f.age === "new10" && age > 10) return false;
+        if (f.age === "mid" && (age <= 10 || age > 30)) return false;
+        if (f.age === "old30" && age < 30) return false;
+      }
+      if (f.hh && !(m.hh >= +f.hh)) return false;
+      if (f.far && !(m.far && m.far <= +f.far)) return false;
+      if (f.n1y && !(m.n1y >= +f.n1y)) return false;
       return true;
     });
+  }
+
+  function activeFilterCount() {
+    const f = state.filters;
+    let n = 0;
+    if (f.min != null || f.max != null) n++;
+    ["jr", "drop", "age", "hh", "far", "n1y"].forEach((k) => { if (f[k]) n++; });
+    if (f.peak) n++;
+    return n;
+  }
+
+  function bindFilterUI() {
+    const panel = $("filter-panel");
+    $("btn-filter").addEventListener("click", () =>
+      panel.classList.toggle("hidden"));
+    $("f-close").addEventListener("click", () => panel.classList.add("hidden"));
+
+    const onChange = () => {
+      const f = state.filters;
+      f.min = $("f-min").value === "" ? null : +$("f-min").value;
+      f.max = $("f-max").value === "" ? null : +$("f-max").value;
+      f.jr = $("f-jr").value;
+      f.drop = $("f-drop").value ? +$("f-drop").value : "";
+      f.age = $("f-age").value;
+      f.hh = $("f-hh").value;
+      f.far = $("f-far").value;
+      f.n1y = $("f-n1y").value;
+      f.peak = $("f-peak").checked;
+      updateFilterBadge();
+      applyFilters();
+    };
+    ["f-jr", "f-drop", "f-age", "f-hh", "f-far", "f-n1y", "f-peak"].forEach((id) =>
+      $(id).addEventListener("change", onChange));
+    ["f-min", "f-max"].forEach((id) =>
+      $(id).addEventListener("input", debounce(onChange, 400)));
+
+    $("f-reset").addEventListener("click", () => {
+      ["f-min", "f-max"].forEach((id) => { $(id).value = ""; });
+      ["f-jr", "f-drop", "f-age", "f-hh", "f-far", "f-n1y"].forEach((id) => {
+        $(id).value = "";
+      });
+      $("f-peak").checked = false;
+      onChange();
+    });
+  }
+
+  function updateFilterBadge() {
+    const n = activeFilterCount();
+    const el = $("filter-count");
+    el.textContent = n;
+    el.classList.toggle("hidden", n === 0);
   }
 
   function applyFilters() {

@@ -29,10 +29,15 @@ def export_all(conn, kakao_js_key: str | None = None) -> dict:
     export_dir = config.EXPORT_DIR
     markers = []
     district_list = []
+    ppy_trend = {}   # 대시보드용: 구별 월별 평단가(경량)
     totals = {"sale": 0, "rent": 0, "complex": 0}
 
     for lawd_cd, name in config.SEOUL_DISTRICTS.items():
         monthly = aggregate.district_monthly(conn, lawd_cd)
+        ppy_trend[lawd_cd] = [
+            {"m": m["month"], "p": m["ppy_median"]}
+            for m in monthly if m["ppy_median"]
+        ]
         complexes = aggregate.complex_list(conn, lawd_cd)
         recent = aggregate.district_recent_txns(conn, lawd_cd, limit=30)
 
@@ -76,11 +81,24 @@ def export_all(conn, kakao_js_key: str | None = None) -> dict:
                     "jeonse_area": c["jeonse_by_area"],
                     "jeonse_ratio": c["jeonse_ratio"],
                     "is_peak": c["is_peak"],
+                    # 필터용 부가 필드(짧은 키로 용량 절약)
+                    "by": c["build_year"],       # 준공연도
+                    "hh": c["households"],       # 세대수
+                    "far": c["far"],             # 용적률(%)
+                    "n1y": c["sale_1y"],         # 최근 1년 매매 건수
+                    "drop": c["drop_pct"],       # 고점대비 %(음수=하락)
                 })
 
     _write_json(export_dir / "markers.json", {"markers": markers})
     _write_json(export_dir / "reb" / "seoul_index.json",
                 aggregate.reb_series(conn))
+    # 대시보드 전용 데이터(구별 평단가 추이 + 신고가 비중)
+    _write_json(export_dir / "dashboard.json", {
+        "generated": now.isoformat(timespec="seconds"),
+        "ppy_trend": ppy_trend,
+        "peak_share": aggregate.district_peak_share(conn, days=90),
+        "peak_share_days": 90,
+    })
     _write_json(export_dir / "meta.json", {
         "last_updated": now.isoformat(timespec="seconds"),
         "last_updated_display": now.strftime("%Y-%m-%d %H:%M KST"),

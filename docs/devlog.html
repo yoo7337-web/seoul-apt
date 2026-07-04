@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>개발일지 - 서울 아파트 시세 지도</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css?v=5">
+</head>
+<body class="page">
+  <header class="float-bar">
+    <a class="brand-chip nav-link" href="index.html"><span class="logo">🏙️</span><b>서울아파트</b></a>
+    <span class="nav-spacer"></span>
+    <a class="chip-btn nav-link" href="index.html">🗺️ 지도</a>
+    <a class="chip-btn nav-link" href="dashboard.html">📊 대시보드</a>
+    <a class="chip-btn nav-link active" href="devlog.html">📝 개발일지</a>
+  </header>
+
+  <main class="page-wrap">
+    <section class="page-section">
+      <div id="md" class="md-body">불러오는 중…</div>
+    </section>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/marked@12.0.0/marked.min.js"></script>
+  <script>
+    fetch("devlog.md").then(r => r.text()).then(t => {
+      document.getElementById("md").innerHTML = marked.parse(t);
+    }).catch(() => {
+      document.getElementById("md").textContent = "devlog.md 를 불러오지 못했습니다.";
+    });
+  </script>
+</body>
+</html>

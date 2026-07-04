@@ -6,6 +6,7 @@ SQLite 에 median 함수가 없어 그룹 값을 파이썬으로 가져와 통�
 
 import statistics
 from collections import defaultdict
+from datetime import date, timedelta
 
 from . import config
 
@@ -133,6 +134,7 @@ def complex_list(conn, lawd_cd: str) -> list[dict]:
     """구의 단지 목록 - 좌표·대표가·평단가·전세가율·공시가격."""
     complexes = conn.execute(
         "SELECT * FROM complex WHERE lawd_cd=?", (lawd_cd,)).fetchall()
+    year_ago = (date.today() - timedelta(days=365)).isoformat()
     out = []
     for c in complexes:
         cid = c["complex_id"]
@@ -154,6 +156,10 @@ def complex_list(conn, lawd_cd: str) -> list[dict]:
         # 역대 최고가(신고가 하이라이트용)
         peak = max((r["amount_manwon"] for r in recent_sales), default=None)
         last_amount = recent_sales[0]["amount_manwon"] if recent_sales else None
+        # 최근 1년 거래 건수(활발도 필터) + 고점대비 하락률(%)
+        n1y = sum(1 for r in recent_sales if r["deal_date"] >= year_ago)
+        drop_pct = (round((sale_med - peak) / peak * 100, 1)
+                    if peak and sale_med else None)
 
         jeonse_rows = conn.execute(
             "SELECT exclu_area, deposit_manwon FROM rent_txn "
@@ -177,6 +183,10 @@ def complex_list(conn, lawd_cd: str) -> list[dict]:
             "sale_by_area": sale_by_area,
             "ppy_median": round(ppy, 0) if ppy else None,
             "sale_count": len(recent_sales),
+            "sale_1y": n1y,
+            "drop_pct": drop_pct,
+            "households": c["households"],
+            "far": c["far"],
             "last_amount": last_amount,
             "peak_amount": peak,
             "is_peak": bool(last_amount and peak and last_amount >= peak),
@@ -261,6 +271,47 @@ def complex_detail(conn, complex_id: int) -> dict:
         "gongsi": [{"year": g["year"], "area": g["exclu_area"],
                     "price": g["price_manwon"]} for g in gongsi],
     }
+
+
+def district_peak_share(conn, days: int = 90) -> list[dict]:
+    """구별 최근 N일 매매 중 신고가(단지 역대 최고가) 거래 비중(%).
+
+    어느 지역이 최근에 고점을 갱신하며 오르는지 보는 모멘텀 지표.
+    기준일은 DB 최신 계약일(수집 지연 무관). 표본 노이즈를 줄이기 위해
+    누적 거래 3건 미만 단지의 거래는 신고가로 치지 않는다.
+    """
+    anchor = conn.execute(
+        "SELECT MAX(deal_date) AS d FROM sale_txn WHERE canceled=0").fetchone()["d"]
+    if not anchor:
+        return []
+    y, m, d = (int(x) for x in anchor.split("-"))
+    cutoff = (date(y, m, d) - timedelta(days=days)).isoformat()
+
+    rows = conn.execute(
+        """SELECT c.lawd_cd,
+                  COUNT(*) AS total,
+                  SUM(CASE WHEN s.amount_manwon >= cm.mx AND cm.n >= 3
+                      THEN 1 ELSE 0 END) AS peaks
+           FROM sale_txn s
+           JOIN complex c ON s.complex_id = c.complex_id
+           JOIN (SELECT complex_id, MAX(amount_manwon) AS mx, COUNT(*) AS n
+                 FROM sale_txn WHERE canceled=0 GROUP BY complex_id) cm
+             ON cm.complex_id = s.complex_id
+           WHERE s.canceled=0 AND s.deal_date >= ?
+           GROUP BY c.lawd_cd""", (cutoff,)).fetchall()
+
+    out = []
+    for r in rows:
+        total, peaks = r["total"], r["peaks"] or 0
+        out.append({
+            "lawd_cd": r["lawd_cd"],
+            "name": config.SEOUL_DISTRICTS.get(r["lawd_cd"], r["lawd_cd"]),
+            "total": total,
+            "peaks": peaks,
+            "share": round(peaks / total * 100, 1) if total else 0.0,
+        })
+    out.sort(key=lambda x: -x["share"])
+    return out
 
 
 # ── 랭킹 / 부동산원 ──────────────────────────────────────────────────────

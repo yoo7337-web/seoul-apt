@@ -136,6 +136,34 @@ def test_canceled_excluded_from_stats():
     conn.close()
 
 
+def test_complex_list_filter_fields_and_peak_share():
+    """필터용 필드(n1y·drop)와 구별 신고가 비중 산출 검증."""
+    conn = db.connect(":memory:")
+    cid = db.upsert_complex(conn, "11680", "대치동", "은마", 1979, "316")
+    # 과거 거래(1년 밖) 2건 + 최근 거래 3건(마지막이 신고가)
+    db.insert_sale(conn, cid, "2020-01-10", 76.79, 3, 200000)
+    db.insert_sale(conn, cid, "2020-02-10", 76.79, 5, 210000)
+    from datetime import date, timedelta
+    recent = [(date.today() - timedelta(days=10 * i)).isoformat() for i in (3, 2, 1)]
+    db.insert_sale(conn, cid, recent[0], 76.79, 7, 250000)
+    db.insert_sale(conn, cid, recent[1], 76.79, 9, 260000)
+    db.insert_sale(conn, cid, recent[2], 76.79, 11, 300000)   # 역대 최고가
+    conn.commit()
+
+    cx = aggregate.complex_list(conn, "11680")[0]
+    assert cx["sale_1y"] == 3                     # 최근 1년 거래만 카운트
+    assert cx["households"] is None               # 건축물대장 미수집 상태
+    # 고점(300000) 대비 중앙값 하락률(음수)
+    assert cx["drop_pct"] is not None and cx["drop_pct"] < 0
+
+    ps = aggregate.district_peak_share(conn, days=90)
+    gang = next(p for p in ps if p["lawd_cd"] == "11680")
+    assert gang["total"] == 3                     # 최근 90일 거래 3건
+    assert gang["peaks"] == 1                     # 그중 신고가 1건
+    assert gang["share"] == round(1 / 3 * 100, 1)
+    conn.close()
+
+
 def test_upsert_updates_cancel_status():
     """같은 거래가 나중에 해제로 재수집되면 canceled 가 갱신되어야 한다."""
     conn = db.connect(":memory:")

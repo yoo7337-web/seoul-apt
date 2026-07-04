@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>대시보드 - 서울 아파트 시세 지도</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css?v=5">
+</head>
+<body class="page">
+  <header class="float-bar">
+    <a class="brand-chip nav-link" href="index.html"><span class="logo">🏙️</span><b>서울아파트</b></a>
+    <span class="nav-spacer"></span>
+    <a class="chip-btn nav-link" href="index.html">🗺️ 지도</a>
+    <a class="chip-btn nav-link active" href="dashboard.html">📊 대시보드</a>
+    <a class="chip-btn nav-link" href="devlog.html">📝 개발일지</a>
+  </header>
+
+  <main class="page-wrap">
+    <section class="page-section">
+      <h2>구별 평단가 랭킹</h2>
+      <div class="desc" id="rank-desc">최근 표본 충분월 기준 · 만원/평</div>
+      <div class="table-scroll" id="rank-table-wrap"></div>
+    </section>
+
+    <section class="page-section">
+      <h2>구별 평단가 추이</h2>
+      <div class="desc">월별 매매 평단가 중앙값(만원/평) · 칩을 눌러 구를 켜고 끄세요</div>
+      <div class="chip-row" id="trend-chips"></div>
+      <div class="chart-tall"><canvas id="trend-chart"></canvas></div>
+    </section>
+
+    <section class="page-section">
+      <h2>신축 → 구축 단지 보기</h2>
+      <div class="desc">준공연도 내림차순 · 구를 선택하세요</div>
+      <select id="no-district" class="chip-select" style="margin-bottom:10px"></select>
+      <div class="table-scroll" id="no-table-wrap"></div>
+    </section>
+
+    <section class="page-section">
+      <h2>지역별 신고가 비중 <span id="ps-days" style="font-weight:400;font-size:12px;color:var(--muted)"></span></h2>
+      <div class="desc">최근 거래 중 단지 역대 최고가 갱신 비율 — 높을수록 최근 상승세가 강한 지역</div>
+      <div class="chart-tall" style="height:560px"><canvas id="peak-chart"></canvas></div>
+    </section>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="js/charts.js?v=4"></script>
+  <script src="js/dashboard.js?v=1"></script>
+</body>
+</html>

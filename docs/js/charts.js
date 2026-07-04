@@ -27,6 +27,7 @@
       })) },
       options: {
         responsive: true, maintainAspectRatio: false,
+        animation: false,   // 백그라운드 탭/캡처에서 rAF 정지로 빈 캔버스가 되는 것 방지
         interaction: { mode: "index", intersect: false },
         plugins: {
           legend: { labels: { color: themeColor(), font: { size: 11 }, boxWidth: 12 } },
@@ -44,11 +45,43 @@
     });
   }
 
+  function bar(canvasId, labels, values, opts = {}) {
+    destroy(canvasId);
+    const ctx = document.getElementById(canvasId);
+    if (!ctx) return;
+    const color = opts.color || "#ff7e00";
+    charts[canvasId] = new Chart(ctx, {
+      type: "bar",
+      data: { labels, datasets: [{
+        label: opts.label || "", data: values,
+        backgroundColor: color + "cc", borderColor: color,
+        borderWidth: 1, borderRadius: 4,
+      }] },
+      options: {
+        indexAxis: opts.horizontal ? "y" : "x",
+        responsive: true, maintainAspectRatio: false,
+        animation: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: { callbacks: {
+            label: (c) => `${opts.label || ""} ${c.parsed[opts.horizontal ? "x" : "y"]}${opts.unit || ""}`,
+          } },
+        },
+        scales: {
+          x: { ticks: { color: themeColor(), font: { size: 10 } },
+               grid: { color: opts.horizontal ? themeColor() + "22" : "transparent" } },
+          y: { ticks: { color: themeColor(), font: { size: 10 } },
+               grid: { color: opts.horizontal ? "transparent" : themeColor() + "22" } },
+        },
+      },
+    });
+  }
+
   function fmt(v) {
     if (v == null) return "-";
     if (v >= 10000) return (v / 10000).toFixed(1).replace(/\.0$/, "") + "억";
     return Math.round(v).toLocaleString();
   }
 
-  global.SeoulCharts = { line, destroy, palette, fmt };
+  global.SeoulCharts = { line, bar, destroy, palette, fmt };
 })(window);
