@@ -27,19 +27,20 @@ def _month(deal_date: str) -> str:
 AREA_MARKER_RECENT = 30
 
 
-def _sale_by_area(sale_rows: list) -> dict:
+def _amount_by_area(rows: list, amount_key: str) -> dict:
     """전용면적 버킷별 최근 거래 중앙값(만원). 거래 있는 버킷만 포함.
 
-    sale_rows 는 canceled=0, deal_date DESC 로 정렬돼 있다고 가정.
+    rows 는 deal_date DESC 로 정렬돼 있다고 가정(매매는 canceled=0).
     각 버킷의 최근 AREA_MARKER_RECENT 건만 취해 중앙값을 낸다.
+    amount_key: 매매는 'amount_manwon', 전세는 'deposit_manwon'.
     """
     by_bucket: dict[str, list] = defaultdict(list)
-    for r in sale_rows:
+    for r in rows:
         if r["exclu_area"] is None:
             continue
         b = config.area_bucket(r["exclu_area"])
         if len(by_bucket[b]) < AREA_MARKER_RECENT:
-            by_bucket[b].append(r["amount_manwon"])
+            by_bucket[b].append(r[amount_key])
     out = {}
     for b, amounts in by_bucket.items():
         m = _median(amounts)
@@ -149,16 +150,17 @@ def complex_list(conn, lawd_cd: str) -> list[dict]:
         ppy = _median([r["amount_manwon"] / _pyeong(r["exclu_area"])
                        for r in recent if r["exclu_area"]])
         # 평형(전용면적 버킷)별 최근 거래 중앙값 - 지도에서 평형 선택 시 사용
-        sale_by_area = _sale_by_area(recent_sales)
+        sale_by_area = _amount_by_area(recent_sales, "amount_manwon")
         # 역대 최고가(신고가 하이라이트용)
         peak = max((r["amount_manwon"] for r in recent_sales), default=None)
         last_amount = recent_sales[0]["amount_manwon"] if recent_sales else None
 
         jeonse_rows = conn.execute(
-            "SELECT deposit_manwon FROM rent_txn "
+            "SELECT exclu_area, deposit_manwon FROM rent_txn "
             "WHERE complex_id=? AND rent_type='jeonse' "
-            "ORDER BY deal_date DESC LIMIT 30", (cid,)).fetchall()
-        jeonse_med = _median([r["deposit_manwon"] for r in jeonse_rows])
+            "ORDER BY deal_date DESC", (cid,)).fetchall()
+        jeonse_med = _median([r["deposit_manwon"] for r in jeonse_rows[:30]])
+        jeonse_by_area = _amount_by_area(jeonse_rows, "deposit_manwon")
 
         gongsi = conn.execute(
             "SELECT year, price_manwon FROM gongsi_price "
@@ -179,6 +181,7 @@ def complex_list(conn, lawd_cd: str) -> list[dict]:
             "peak_amount": peak,
             "is_peak": bool(last_amount and peak and last_amount >= peak),
             "jeonse_median": jeonse_med,
+            "jeonse_by_area": jeonse_by_area,
             "jeonse_ratio": round(jeonse_med / sale_med * 100, 1)
             if jeonse_med and sale_med else None,
             "gongsi_price": gongsi["price_manwon"] if gongsi else None,

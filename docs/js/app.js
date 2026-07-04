@@ -27,6 +27,7 @@
   const state = {
     meta: null, markers: [], map: null,
     overlays: [], selectedId: null, district: "", search: "", area: "",
+    dealType: "sale",   // 지도 말풍선 기준: 'sale'(매매) | 'jeonse'(전세)
     favorites: loadFavorites(), currentDetail: null, chartMode: "sale",
   };
 
@@ -57,6 +58,10 @@
     $("search-input").addEventListener("input", debounce((e) => {
       state.search = e.target.value.trim(); applyFilters();
     }, 250));
+    $("deal-type").addEventListener("change", (e) => {
+      state.dealType = e.target.value;      // 매매/전세 → 지도 말풍선 가격 전환
+      applyFilters();
+    });
     $("area-filter").addEventListener("change", (e) => {
       state.area = e.target.value;
       applyFilters();                       // 지도 말풍선을 선택 평형 가격으로 갱신
@@ -140,8 +145,10 @@
     clearOverlays();
 
     // 축소 상태 + 필터 없음 → 구 단위 요약 버블
+    // 구 요약 버블은 매매·전체평형·필터없음일 때만(전세/평형 선택 시 단지 버블로 전환)
     const zoomedOut = state.map.getLevel() >= REGION_LEVEL;
-    if (zoomedOut && !state.district && !state.search && !state.area) {
+    if (zoomedOut && !state.district && !state.search && !state.area
+        && state.dealType === "sale") {
       renderRegionBubbles();
       hideNotice();
       return;
@@ -169,7 +176,7 @@
   function makeBubble(mk) {
     const el = document.createElement("div");
     el.className = "price-bubble"
-      + (mk.is_peak ? " peak" : "")
+      + (mk.is_peak && state.dealType === "sale" ? " peak" : "")
       + (mk.id === state.selectedId ? " selected" : "");
     el.innerHTML =
       `<div class="pb-price">${bubblePrice(markerPrice(mk))}</div>` +
@@ -211,10 +218,12 @@
     });
   }
 
-  // 선택된 평형이 있으면 그 평형대 최근 거래 중앙값, 없으면 전 면적 중앙값
+  // 거래유형(매매/전세) + 선택 평형에 따른 말풍선 가격
   function markerPrice(mk) {
-    if (state.area) return mk.sale_area ? mk.sale_area[state.area] : null;
-    return mk.sale;
+    if (state.dealType === "jeonse") {
+      return state.area ? (mk.jeonse_area ? mk.jeonse_area[state.area] : null) : mk.jeonse;
+    }
+    return state.area ? (mk.sale_area ? mk.sale_area[state.area] : null) : mk.sale;
   }
 
   function bubblePrice(manwon) {

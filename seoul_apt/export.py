@@ -72,6 +72,8 @@ def export_all(conn, kakao_js_key: str | None = None) -> dict:
                     "lat": c["lat"], "lon": c["lon"],
                     "ppy": c["ppy_median"], "sale": c["sale_median"],
                     "sale_area": c["sale_by_area"],
+                    "jeonse": c["jeonse_median"],
+                    "jeonse_area": c["jeonse_by_area"],
                     "jeonse_ratio": c["jeonse_ratio"],
                     "is_peak": c["is_peak"],
                 })
