@@ -1,1 +1,1 @@
-{"sale_series":{"60~85㎡":[{"month":"2026-02","median":110000,"count":1}]},"jeonse_series":{"60~85㎡":[{"month":"2026-04","median":59000,"count":1}]},"recent_sales":[{"date":"2026-02-21","area":81.26,"floor":2,"amount":110000}],"gongsi":[],"id":73524,"apt":"목동노블레스","lawd_cd":"11470"}
+{"sale_series":{"60~85㎡":[{"month":"2026-02","median":110000,"count":1}]},"jeonse_series":{"60~85㎡":[{"month":"2026-04","median":59000,"count":1}]},"recent_sales":[{"date":"2026-02-21","area":81.26,"floor":2,"amount":110000,"canceled":0}],"gongsi":[],"id":73524,"apt":"목동노블레스","lawd_cd":"11470"}

@@ -1,1 +1,1 @@
-{"sale_series":{"60~85㎡":[{"month":"2026-04","median":66300,"count":1}]},"jeonse_series":{"60~85㎡":[{"month":"2026-03","median":33850.0,"count":4}]},"recent_sales":[{"date":"2026-04-10","area":79.52,"floor":5,"amount":66300}],"gongsi":[],"id":56762,"apt":"녹번현대아파트","lawd_cd":"11380"}
+{"sale_series":{"60~85㎡":[{"month":"2026-04","median":66300,"count":1}]},"jeonse_series":{"60~85㎡":[{"month":"2026-03","median":33850.0,"count":4}]},"recent_sales":[{"date":"2026-04-10","area":79.52,"floor":5,"amount":66300,"canceled":0}],"gongsi":[],"id":56762,"apt":"녹번현대아파트","lawd_cd":"11380"}

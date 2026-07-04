@@ -1,1 +1,1 @@
-{"sale_series":{"60~85㎡":[{"month":"2026-03","median":59500,"count":1}]},"jeonse_series":{"60~85㎡":[{"month":"2026-05","median":46200,"count":1}]},"recent_sales":[{"date":"2026-03-03","area":84.973,"floor":11,"amount":59500}],"gongsi":[],"id":90331,"apt":"SR친오애","lawd_cd":"11530"}
+{"sale_series":{"60~85㎡":[{"month":"2026-03","median":59500,"count":1}]},"jeonse_series":{"60~85㎡":[{"month":"2026-05","median":46200,"count":1}]},"recent_sales":[{"date":"2026-03-03","area":84.973,"floor":11,"amount":59500,"canceled":0}],"gongsi":[],"id":90331,"apt":"SR친오애","lawd_cd":"11530"}

@@ -1,1 +1,1 @@
-{"sale_series":{"~60㎡":[{"month":"2026-03","median":60000,"count":1}]},"jeonse_series":{},"recent_sales":[{"date":"2026-03-25","area":58.11,"floor":15,"amount":60000}],"gongsi":[],"id":23050,"apt":"신도2","lawd_cd":"11260"}
+{"sale_series":{"~60㎡":[{"month":"2026-03","median":60000,"count":1}]},"jeonse_series":{},"recent_sales":[{"date":"2026-03-25","area":58.11,"floor":15,"amount":60000,"canceled":0}],"gongsi":[],"id":23050,"apt":"신도2","lawd_cd":"11260"}

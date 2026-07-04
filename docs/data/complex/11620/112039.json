@@ -1,1 +1,1 @@
-{"sale_series":{"60~85㎡":[{"month":"2026-06","median":77000,"count":1}]},"jeonse_series":{"60~85㎡":[{"month":"2026-03","median":49000,"count":1}]},"recent_sales":[{"date":"2026-06-30","area":81.12,"floor":1,"amount":77000}],"gongsi":[],"id":112039,"apt":"뉴그린아파트","lawd_cd":"11620"}
+{"sale_series":{"60~85㎡":[{"month":"2026-06","median":77000,"count":1}]},"jeonse_series":{"60~85㎡":[{"month":"2026-03","median":49000,"count":1}]},"recent_sales":[{"date":"2026-06-30","area":81.12,"floor":1,"amount":77000,"canceled":0}],"gongsi":[],"id":112039,"apt":"뉴그린아파트","lawd_cd":"11620"}

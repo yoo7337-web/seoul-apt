@@ -1,1 +1,1 @@
-{"sale_series":{"~60㎡":[{"month":"2026-03","median":18000,"count":1}]},"jeonse_series":{"~60㎡":[{"month":"2026-06","median":19000,"count":1}]},"recent_sales":[{"date":"2026-03-07","area":13.01,"floor":17,"amount":18000}],"gongsi":[],"id":4664,"apt":"용산큐브","lawd_cd":"11170"}
+{"sale_series":{"~60㎡":[{"month":"2026-03","median":18000,"count":1}]},"jeonse_series":{"~60㎡":[{"month":"2026-06","median":19000,"count":1}]},"recent_sales":[{"date":"2026-03-07","area":13.01,"floor":17,"amount":18000,"canceled":0}],"gongsi":[],"id":4664,"apt":"용산큐브","lawd_cd":"11170"}

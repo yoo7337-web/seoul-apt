@@ -1,1 +1,1 @@
-{"sale_series":{"~60㎡":[{"month":"2026-04","median":50000,"count":1}]},"jeonse_series":{"~60㎡":[{"month":"2026-04","median":23940,"count":3}]},"recent_sales":[{"date":"2026-04-08","area":19.83,"floor":6,"amount":50000}],"gongsi":[],"id":6340,"apt":"G&D용산드림","lawd_cd":"11170"}
+{"sale_series":{"~60㎡":[{"month":"2026-04","median":50000,"count":1}]},"jeonse_series":{"~60㎡":[{"month":"2026-04","median":23940,"count":3}]},"recent_sales":[{"date":"2026-04-08","area":19.83,"floor":6,"amount":50000,"canceled":0}],"gongsi":[],"id":6340,"apt":"G&D용산드림","lawd_cd":"11170"}

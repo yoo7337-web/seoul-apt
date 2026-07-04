@@ -1,1 +1,1 @@
-{"sale_series":{"60~85㎡":[{"month":"2026-06","median":303000,"count":1}]},"jeonse_series":{"60~85㎡":[{"month":"2026-03","median":51750.0,"count":2}]},"recent_sales":[{"date":"2026-06-13","area":81.8,"floor":14,"amount":303000}],"gongsi":[],"id":10573,"apt":"강변현대","lawd_cd":"11200"}
+{"sale_series":{"60~85㎡":[{"month":"2026-06","median":303000,"count":1}]},"jeonse_series":{"60~85㎡":[{"month":"2026-03","median":51750.0,"count":2}]},"recent_sales":[{"date":"2026-06-13","area":81.8,"floor":14,"amount":303000,"canceled":0}],"gongsi":[],"id":10573,"apt":"강변현대","lawd_cd":"11200"}

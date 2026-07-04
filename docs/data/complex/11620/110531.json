@@ -1,1 +1,1 @@
-{"sale_series":{"85~135㎡":[{"month":"2026-03","median":60000,"count":1}]},"jeonse_series":{"135㎡~":[{"month":"2026-01","median":55000,"count":1}]},"recent_sales":[{"date":"2026-03-23","area":92.11,"floor":5,"amount":60000}],"gongsi":[],"id":110531,"apt":"은선파인빌","lawd_cd":"11620"}
+{"sale_series":{"85~135㎡":[{"month":"2026-03","median":60000,"count":1}]},"jeonse_series":{"135㎡~":[{"month":"2026-01","median":55000,"count":1}]},"recent_sales":[{"date":"2026-03-23","area":92.11,"floor":5,"amount":60000,"canceled":0}],"gongsi":[],"id":110531,"apt":"은선파인빌","lawd_cd":"11620"}

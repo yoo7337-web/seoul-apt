@@ -1,1 +1,1 @@
-{"sale_series":{"~60㎡":[{"month":"2026-05","median":18200,"count":1}]},"jeonse_series":{"~60㎡":[{"month":"2026-04","median":18000,"count":1}]},"recent_sales":[{"date":"2026-05-16","area":14.02,"floor":16,"amount":18200}],"gongsi":[],"id":28558,"apt":"시티플레이스","lawd_cd":"11290"}
+{"sale_series":{},"jeonse_series":{"~60㎡":[{"month":"2026-04","median":18000,"count":1}]},"recent_sales":[{"date":"2026-05-16","area":14.02,"floor":16,"amount":18200,"canceled":1}],"gongsi":[],"id":28558,"apt":"시티플레이스","lawd_cd":"11290"}

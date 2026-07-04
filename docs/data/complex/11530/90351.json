@@ -1,1 +1,1 @@
-{"sale_series":{"60~85㎡":[{"month":"2026-04","median":40000,"count":1}]},"jeonse_series":{"60~85㎡":[{"month":"2026-03","median":32250.0,"count":2}]},"recent_sales":[{"date":"2026-04-21","area":84.87,"floor":5,"amount":40000}],"gongsi":[],"id":90351,"apt":"동보수목원","lawd_cd":"11530"}
+{"sale_series":{"60~85㎡":[{"month":"2026-04","median":40000,"count":1}]},"jeonse_series":{"60~85㎡":[{"month":"2026-03","median":32250.0,"count":2}]},"recent_sales":[{"date":"2026-04-21","area":84.87,"floor":5,"amount":40000,"canceled":0}],"gongsi":[],"id":90351,"apt":"동보수목원","lawd_cd":"11530"}

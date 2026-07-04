@@ -1,1 +1,1 @@
-{"sale_series":{"60~85㎡":[{"month":"2026-05","median":62000,"count":1}]},"jeonse_series":{"60~85㎡":[{"month":"2026-02","median":47250,"count":1}]},"recent_sales":[{"date":"2026-05-20","area":84.42,"floor":8,"amount":62000}],"gongsi":[],"id":81395,"apt":"한림리첸빌101동","lawd_cd":"11500"}
+{"sale_series":{"60~85㎡":[{"month":"2026-05","median":62000,"count":1}]},"jeonse_series":{"60~85㎡":[{"month":"2026-02","median":47250,"count":1}]},"recent_sales":[{"date":"2026-05-20","area":84.42,"floor":8,"amount":62000,"canceled":0}],"gongsi":[],"id":81395,"apt":"한림리첸빌101동","lawd_cd":"11500"}

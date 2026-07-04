@@ -4,9 +4,29 @@
 
   const DATA = "data/";
   const SEOUL_CENTER = { lat: 37.5665, lng: 126.978 };
+  const BUBBLE_CAP = 250;            // 화면에 동시에 그릴 최대 단지 버블 수
+  const REGION_LEVEL = 7;            // 이 레벨 이상(축소)이면 구 단위 버블 표시
+
+  // 자치구 중심 좌표(구청 기준) - 저줌 지역 버블용
+  const DISTRICT_CENTERS = {
+    "11110": [37.5735, 126.9790], "11140": [37.5641, 126.9979],
+    "11170": [37.5324, 126.9908], "11200": [37.5634, 127.0369],
+    "11215": [37.5385, 127.0823], "11230": [37.5744, 127.0396],
+    "11260": [37.6063, 127.0925], "11290": [37.5894, 127.0167],
+    "11305": [37.6396, 127.0257], "11320": [37.6688, 127.0472],
+    "11350": [37.6542, 127.0568], "11380": [37.6027, 126.9291],
+    "11410": [37.5791, 126.9368], "11440": [37.5663, 126.9014],
+    "11470": [37.5170, 126.8666], "11500": [37.5510, 126.8495],
+    "11530": [37.4954, 126.8874], "11545": [37.4568, 126.8955],
+    "11560": [37.5264, 126.8963], "11590": [37.5124, 126.9393],
+    "11620": [37.4784, 126.9516], "11650": [37.4837, 127.0324],
+    "11680": [37.5172, 127.0473], "11710": [37.5145, 127.1060],
+    "11740": [37.5301, 127.1238],
+  };
+
   const state = {
-    meta: null, markers: [], map: null, clusterer: null,
-    kakaoMarkers: [], district: "", search: "", area: "",
+    meta: null, markers: [], map: null,
+    overlays: [], selectedId: null, district: "", search: "", area: "",
     favorites: loadFavorites(), currentDetail: null, chartMode: "sale",
   };
 
@@ -81,19 +101,13 @@
     } catch {
       state.markers = [];
     }
-    if (!state.markers.length) {
-      showNotice("아직 수집된 데이터가 없습니다",
-        "수집기(collect→geocode→export)를 실행하면 단지 마커가 표시됩니다.");
-      return;
-    }
-    hideNotice();
-    renderMarkers();
+    renderMarkers();   // 마커가 없어도 구 단위 버블(meta 기반)은 표시
   }
 
   // ── 카카오 지도 ─────────────────────────────────────────────────────
   function loadKakao(cb) {
     const s = document.createElement("script");
-    s.src = "https://dapi.kakao.com/v2/maps/sdk.js?autoload=false&libraries=clusterer&appkey="
+    s.src = "https://dapi.kakao.com/v2/maps/sdk.js?autoload=false&appkey="
       + window.KAKAO_JS_KEY;
     s.onload = () => kakao.maps.load(cb);
     s.onerror = () => showNotice("지도를 불러오지 못했습니다",
@@ -106,33 +120,107 @@
       center: new kakao.maps.LatLng(SEOUL_CENTER.lat, SEOUL_CENTER.lng),
       level: 8,
     });
-    state.clusterer = new kakao.maps.MarkerClusterer({
-      map: state.map, averageCenter: true, minLevel: 6, gridSize: 70,
-    });
+    // 이동/줌이 끝날 때마다 화면 안 버블만 다시 그린다
+    kakao.maps.event.addListener(state.map, "idle", renderMarkers);
+  }
+
+  // ── 가격 버블 렌더링 (호갱노노 스타일 커스텀 오버레이) ──────────────
+  function clearOverlays() {
+    state.overlays.forEach((o) => o.setMap(null));
+    state.overlays = [];
   }
 
   function renderMarkers() {
-    if (!state.clusterer) return;
-    state.clusterer.clear();
-    state.kakaoMarkers.forEach((m) => m.setMap(null));
-    state.kakaoMarkers = [];
+    if (!state.map) return;
+    clearOverlays();
 
-    const visible = filteredMarkers();
-    const kmarkers = visible.map((mk) => {
-      const marker = new kakao.maps.Marker({
-        position: new kakao.maps.LatLng(mk.lat, mk.lon),
-        title: mk.apt,
-      });
-      kakao.maps.event.addListener(marker, "click", () => openComplex(mk));
-      return marker;
-    });
-    state.kakaoMarkers = kmarkers;
-    state.clusterer.addMarkers(kmarkers);
-    if (!visible.length) {
+    // 축소 상태 + 필터 없음 → 구 단위 요약 버블
+    const zoomedOut = state.map.getLevel() >= REGION_LEVEL;
+    if (zoomedOut && !state.district && !state.search) {
+      renderRegionBubbles();
+      hideNotice();
+      return;
+    }
+
+    const bounds = state.map.getBounds();
+    let visible = filteredMarkers().filter((m) =>
+      bounds.contain(new kakao.maps.LatLng(m.lat, m.lon)));
+    if (visible.length > BUBBLE_CAP) {
+      visible = visible.slice()
+        .sort((a, b) => (b.sale || 0) - (a.sale || 0)).slice(0, BUBBLE_CAP);
+    }
+    visible.forEach((mk) => state.overlays.push(makeBubble(mk)));
+
+    if (!visible.length && state.markers.length) {
       showNotice("조건에 맞는 단지가 없습니다", "검색어나 필터를 조정해 보세요.");
+    } else if (!state.markers.length) {
+      showNotice("아직 단지 좌표가 없습니다",
+        "수집기(collect→geocode→export)를 실행하면 단지 버블이 표시됩니다.");
     } else {
       hideNotice();
     }
+  }
+
+  function makeBubble(mk) {
+    const el = document.createElement("div");
+    el.className = "price-bubble"
+      + (mk.is_peak ? " peak" : "")
+      + (mk.id === state.selectedId ? " selected" : "");
+    el.innerHTML =
+      `<div class="pb-price">${bubblePrice(mk.sale)}</div>` +
+      `<div class="pb-name">${escapeHtml(mk.apt)}</div>`;
+    el.addEventListener("click", () => {
+      state.selectedId = mk.id;
+      openComplex(mk);
+      renderMarkers();
+    });
+    const ov = new kakao.maps.CustomOverlay({
+      position: new kakao.maps.LatLng(mk.lat, mk.lon),
+      content: el, yAnchor: 1, clickable: true,
+    });
+    ov.setMap(state.map);
+    return ov;
+  }
+
+  function renderRegionBubbles() {
+    const list = (state.meta && state.meta.districts) || [];
+    list.forEach((d) => {
+      const c = DISTRICT_CENTERS[d.lawd_cd];
+      if (!c) return;
+      const el = document.createElement("div");
+      el.className = "region-bubble";
+      el.innerHTML =
+        `<div class="rb-name">${d.name}</div>` +
+        `<div class="rb-ppy">${d.ppy_median ? Math.round(d.ppy_median).toLocaleString() : "-"}</div>` +
+        `<div class="rb-unit">만원/평</div>`;
+      el.addEventListener("click", () => {
+        state.map.setLevel(5);
+        state.map.setCenter(new kakao.maps.LatLng(c[0], c[1]));
+      });
+      const ov = new kakao.maps.CustomOverlay({
+        position: new kakao.maps.LatLng(c[0], c[1]),
+        content: el, yAnchor: .5, clickable: true,
+      });
+      ov.setMap(state.map);
+      state.overlays.push(ov);
+    });
+  }
+
+  function bubblePrice(manwon) {
+    if (!manwon) return "-";
+    if (manwon >= 10000) {
+      const eok = manwon / 10000;
+      const s = eok >= 100 ? Math.round(eok).toString()
+        : (Math.round(eok * 10) / 10).toString();
+      return s.replace(/\.0$/, "") + "억";
+    }
+    return manwon.toLocaleString() + "만";
+  }
+
+  function escapeHtml(s) {
+    return String(s || "").replace(/[&<>"']/g, (ch) => ({
+      "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+    }[ch]));
   }
 
   function filteredMarkers() {
@@ -230,7 +318,7 @@
     const months = new Set();
     buckets.forEach((b) => series[b].forEach((p) => months.add(p.month)));
     const labels = [...months].sort();
-    const colors = ["#2563eb", "#10b981", "#f59e0b", "#a855f7"];
+    const colors = ["#ff7e00", "#2563eb", "#10b981", "#a855f7"];
     const datasets = buckets.map((b, i) => ({
       label: b, color: colors[i % colors.length],
       data: labels.map((m) => {
@@ -342,7 +430,7 @@
     try { reb = await fetchJSON(DATA + "reb/seoul_index.json"); } catch { return; }
     const stats = Object.keys(reb || {});
     if (!stats.length || !window.SeoulCharts) return;
-    const colors = ["#ef4444", "#2563eb"];
+    const colors = ["#ff7e00", "#2563eb"];
     let labels = [];
     const datasets = [];
     stats.forEach((stat, i) => {

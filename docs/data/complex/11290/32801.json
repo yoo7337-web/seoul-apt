@@ -1,1 +1,1 @@
-{"sale_series":{"60~85㎡":[{"month":"2026-05","median":65000,"count":1}]},"jeonse_series":{"60~85㎡":[{"month":"2026-06","median":49000,"count":1}]},"recent_sales":[{"date":"2026-05-11","area":68.03,"floor":9,"amount":65000}],"gongsi":[],"id":32801,"apt":"한양수자인","lawd_cd":"11290"}
+{"sale_series":{"60~85㎡":[{"month":"2026-05","median":65000,"count":1}]},"jeonse_series":{"60~85㎡":[{"month":"2026-06","median":49000,"count":1}]},"recent_sales":[{"date":"2026-05-11","area":68.03,"floor":9,"amount":65000,"canceled":0}],"gongsi":[],"id":32801,"apt":"한양수자인","lawd_cd":"11290"}

@@ -1,1 +1,1 @@
-{"sale_series":{"60~85㎡":[{"month":"2026-03","median":69300,"count":1}]},"jeonse_series":{"60~85㎡":[{"month":"2026-02","median":56500,"count":1}]},"recent_sales":[{"date":"2026-03-29","area":84.8729,"floor":8,"amount":69300}],"gongsi":[],"id":81161,"apt":"청솔해오름","lawd_cd":"11500"}
+{"sale_series":{"60~85㎡":[{"month":"2026-03","median":69300,"count":1}]},"jeonse_series":{"60~85㎡":[{"month":"2026-02","median":56500,"count":1}]},"recent_sales":[{"date":"2026-03-29","area":84.8729,"floor":8,"amount":69300,"canceled":0}],"gongsi":[],"id":81161,"apt":"청솔해오름","lawd_cd":"11500"}

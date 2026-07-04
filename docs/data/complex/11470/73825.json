@@ -1,1 +1,1 @@
-{"sale_series":{"~60㎡":[{"month":"2026-03","median":32000,"count":1}]},"jeonse_series":{"~60㎡":[{"month":"2026-02","median":20000,"count":1}]},"recent_sales":[{"date":"2026-03-25","area":45.66,"floor":2,"amount":32000}],"gongsi":[],"id":73825,"apt":"양천홈타운2차아파트","lawd_cd":"11470"}
+{"sale_series":{"~60㎡":[{"month":"2026-03","median":32000,"count":1}]},"jeonse_series":{"~60㎡":[{"month":"2026-02","median":20000,"count":1}]},"recent_sales":[{"date":"2026-03-25","area":45.66,"floor":2,"amount":32000,"canceled":0}],"gongsi":[],"id":73825,"apt":"양천홈타운2차아파트","lawd_cd":"11470"}

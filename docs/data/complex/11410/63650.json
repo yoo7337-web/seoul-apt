@@ -1,1 +1,1 @@
-{"sale_series":{"60~85㎡":[{"month":"2026-04","median":105000,"count":1}]},"jeonse_series":{"60~85㎡":[{"month":"2026-04","median":28000,"count":1}]},"recent_sales":[{"date":"2026-04-13","area":84.42,"floor":2,"amount":105000}],"gongsi":[],"id":63650,"apt":"우공팰리스","lawd_cd":"11410"}
+{"sale_series":{"60~85㎡":[{"month":"2026-04","median":105000,"count":1}]},"jeonse_series":{"60~85㎡":[{"month":"2026-04","median":28000,"count":1}]},"recent_sales":[{"date":"2026-04-13","area":84.42,"floor":2,"amount":105000,"canceled":0}],"gongsi":[],"id":63650,"apt":"우공팰리스","lawd_cd":"11410"}

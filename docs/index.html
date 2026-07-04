@@ -4,44 +4,46 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>서울 아파트 시세 지도</title>
-  <link rel="stylesheet" href="css/style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css?v=2">
 </head>
 <body>
-  <header class="topbar">
-    <div class="brand">
-      <span class="logo">🏙️</span>
-      <h1>서울 아파트 시세 지도</h1>
-    </div>
-    <div class="topbar-controls">
-      <select id="district-select" title="자치구 선택">
-        <option value="">전체 서울</option>
-      </select>
+  <!-- 풀스크린 지도 -->
+  <div id="map"></div>
+
+  <!-- 플로팅 상단 컨트롤 (호갱노노 스타일) -->
+  <header class="float-bar">
+    <div class="brand-chip"><span class="logo">🏙️</span><b>서울아파트</b></div>
+    <div class="search-box">
+      <span class="s-icon">🔍</span>
       <input id="search-input" type="search" placeholder="단지명 검색" autocomplete="off">
-      <select id="area-filter" title="평형(전용면적) 필터">
-        <option value="">전체 평형</option>
-        <option value="~60㎡">~60㎡</option>
-        <option value="60~85㎡">60~85㎡</option>
-        <option value="85~135㎡">85~135㎡</option>
-        <option value="135㎡~">135㎡~</option>
-      </select>
-      <button id="btn-rankings" class="ghost">구별 랭킹</button>
-      <button id="btn-favorites" class="ghost">관심단지 <span id="fav-count">0</span></button>
     </div>
-    <div class="updated" id="updated-label">데이터 기준일: —</div>
+    <select id="district-select" class="chip-select" title="자치구 선택">
+      <option value="">전체 서울</option>
+    </select>
+    <select id="area-filter" class="chip-select" title="평형(전용면적) 필터">
+      <option value="">전체 평형</option>
+      <option value="~60㎡">~60㎡</option>
+      <option value="60~85㎡">60~85㎡</option>
+      <option value="85~135㎡">85~135㎡</option>
+      <option value="135㎡~">135㎡~</option>
+    </select>
+    <button id="btn-rankings" class="chip-btn">구별 랭킹</button>
+    <button id="btn-favorites" class="chip-btn">★ 관심단지 <span id="fav-count" class="count">0</span></button>
   </header>
 
-  <main class="layout">
-    <div id="map"></div>
+  <div class="updated" id="updated-label">데이터 기준일: —</div>
 
-    <aside id="panel" class="panel hidden">
-      <button class="panel-close" id="panel-close">✕</button>
-      <div id="panel-content"></div>
-    </aside>
+  <!-- 단지 상세 패널 -->
+  <aside id="panel" class="panel hidden">
+    <button class="panel-close" id="panel-close">✕</button>
+    <div id="panel-content"></div>
+  </aside>
 
-    <div id="map-notice" class="map-notice hidden"></div>
-  </main>
+  <div id="map-notice" class="map-notice hidden"></div>
 
-  <!-- 랭킹 모달 -->
+  <!-- 랭킹/관심단지 모달 -->
   <div id="modal" class="modal hidden">
     <div class="modal-box">
       <button class="modal-close" id="modal-close">✕</button>
@@ -53,7 +55,7 @@
   <script src="js/config.js"></script>
   <!-- 차트 -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-  <script src="js/charts.js"></script>
-  <script src="js/app.js"></script>
+  <script src="js/charts.js?v=2"></script>
+  <script src="js/app.js?v=2"></script>
 </body>
 </html>

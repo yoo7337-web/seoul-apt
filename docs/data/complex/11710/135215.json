@@ -1,1 +1,1 @@
-{"sale_series":{"85~135㎡":[{"month":"2026-03","median":98000,"count":1}]},"jeonse_series":{"85~135㎡":[{"month":"2026-01","median":52000,"count":1}]},"recent_sales":[{"date":"2026-03-06","area":131.29,"floor":3,"amount":98000}],"gongsi":[],"id":135215,"apt":"삼성프라자","lawd_cd":"11710"}
+{"sale_series":{"85~135㎡":[{"month":"2026-03","median":98000,"count":1}]},"jeonse_series":{"85~135㎡":[{"month":"2026-01","median":52000,"count":1}]},"recent_sales":[{"date":"2026-03-06","area":131.29,"floor":3,"amount":98000,"canceled":0}],"gongsi":[],"id":135215,"apt":"삼성프라자","lawd_cd":"11710"}

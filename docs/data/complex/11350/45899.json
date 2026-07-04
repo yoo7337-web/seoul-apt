@@ -1,1 +1,1 @@
-{"sale_series":{"60~85㎡":[{"month":"2026-03","median":35000,"count":1}]},"jeonse_series":{"60~85㎡":[{"month":"2026-03","median":28000,"count":1}]},"recent_sales":[{"date":"2026-03-09","area":84.92,"floor":3,"amount":35000}],"gongsi":[],"id":45899,"apt":"수락파크","lawd_cd":"11350"}
+{"sale_series":{"60~85㎡":[{"month":"2026-03","median":35000,"count":1}]},"jeonse_series":{"60~85㎡":[{"month":"2026-03","median":28000,"count":1}]},"recent_sales":[{"date":"2026-03-09","area":84.92,"floor":3,"amount":35000,"canceled":0}],"gongsi":[],"id":45899,"apt":"수락파크","lawd_cd":"11350"}

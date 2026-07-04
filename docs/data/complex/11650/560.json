@@ -1,1 +1,1 @@
-{"sale_series":{"~60㎡":[{"month":"2026-05","median":76500,"count":1}]},"jeonse_series":{"~60㎡":[{"month":"2026-02","median":42000,"count":1}]},"recent_sales":[{"date":"2026-05-20","area":56.3,"floor":4,"amount":76500}],"gongsi":[],"id":560,"apt":"아이리스","lawd_cd":"11650"}
+{"sale_series":{"~60㎡":[{"month":"2026-05","median":76500,"count":1}]},"jeonse_series":{"~60㎡":[{"month":"2026-02","median":42000,"count":1}]},"recent_sales":[{"date":"2026-05-20","area":56.3,"floor":4,"amount":76500,"canceled":0}],"gongsi":[],"id":560,"apt":"아이리스","lawd_cd":"11650"}

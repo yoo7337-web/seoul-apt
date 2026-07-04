@@ -1,1 +1,1 @@
-{"sale_series":{"~60㎡":[{"month":"2026-05","median":132000,"count":1}]},"jeonse_series":{"~60㎡":[{"month":"2026-06","median":45000,"count":1}]},"recent_sales":[{"date":"2026-05-11","area":47.7,"floor":4,"amount":132000}],"gongsi":[],"id":114502,"apt":"반포두산힐스빌","lawd_cd":"11650"}
+{"sale_series":{"~60㎡":[{"month":"2026-05","median":132000,"count":1}]},"jeonse_series":{"~60㎡":[{"month":"2026-06","median":45000,"count":1}]},"recent_sales":[{"date":"2026-05-11","area":47.7,"floor":4,"amount":132000,"canceled":0}],"gongsi":[],"id":114502,"apt":"반포두산힐스빌","lawd_cd":"11650"}

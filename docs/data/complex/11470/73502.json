@@ -1,1 +1,1 @@
-{"sale_series":{"60~85㎡":[{"month":"2026-02","median":73000,"count":1}]},"jeonse_series":{"60~85㎡":[{"month":"2026-03","median":44000.0,"count":2}]},"recent_sales":[{"date":"2026-02-21","area":83.09,"floor":3,"amount":73000}],"gongsi":[],"id":73502,"apt":"목동보미리즌빌","lawd_cd":"11470"}
+{"sale_series":{"60~85㎡":[{"month":"2026-02","median":73000,"count":1}]},"jeonse_series":{"60~85㎡":[{"month":"2026-03","median":44000.0,"count":2}]},"recent_sales":[{"date":"2026-02-21","area":83.09,"floor":3,"amount":73000,"canceled":0}],"gongsi":[],"id":73502,"apt":"목동보미리즌빌","lawd_cd":"11470"}

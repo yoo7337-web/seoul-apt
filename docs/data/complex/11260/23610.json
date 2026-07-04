@@ -1,1 +1,1 @@
-{"sale_series":{"60~85㎡":[{"month":"2026-02","median":72000,"count":1}]},"jeonse_series":{"60~85㎡":[{"month":"2026-02","median":33600,"count":1}]},"recent_sales":[{"date":"2026-02-10","area":84.9,"floor":9,"amount":72000}],"gongsi":[],"id":23610,"apt":"미영리치타운103","lawd_cd":"11260"}
+{"sale_series":{"60~85㎡":[{"month":"2026-02","median":72000,"count":1}]},"jeonse_series":{"60~85㎡":[{"month":"2026-02","median":33600,"count":1}]},"recent_sales":[{"date":"2026-02-10","area":84.9,"floor":9,"amount":72000,"canceled":0}],"gongsi":[],"id":23610,"apt":"미영리치타운103","lawd_cd":"11260"}

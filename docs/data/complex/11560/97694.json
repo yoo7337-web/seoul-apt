@@ -1,1 +1,1 @@
-{"sale_series":{"~60㎡":[{"month":"2026-05","median":13800,"count":1}]},"jeonse_series":{"~60㎡":[{"month":"2026-06","median":23000,"count":1}]},"recent_sales":[{"date":"2026-05-28","area":20.51,"floor":11,"amount":13800}],"gongsi":[],"id":97694,"apt":"THESILK","lawd_cd":"11560"}
+{"sale_series":{"~60㎡":[{"month":"2026-05","median":13800,"count":1}]},"jeonse_series":{"~60㎡":[{"month":"2026-06","median":23000,"count":1}]},"recent_sales":[{"date":"2026-05-28","area":20.51,"floor":11,"amount":13800,"canceled":0}],"gongsi":[],"id":97694,"apt":"THESILK","lawd_cd":"11560"}

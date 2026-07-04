@@ -1,1 +1,1 @@
-{"sale_series":{"60~85㎡":[{"month":"2026-05","median":50000,"count":1}]},"jeonse_series":{"60~85㎡":[{"month":"2026-06","median":32550,"count":1}]},"recent_sales":[{"date":"2026-05-30","area":65.03,"floor":4,"amount":50000}],"gongsi":[],"id":32461,"apt":"센트럴힐","lawd_cd":"11290"}
+{"sale_series":{"60~85㎡":[{"month":"2026-05","median":50000,"count":1}]},"jeonse_series":{"60~85㎡":[{"month":"2026-06","median":32550,"count":1}]},"recent_sales":[{"date":"2026-05-30","area":65.03,"floor":4,"amount":50000,"canceled":0}],"gongsi":[],"id":32461,"apt":"센트럴힐","lawd_cd":"11290"}

@@ -1,1 +1,1 @@
-{"sale_series":{"~60㎡":[{"month":"2026-05","median":25000,"count":1}]},"jeonse_series":{"~60㎡":[{"month":"2026-02","median":24250.0,"count":2}]},"recent_sales":[{"date":"2026-05-28","area":14.89,"floor":6,"amount":25000}],"gongsi":[],"id":65895,"apt":"엠제이더퍼스트홍대","lawd_cd":"11440"}
+{"sale_series":{"~60㎡":[{"month":"2026-05","median":25000,"count":1}]},"jeonse_series":{"~60㎡":[{"month":"2026-02","median":24250.0,"count":2}]},"recent_sales":[{"date":"2026-05-28","area":14.89,"floor":6,"amount":25000,"canceled":0}],"gongsi":[],"id":65895,"apt":"엠제이더퍼스트홍대","lawd_cd":"11440"}

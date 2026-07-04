@@ -1,1 +1,1 @@
-{"sale_series":{"60~85㎡":[{"month":"2026-03","median":40000,"count":1}]},"jeonse_series":{"60~85㎡":[{"month":"2026-06","median":42000,"count":1}]},"recent_sales":[{"date":"2026-03-09","area":83.41,"floor":4,"amount":40000}],"gongsi":[],"id":74598,"apt":"탑건진선미","lawd_cd":"11470"}
+{"sale_series":{"60~85㎡":[{"month":"2026-03","median":40000,"count":1}]},"jeonse_series":{"60~85㎡":[{"month":"2026-06","median":42000,"count":1}]},"recent_sales":[{"date":"2026-03-09","area":83.41,"floor":4,"amount":40000,"canceled":0}],"gongsi":[],"id":74598,"apt":"탑건진선미","lawd_cd":"11470"}

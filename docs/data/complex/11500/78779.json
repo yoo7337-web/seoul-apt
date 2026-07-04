@@ -1,1 +1,1 @@
-{"sale_series":{"~60㎡":[{"month":"2026-01","median":25600,"count":1}]},"jeonse_series":{"~60㎡":[{"month":"2026-03","median":19650,"count":1}]},"recent_sales":[{"date":"2026-01-18","area":28.25,"floor":7,"amount":25600}],"gongsi":[],"id":78779,"apt":"동양하우징(899-4)","lawd_cd":"11500"}
+{"sale_series":{"~60㎡":[{"month":"2026-01","median":25600,"count":1}]},"jeonse_series":{"~60㎡":[{"month":"2026-03","median":19650,"count":1}]},"recent_sales":[{"date":"2026-01-18","area":28.25,"floor":7,"amount":25600,"canceled":0}],"gongsi":[],"id":78779,"apt":"동양하우징(899-4)","lawd_cd":"11500"}

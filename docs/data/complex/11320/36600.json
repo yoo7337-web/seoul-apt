@@ -1,1 +1,1 @@
-{"sale_series":{"~60㎡":[{"month":"2026-01","median":32000,"count":1}]},"jeonse_series":{"~60㎡":[{"month":"2026-03","median":12600.0,"count":2}]},"recent_sales":[{"date":"2026-01-20","area":58.43,"floor":8,"amount":32000}],"gongsi":[],"id":36600,"apt":"삼성브래뉴","lawd_cd":"11320"}
+{"sale_series":{"~60㎡":[{"month":"2026-01","median":32000,"count":1}]},"jeonse_series":{"~60㎡":[{"month":"2026-03","median":12600.0,"count":2}]},"recent_sales":[{"date":"2026-01-20","area":58.43,"floor":8,"amount":32000,"canceled":0}],"gongsi":[],"id":36600,"apt":"삼성브래뉴","lawd_cd":"11320"}
