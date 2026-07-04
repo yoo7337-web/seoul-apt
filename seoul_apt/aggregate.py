@@ -23,6 +23,31 @@ def _month(deal_date: str) -> str:
     return deal_date[:7]  # 'YYYY-MM'
 
 
+# 지도 평형별 대표가 산출 시 버킷당 사용할 최근 거래 수
+AREA_MARKER_RECENT = 30
+
+
+def _sale_by_area(sale_rows: list) -> dict:
+    """전용면적 버킷별 최근 거래 중앙값(만원). 거래 있는 버킷만 포함.
+
+    sale_rows 는 canceled=0, deal_date DESC 로 정렬돼 있다고 가정.
+    각 버킷의 최근 AREA_MARKER_RECENT 건만 취해 중앙값을 낸다.
+    """
+    by_bucket: dict[str, list] = defaultdict(list)
+    for r in sale_rows:
+        if r["exclu_area"] is None:
+            continue
+        b = config.area_bucket(r["exclu_area"])
+        if len(by_bucket[b]) < AREA_MARKER_RECENT:
+            by_bucket[b].append(r["amount_manwon"])
+    out = {}
+    for b, amounts in by_bucket.items():
+        m = _median(amounts)
+        if m is not None:
+            out[b] = m
+    return out
+
+
 def representative_months(monthly: list[dict]) -> list[dict]:
     """대표값 산정용 월 목록 - 평단가가 있고 표본이 충분한 월만.
 
@@ -123,6 +148,8 @@ def complex_list(conn, lawd_cd: str) -> list[dict]:
         sale_med = _median([r["amount_manwon"] for r in recent])
         ppy = _median([r["amount_manwon"] / _pyeong(r["exclu_area"])
                        for r in recent if r["exclu_area"]])
+        # 평형(전용면적 버킷)별 최근 거래 중앙값 - 지도에서 평형 선택 시 사용
+        sale_by_area = _sale_by_area(recent_sales)
         # 역대 최고가(신고가 하이라이트용)
         peak = max((r["amount_manwon"] for r in recent_sales), default=None)
         last_amount = recent_sales[0]["amount_manwon"] if recent_sales else None
@@ -145,6 +172,7 @@ def complex_list(conn, lawd_cd: str) -> list[dict]:
             "lat": c["lat"],
             "lon": c["lon"],
             "sale_median": sale_med,
+            "sale_by_area": sale_by_area,
             "ppy_median": round(ppy, 0) if ppy else None,
             "sale_count": len(recent_sales),
             "last_amount": last_amount,

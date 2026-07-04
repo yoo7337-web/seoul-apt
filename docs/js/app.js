@@ -59,6 +59,7 @@
     }, 250));
     $("area-filter").addEventListener("change", (e) => {
       state.area = e.target.value;
+      applyFilters();                       // 지도 말풍선을 선택 평형 가격으로 갱신
       if (state.currentDetail) renderChart();
     });
     $("btn-rankings").addEventListener("click", showRankings);
@@ -140,7 +141,7 @@
 
     // 축소 상태 + 필터 없음 → 구 단위 요약 버블
     const zoomedOut = state.map.getLevel() >= REGION_LEVEL;
-    if (zoomedOut && !state.district && !state.search) {
+    if (zoomedOut && !state.district && !state.search && !state.area) {
       renderRegionBubbles();
       hideNotice();
       return;
@@ -148,10 +149,10 @@
 
     const bounds = state.map.getBounds();
     let visible = filteredMarkers().filter((m) =>
-      m.sale && bounds.contain(new kakao.maps.LatLng(m.lat, m.lon)));
+      markerPrice(m) && bounds.contain(new kakao.maps.LatLng(m.lat, m.lon)));
     if (visible.length > BUBBLE_CAP) {
       visible = visible.slice()
-        .sort((a, b) => (b.sale || 0) - (a.sale || 0)).slice(0, BUBBLE_CAP);
+        .sort((a, b) => (markerPrice(b) || 0) - (markerPrice(a) || 0)).slice(0, BUBBLE_CAP);
     }
     visible.forEach((mk) => state.overlays.push(makeBubble(mk)));
 
@@ -171,7 +172,7 @@
       + (mk.is_peak ? " peak" : "")
       + (mk.id === state.selectedId ? " selected" : "");
     el.innerHTML =
-      `<div class="pb-price">${bubblePrice(mk.sale)}</div>` +
+      `<div class="pb-price">${bubblePrice(markerPrice(mk))}</div>` +
       `<div class="pb-name">${escapeHtml(mk.apt)}</div>`;
     el.addEventListener("click", () => {
       state.selectedId = mk.id;
@@ -208,6 +209,12 @@
       ov.setMap(state.map);
       state.overlays.push(ov);
     });
+  }
+
+  // 선택된 평형이 있으면 그 평형대 최근 거래 중앙값, 없으면 전 면적 중앙값
+  function markerPrice(mk) {
+    if (state.area) return mk.sale_area ? mk.sale_area[state.area] : null;
+    return mk.sale;
   }
 
   function bubblePrice(manwon) {

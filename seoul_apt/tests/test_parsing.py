@@ -92,6 +92,28 @@ def test_aggregate_ppy_and_jeonse_ratio():
     conn.close()
 
 
+def test_sale_by_area_buckets():
+    """평형(전용면적 버킷)별 최근 거래 중앙값이 올바르게, 해제 제외로 산출된다."""
+    conn = db.connect(":memory:")
+    cid = db.upsert_complex(conn, "11680", "대치동", "은마", 1979, "316")
+    # ~60㎡ 버킷: 50,55 → 중앙값 52.5억(만원 525000/500000...) 단순화 위해 두 건
+    db.insert_sale(conn, cid, "2026-05-01", 49.5, 3, 200000)
+    db.insert_sale(conn, cid, "2026-05-02", 55.0, 4, 220000)
+    # 60~85㎡ 버킷: 두 건 중앙값
+    db.insert_sale(conn, cid, "2026-05-03", 76.79, 5, 300000)
+    db.insert_sale(conn, cid, "2026-05-04", 84.0, 6, 320000)
+    # 85~135㎡ 버킷: 한 건이지만 해제 → 제외되어 버킷 자체가 없어야 함
+    db.insert_sale(conn, cid, "2026-05-05", 120.0, 7, 900000,
+                   canceled=1, cancel_date="2026-06-01")
+    conn.commit()
+    cx = aggregate.complex_list(conn, "11680")[0]
+    sba = cx["sale_by_area"]
+    assert sba["~60㎡"] == 210000        # median(200000, 220000)
+    assert sba["60~85㎡"] == 310000      # median(300000, 320000)
+    assert "85~135㎡" not in sba         # 해제 건뿐이라 버킷 없음
+    conn.close()
+
+
 def test_canceled_excluded_from_stats():
     conn = db.connect(":memory:")
     cid = db.upsert_complex(conn, "11680", "대치동", "은마", 1979, "316")
