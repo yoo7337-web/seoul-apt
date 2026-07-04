@@ -279,7 +279,7 @@
     const el = $("panel-content");
     el.innerHTML = `
       <h2>${d.apt} ${d.is_peak ? '<span class="badge peak">신고가</span>' : ""}</h2>
-      <div class="sub">${districtName(d.lawd_cd)} · 전용면적별 실거래 기준</div>
+      <div class="sub">${districtName(d.lawd_cd)}${d.umd ? " " + d.umd : ""} · ${buildYearText(d)}</div>
       <div class="price-cards">
         <div class="card"><div class="label">최근 매매 중앙값</div>
           <div class="value">${fmt(d.sale)}</div></div>
@@ -308,8 +308,11 @@
       </div>
       <div class="chart-wrap"><canvas id="detail-chart"></canvas></div>
 
-      <div class="section-title">최근 실거래</div>
+      <div class="section-title">최근 매매 실거래</div>
       ${recentTxnsTable(d)}
+
+      <div class="section-title">최근 전월세 실거래</div>
+      ${recentRentsTable(d)}
     `;
     $("panel").classList.remove("hidden");
     $("fav-toggle").addEventListener("click", () => toggleFavorite(d));
@@ -352,6 +355,32 @@
         <td>${r.date}</td><td>${r.area}㎡</td><td>${r.floor || "-"}</td>
         <td>${fmt(r.amount)}${r.canceled ? ' <span class="cancel-badge">해제</span>' : ""}</td></tr>`).join("")}
       </tbody></table>`;
+  }
+
+  function recentRentsTable(d) {
+    const rows = (d.recent_rents || []).slice(0, 20);
+    if (!rows.length) return '<div class="empty">최근 전월세 거래 없음</div>';
+    return `<table class="txns"><thead><tr>
+        <th>계약일</th><th>구분</th><th>면적</th><th>층</th><th>보증금 / 월세</th></tr></thead><tbody>
+      ${rows.map((r) => {
+        const isJeonse = r.type === "jeonse";
+        const badge = isJeonse
+          ? '<span class="rent-badge jeonse">전세</span>'
+          : '<span class="rent-badge wolse">월세</span>';
+        const price = isJeonse ? fmt(r.deposit)
+          : `${fmt(r.deposit)} / ${r.monthly.toLocaleString()}만`;
+        return `<tr><td>${r.date}</td><td>${badge}</td>
+          <td>${r.area}㎡</td><td>${r.floor || "-"}</td><td>${price}</td></tr>`;
+      }).join("")}
+      </tbody></table>`;
+  }
+
+  function buildYearText(d) {
+    if (!d.build_year) return "전용면적별 실거래 기준";
+    const now = new Date().getFullYear();
+    const age = now - d.build_year;
+    const ageTxt = age <= 0 ? "신축" : `${age}년차`;
+    return `${d.build_year}년 준공 · ${ageTxt}`;
   }
 
   // ── 즐겨찾기 ────────────────────────────────────────────────────────

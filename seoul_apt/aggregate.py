@@ -196,8 +196,8 @@ def complex_detail(conn, complex_id: int) -> dict:
         "FROM sale_txn WHERE complex_id=? ORDER BY deal_date",
         (complex_id,)).fetchall()
     rents = conn.execute(
-        "SELECT deal_date, exclu_area, deposit_manwon, monthly_manwon, rent_type "
-        "FROM rent_txn WHERE complex_id=? ORDER BY deal_date",
+        "SELECT deal_date, exclu_area, floor, deposit_manwon, monthly_manwon, "
+        "rent_type FROM rent_txn WHERE complex_id=? ORDER BY deal_date",
         (complex_id,)).fetchall()
 
     # 면적버킷 -> month -> 값들
@@ -229,14 +229,28 @@ def complex_detail(conn, complex_id: int) -> dict:
         "amount": s["amount_manwon"], "canceled": int(s["canceled"] or 0),
     } for s in sorted(sales, key=lambda x: x["deal_date"], reverse=True)[:40]]
 
+    # 최근 전월세 실거래(전세=월세 0). type 으로 구분해 프런트에서 표기.
+    recent_rents = [{
+        "date": r["deal_date"], "area": r["exclu_area"], "floor": r["floor"],
+        "deposit": r["deposit_manwon"], "monthly": r["monthly_manwon"],
+        "type": r["rent_type"],
+    } for r in sorted(rents, key=lambda x: x["deal_date"], reverse=True)[:40]]
+
     gongsi = conn.execute(
         "SELECT year, exclu_area, price_manwon FROM gongsi_price "
         "WHERE complex_id=? ORDER BY year DESC", (complex_id,)).fetchall()
 
+    meta = conn.execute(
+        "SELECT build_year, umd_nm FROM complex WHERE complex_id=?",
+        (complex_id,)).fetchone()
+
     return {
+        "build_year": meta["build_year"] if meta else None,
+        "umd": meta["umd_nm"] if meta else None,
         "sale_series": _series(sale_series),
         "jeonse_series": _series(jeonse_series),
         "recent_sales": recent,
+        "recent_rents": recent_rents,
         "gongsi": [{"year": g["year"], "area": g["exclu_area"],
                     "price": g["price_manwon"]} for g in gongsi],
     }

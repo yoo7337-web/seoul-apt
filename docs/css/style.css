@@ -192,6 +192,12 @@ table.txns tr.canceled td { color: var(--muted); text-decoration: line-through; 
   display: inline-block; font-size: 10px; padding: 1px 5px; border-radius: 8px;
   background: var(--up); color: #fff; text-decoration: none; margin-left: 4px;
 }
+.rent-badge {
+  display: inline-block; font-size: 10px; padding: 1px 6px; border-radius: 8px;
+  color: #fff; font-weight: 600;
+}
+.rent-badge.jeonse { background: #2563eb; }
+.rent-badge.wolse { background: #10b981; }
 
 .btn-row { display: flex; gap: 8px; margin: 14px 0; }
 .btn-row button {
