@@ -50,7 +50,10 @@ def collect_month(conn, client: MolitClient, lawd_cd: str, ymd: str) -> tuple[in
         cid = db.upsert_complex(conn, lawd_cd, s["umd_nm"], s["apt_nm"],
                                 s["build_year"], s["jibun"])
         db.insert_sale(conn, cid, s["deal_date"], s["exclu_area"],
-                       s["floor"], s["amount_manwon"])
+                       s["floor"], s["amount_manwon"],
+                       canceled=s.get("canceled", 0),
+                       cancel_date=s.get("cancel_date"),
+                       deal_gbn=s.get("deal_gbn"))
     db.record_fetch(conn, lawd_cd, ymd, "sale", fetched_at, len(sales))
 
     rents = client.fetch_rents(lawd_cd, ymd)

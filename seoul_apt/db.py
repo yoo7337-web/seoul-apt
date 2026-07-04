@@ -37,6 +37,9 @@ CREATE TABLE IF NOT EXISTS sale_txn (
     exclu_area    REAL NOT NULL,
     floor         INTEGER,
     amount_manwon INTEGER NOT NULL,   -- 거래금액(만원)
+    canceled      INTEGER NOT NULL DEFAULT 0,  -- 계약해제 여부(1=해제)
+    cancel_date   TEXT,               -- 해제사유발생일 'YYYY-MM-DD'
+    deal_gbn      TEXT,               -- 거래유형(중개거래/직거래)
     UNIQUE(complex_id, deal_date, exclu_area, floor, amount_manwon)
 );
 
@@ -103,9 +106,23 @@ def connect(db_path: Path | str = config.DB_PATH) -> sqlite3.Connection:
     conn = sqlite3.connect(str(db_path))
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
+    conn.execute("PRAGMA busy_timeout = 15000")  # 동시 실행 시 락 대기(ms)
     conn.executescript(SCHEMA)
+    _migrate(conn)
     _seed_districts(conn)
     return conn
+
+
+def _migrate(conn: sqlite3.Connection) -> None:
+    """구버전 DB에 없는 컬럼을 추가한다(멱등)."""
+    cols = {r["name"] for r in conn.execute("PRAGMA table_info(sale_txn)")}
+    if "canceled" not in cols:
+        conn.execute("ALTER TABLE sale_txn ADD COLUMN canceled INTEGER NOT NULL DEFAULT 0")
+    if "cancel_date" not in cols:
+        conn.execute("ALTER TABLE sale_txn ADD COLUMN cancel_date TEXT")
+    if "deal_gbn" not in cols:
+        conn.execute("ALTER TABLE sale_txn ADD COLUMN deal_gbn TEXT")
+    conn.commit()
 
 
 def _seed_districts(conn: sqlite3.Connection) -> None:
@@ -133,12 +150,25 @@ def upsert_complex(conn, lawd_cd, umd_nm, apt_nm, build_year, jibun) -> int:
     return row["complex_id"]
 
 
-def insert_sale(conn, complex_id, deal_date, exclu_area, floor, amount_manwon) -> None:
+def insert_sale(conn, complex_id, deal_date, exclu_area, floor, amount_manwon,
+                canceled=0, cancel_date=None, deal_gbn=None) -> None:
+    """매매 거래 upsert.
+
+    같은 거래가 나중에 계약해제로 재수집되면 canceled/cancel_date 를 갱신해야
+    하므로 INSERT OR IGNORE 가 아니라 ON CONFLICT DO UPDATE 를 쓴다.
+    """
     conn.execute(
-        """INSERT OR IGNORE INTO sale_txn
-           (complex_id, deal_date, exclu_area, floor, amount_manwon)
-           VALUES (?, ?, ?, ?, ?)""",
-        (complex_id, deal_date, exclu_area, floor, amount_manwon),
+        """INSERT INTO sale_txn
+           (complex_id, deal_date, exclu_area, floor, amount_manwon,
+            canceled, cancel_date, deal_gbn)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+           ON CONFLICT(complex_id, deal_date, exclu_area, floor, amount_manwon)
+           DO UPDATE SET
+             canceled=excluded.canceled,
+             cancel_date=excluded.cancel_date,
+             deal_gbn=COALESCE(excluded.deal_gbn, sale_txn.deal_gbn)""",
+        (complex_id, deal_date, exclu_area, floor, amount_manwon,
+         int(canceled), cancel_date, deal_gbn),
     )
 
 

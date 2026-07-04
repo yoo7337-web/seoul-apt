@@ -13,6 +13,10 @@ DOCS_DIR = REPO_ROOT / "docs"
 EXPORT_DIR = DOCS_DIR / "data"
 GONGSI_DIR = DATA_DIR / "gongsi"  # 공시가격 대량 파일을 놓는 위치
 
+WATCHLIST_PATH = REPO_ROOT / "config" / "watchlist.yml"
+NOTIFY_STATE_PATH = DATA_DIR / "notify_state.json"
+RECO_PATH = DATA_DIR / "reco_candidates.json"
+
 # ── 서울 25개 자치구 법정동코드(시군구 5자리) ────────────────────────────
 # 출처: 행정표준코드관리시스템(code.go.kr) 법정동코드 앞 5자리
 SEOUL_DISTRICTS = {
@@ -78,6 +82,9 @@ ENV_DATA_GO_KR = "DATA_GO_KR_KEY"
 ENV_REB = "REB_API_KEY"
 ENV_KAKAO_REST = "KAKAO_REST_KEY"
 ENV_KAKAO_JS = "KAKAO_JS_KEY"
+ENV_TG_TOKEN = "TELEGRAM_BOT_TOKEN"
+ENV_TG_CHAT = "TELEGRAM_CHAT_ID"
+ENV_GEMINI = "GEMINI_API_KEY"
 
 
 def get_key(env_name: str, required: bool = True) -> str | None:

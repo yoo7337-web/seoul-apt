@@ -1,0 +1,41 @@
+name: Seoul Apt Weekly AI Reco
+
+on:
+  schedule:
+    - cron: '30 1 * * 0'       # 매주 일요일 01:30 UTC = 10:30 KST
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: seoul-apt-data        # daily 와 동시 실행 방지(같은 DB 커밋)
+  cancel-in-progress: false
+
+jobs:
+  reco:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install -r seoul_apt/requirements.txt
+
+      - name: Weekly AI recommendation
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python -m seoul_apt.cli aireco
+
+      - name: Commit reco candidates
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/reco_candidates.json
+          git diff --staged --quiet || git commit -m "data: 주간 추천 후보 $(date -u +%F)"
+          git push

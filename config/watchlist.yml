@@ -1,0 +1,27 @@
+# 관심지역 워치리스트
+# - lawd_cd: 구(시군구 5자리, 필수) — 코드는 seoul_apt/config.py SEOUL_DISTRICTS 참고
+# - umd: 법정동 목록(선택, 비우면 구 전체)
+# - apt_pattern: 단지명 부분일치(선택, 비우면 전체 단지)
+# - alerts: new_deal(신규 실거래) / new_peak(신고가 갱신) / swing(평단가 급변동)
+#
+# GitHub 웹에서 이 파일만 수정해도 다음 자동 실행부터 반영된다.
+
+watches:
+  - name: "강남구 대치동"
+    lawd_cd: "11680"
+    umd: ["대치동"]
+    apt_pattern: ""
+    alerts: [new_deal, new_peak, swing]
+
+  - name: "마포구 전체"
+    lawd_cd: "11440"
+    umd: []
+    apt_pattern: ""
+    alerts: [new_peak, swing]
+
+# 급변동 판정: 관심지역 평단가(만원/평) 월 중앙값의 전월비 변화율 기준
+swing_threshold_pct: 5
+# 급변동 판정에 필요한 월 최소 거래 표본(부분월 왜곡 방지)
+swing_min_sample: 5
+# 다이제스트에 싣는 신규 신고가 최대 개수
+digest_peak_limit: 5

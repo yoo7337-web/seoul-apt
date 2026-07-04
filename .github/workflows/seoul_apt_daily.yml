@@ -63,6 +63,14 @@ jobs:
         run: |
           test -f docs/data/meta.json || { echo "meta.json 없음"; exit 1; }
 
+      - name: Send alerts & digest (Telegram)
+        if: ${{ (github.event.inputs.mode || 'collect') == 'collect' }}
+        continue-on-error: true    # 알림 실패가 데이터 갱신을 막지 않게
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python -m seoul_apt.cli alerts
+
       - name: Commit & push data
         run: |
           git config user.name  "github-actions[bot]"

@@ -43,7 +43,7 @@ def district_monthly(conn, lawd_cd: str) -> list[dict]:
     sales = conn.execute(
         "SELECT s.deal_date, s.exclu_area, s.amount_manwon "
         "FROM sale_txn s JOIN complex c ON s.complex_id=c.complex_id "
-        "WHERE c.lawd_cd=?", (lawd_cd,)).fetchall()
+        "WHERE c.lawd_cd=? AND s.canceled=0", (lawd_cd,)).fetchall()
     rents = conn.execute(
         "SELECT r.deal_date, r.deposit_manwon, r.monthly_manwon, r.rent_type "
         "FROM rent_txn r JOIN complex c ON r.complex_id=c.complex_id "
@@ -91,7 +91,8 @@ def district_recent_txns(conn, lawd_cd: str, limit: int = 30) -> list[dict]:
     rows = conn.execute(
         "SELECT s.deal_date, c.apt_nm, s.exclu_area, s.floor, s.amount_manwon "
         "FROM sale_txn s JOIN complex c ON s.complex_id=c.complex_id "
-        "WHERE c.lawd_cd=? ORDER BY s.deal_date DESC, s.id DESC LIMIT ?",
+        "WHERE c.lawd_cd=? AND s.canceled=0 "
+        "ORDER BY s.deal_date DESC, s.id DESC LIMIT ?",
         (lawd_cd, limit)).fetchall()
     return [{
         "date": r["deal_date"], "apt": r["apt_nm"], "area": r["exclu_area"],
@@ -111,7 +112,8 @@ def complex_list(conn, lawd_cd: str) -> list[dict]:
         cid = c["complex_id"]
         sale_rows = conn.execute(
             "SELECT deal_date, exclu_area, amount_manwon FROM sale_txn "
-            "WHERE complex_id=? ORDER BY deal_date DESC", (cid,)).fetchall()
+            "WHERE complex_id=? AND canceled=0 "
+            "ORDER BY deal_date DESC", (cid,)).fetchall()
         if not sale_rows:
             recent_sales = []
         else:
@@ -162,8 +164,9 @@ def complex_list(conn, lawd_cd: str) -> list[dict]:
 def complex_detail(conn, complex_id: int) -> dict:
     """단지의 면적버킷별 월별 매매/전세/월세 추세 + 최근 거래."""
     sales = conn.execute(
-        "SELECT deal_date, exclu_area, floor, amount_manwon FROM sale_txn "
-        "WHERE complex_id=? ORDER BY deal_date", (complex_id,)).fetchall()
+        "SELECT deal_date, exclu_area, floor, amount_manwon, canceled "
+        "FROM sale_txn WHERE complex_id=? ORDER BY deal_date",
+        (complex_id,)).fetchall()
     rents = conn.execute(
         "SELECT deal_date, exclu_area, deposit_manwon, monthly_manwon, rent_type "
         "FROM rent_txn WHERE complex_id=? ORDER BY deal_date",
@@ -173,6 +176,8 @@ def complex_detail(conn, complex_id: int) -> dict:
     sale_series = defaultdict(lambda: defaultdict(list))
     jeonse_series = defaultdict(lambda: defaultdict(list))
     for s in sales:
+        if s["canceled"]:
+            continue  # 해제 거래는 시세 추세에서 제외
         b = config.area_bucket(s["exclu_area"])
         sale_series[b][_month(s["deal_date"])].append(s["amount_manwon"])
     for r in rents:
@@ -190,9 +195,10 @@ def complex_detail(conn, complex_id: int) -> dict:
             ]
         return result
 
+    # 최근 거래에는 해제 건도 플래그와 함께 노출(프런트에서 취소선 표시)
     recent = [{
         "date": s["deal_date"], "area": s["exclu_area"], "floor": s["floor"],
-        "amount": s["amount_manwon"],
+        "amount": s["amount_manwon"], "canceled": int(s["canceled"] or 0),
     } for s in sorted(sales, key=lambda x: x["deal_date"], reverse=True)[:40]]
 
     gongsi = conn.execute(

@@ -29,10 +29,25 @@
         <dealYear>2026</dealYear>
         <dealMonth>5</dealMonth>
         <dealDay>3</dealDay>
+        <dealingGbn>중개거래</dealingGbn>
+      </item>
+      <item>
+        <aptNm>은마</aptNm>
+        <umdNm>대치동</umdNm>
+        <jibun>316</jibun>
+        <buildYear>1979</buildYear>
+        <excluUseAr>76.79</excluUseAr>
+        <floor>9</floor>
+        <dealAmount>990,000</dealAmount>
+        <dealYear>2026</dealYear>
+        <dealMonth>5</dealMonth>
+        <dealDay>7</dealDay>
+        <cdealType>O</cdealType>
+        <cdealDay>26.05.20</cdealDay>
       </item>
     </items>
     <numOfRows>1000</numOfRows>
     <pageNo>1</pageNo>
-    <totalCount>2</totalCount>
+    <totalCount>3</totalCount>
   </body>
 </response>

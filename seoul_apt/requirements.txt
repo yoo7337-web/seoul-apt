@@ -3,3 +3,4 @@ requests>=2.31.0
 pandas>=2.0.0
 python-dotenv>=1.0.0
 openpyxl>=3.1.0   # 공시가격 XLSX 파싱
+PyYAML>=6.0       # 관심지역 워치리스트(config/watchlist.yml)

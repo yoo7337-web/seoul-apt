@@ -50,6 +50,22 @@ def _to_float(text: str | None) -> float | None:
         return None
 
 
+def _cancel_date(text: str | None) -> str | None:
+    """해제사유발생일 '25.01.03' → '2025-01-03'. 형식이 다르면 원문 유지."""
+    if not text:
+        return None
+    t = text.strip()
+    if not t:
+        return None
+    parts = t.split(".")
+    if len(parts) == 3 and all(p.strip().isdigit() for p in parts):
+        y, m, d = (p.strip() for p in parts)
+        if len(y) == 2:
+            y = "20" + y
+        return f"{int(y):04d}-{int(m):02d}-{int(d):02d}"
+    return t
+
+
 class MolitClient:
     def __init__(self, service_key: str):
         self.service_key = service_key
@@ -111,7 +127,7 @@ class MolitClient:
             time.sleep(config.REQUEST_SLEEP)
 
     def fetch_sales(self, lawd_cd: str, deal_ymd: str) -> list[dict]:
-        """아파트 매매 실거래 목록."""
+        """아파트 매매 실거래 목록(계약해제 건 포함, canceled 플래그로 구분)."""
         rows = []
         for it in self._paged_items(TRADE_EP, lawd_cd, deal_ymd):
             rows.append({
@@ -123,6 +139,10 @@ class MolitClient:
                 "floor": _to_int(it.findtext("floor")),
                 "amount_manwon": _to_int(it.findtext("dealAmount")),
                 "deal_date": self._deal_date(it),
+                # 해제여부 'O' => 계약해제. cdealDay 는 '25.01.03' 형식.
+                "canceled": 1 if (it.findtext("cdealType") or "").strip() == "O" else 0,
+                "cancel_date": _cancel_date(it.findtext("cdealDay")),
+                "deal_gbn": (it.findtext("dealingGbn") or "").strip() or None,
             })
         return [r for r in rows if r["apt_nm"] and r["amount_manwon"]
                 and r["exclu_area"] and r["deal_date"]]

@@ -94,6 +94,11 @@ table.txns { width: 100%; border-collapse: collapse; font-size: 12.5px; }
 table.txns th, table.txns td { padding: 6px 4px; text-align: right; border-bottom: 1px solid var(--border); }
 table.txns th:first-child, table.txns td:first-child { text-align: left; }
 table.txns tr.peak td { color: var(--peak); font-weight: 600; }
+table.txns tr.canceled td { color: var(--muted); text-decoration: line-through; }
+.cancel-badge {
+  display: inline-block; font-size: 10px; padding: 1px 5px; border-radius: 8px;
+  background: var(--up); color: #fff; text-decoration: none; margin-left: 4px;
+}
 
 .btn-row { display: flex; gap: 8px; margin: 14px 0; }
 .btn-row button {

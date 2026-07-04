@@ -244,12 +244,14 @@
   function recentTxnsTable(d) {
     const rows = (d.recent_sales || []).slice(0, 20);
     if (!rows.length) return '<div class="empty">최근 매매 거래 없음</div>';
-    const peak = Math.max(...rows.map((r) => r.amount));
+    // 신고가는 해제되지 않은 거래 기준
+    const valid = rows.filter((r) => !r.canceled);
+    const peak = valid.length ? Math.max(...valid.map((r) => r.amount)) : null;
     return `<table class="txns"><thead><tr>
         <th>계약일</th><th>면적</th><th>층</th><th>거래가</th></tr></thead><tbody>
-      ${rows.map((r) => `<tr class="${r.amount >= peak ? "peak" : ""}">
+      ${rows.map((r) => `<tr class="${r.canceled ? "canceled" : (peak !== null && r.amount >= peak ? "peak" : "")}">
         <td>${r.date}</td><td>${r.area}㎡</td><td>${r.floor || "-"}</td>
-        <td>${fmt(r.amount)}</td></tr>`).join("")}
+        <td>${fmt(r.amount)}${r.canceled ? ' <span class="cancel-badge">해제</span>' : ""}</td></tr>`).join("")}
       </tbody></table>`;
   }
 
