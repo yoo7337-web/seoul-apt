@@ -244,12 +244,16 @@ def complex_detail(conn, complex_id: int) -> dict:
         "WHERE complex_id=? ORDER BY year DESC", (complex_id,)).fetchall()
 
     meta = conn.execute(
-        "SELECT build_year, umd_nm FROM complex WHERE complex_id=?",
-        (complex_id,)).fetchone()
+        "SELECT build_year, umd_nm, households, far, bcr, approval_date "
+        "FROM complex WHERE complex_id=?", (complex_id,)).fetchone()
 
     return {
         "build_year": meta["build_year"] if meta else None,
         "umd": meta["umd_nm"] if meta else None,
+        "households": meta["households"] if meta else None,
+        "far": meta["far"] if meta else None,
+        "bcr": meta["bcr"] if meta else None,
+        "approval_date": meta["approval_date"] if meta else None,
         "sale_series": _series(sale_series),
         "jeonse_series": _series(jeonse_series),
         "recent_sales": recent,

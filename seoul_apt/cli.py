@@ -16,7 +16,7 @@ import sys
 
 from dotenv import load_dotenv
 
-from . import config, db, collect, export, geocode, gongsi, notify, reb_api
+from . import config, db, collect, export, geocode, gongsi, notify, reb_api, building
 
 
 def _kst_now_ym() -> str:
@@ -50,6 +50,17 @@ def cmd_geocode(conn, args):
 def cmd_gongsi(conn, args):
     n = gongsi.load_gongsi_files(conn)
     print(f"[gongsi] 공시가격 {n}건 적재 (파일 위치: {config.GONGSI_DIR})")
+
+
+def cmd_building(conn, args):
+    data_key = config.get_key(config.ENV_DATA_GO_KR)
+    kakao_key = config.get_key(config.ENV_KAKAO_REST, required=False)
+    if not kakao_key:
+        print("[building] KAKAO_REST_KEY 없음 - 건너뜀(주소→법정동 변환 불가)")
+        return
+    stats = building.collect_buildings(conn, data_key, kakao_key,
+                                       args.district, args.limit)
+    print(f"[building] 조회 {stats['tried']} / 정보확보 {stats['filled']}")
 
 
 def cmd_reb(conn, args):
@@ -103,6 +114,7 @@ def cmd_aireco(conn, args):
 def cmd_all(conn, args):
     cmd_collect(conn, args)
     cmd_geocode(conn, args)
+    cmd_building(conn, args)
     cmd_gongsi(conn, args)
     cmd_reb(conn, args)
     cmd_export(conn, args)
@@ -130,6 +142,11 @@ def build_parser() -> argparse.ArgumentParser:
 
     gs = sub.add_parser("gongsi", help="공시가격 파일 적재")
     gs.set_defaults(func=cmd_gongsi)
+
+    bd = sub.add_parser("building", help="건축물대장 부가정보(세대수·용적률·건폐율)")
+    bd.add_argument("--district", default=None, help="특정 구 LAWD_CD")
+    bd.add_argument("--limit", type=int, default=None, help="처리 개수 제한")
+    bd.set_defaults(func=cmd_building)
 
     r = sub.add_parser("reb", help="부동산원 지수 수집")
     r.add_argument("--from", dest="from_ym", default=None)

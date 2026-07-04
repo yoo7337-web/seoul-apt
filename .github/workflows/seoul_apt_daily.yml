@@ -56,6 +56,7 @@ jobs:
             python -m seoul_apt.cli collect
           fi
           python -m seoul_apt.cli geocode
+          python -m seoul_apt.cli building
           python -m seoul_apt.cli gongsi
           python -m seoul_apt.cli reb
 

@@ -304,6 +304,8 @@
           <div class="value small">${gongsiRatio(d, gongsi)}</div></div>
       </div>
 
+      ${buildingInfo(d)}
+
       <div class="btn-row">
         <button id="fav-toggle" class="${isFav ? "active" : ""}">
           ${isFav ? "★ 관심단지" : "☆ 관심단지"}</button>
@@ -390,6 +392,19 @@
     const age = now - d.build_year;
     const ageTxt = age <= 0 ? "신축" : `${age}년차`;
     return `${d.build_year}년 준공 · ${ageTxt}`;
+  }
+
+  // 건축물대장 부가정보(세대수/용적률/건폐율). 값 하나라도 있으면 표시.
+  function buildingInfo(d) {
+    if (!d.households && !d.far && !d.bcr) return "";
+    const cell = (label, val) =>
+      `<div class="info-cell"><span class="info-label">${label}</span>` +
+      `<span class="info-value">${val}</span></div>`;
+    return `<div class="info-row">
+      ${cell("세대수", d.households ? d.households.toLocaleString() + "세대" : "-")}
+      ${cell("용적률", d.far ? d.far + "%" : "-")}
+      ${cell("건폐율", d.bcr ? d.bcr + "%" : "-")}
+    </div>`;
   }
 
   // ── 즐겨찾기 ────────────────────────────────────────────────────────

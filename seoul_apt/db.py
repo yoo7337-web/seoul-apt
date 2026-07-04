@@ -122,6 +122,17 @@ def _migrate(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE sale_txn ADD COLUMN cancel_date TEXT")
     if "deal_gbn" not in cols:
         conn.execute("ALTER TABLE sale_txn ADD COLUMN deal_gbn TEXT")
+    # 건축물대장 부가정보(단지 단위)
+    ccols = {r["name"] for r in conn.execute("PRAGMA table_info(complex)")}
+    for name, decl in [
+        ("households", "INTEGER"),       # 세대수
+        ("far", "REAL"),                 # 용적률(%)
+        ("bcr", "REAL"),                 # 건폐율(%)
+        ("approval_date", "TEXT"),       # 사용승인일 'YYYY-MM-DD'
+        ("bldg_fetched_at", "TEXT"),     # 건축물대장 조회 시각(재조회 skip용)
+    ]:
+        if name not in ccols:
+            conn.execute(f"ALTER TABLE complex ADD COLUMN {name} {decl}")
     conn.commit()
 
 
@@ -234,4 +245,29 @@ def set_coords(conn, complex_id, lat, lon, geocoded_at) -> None:
     conn.execute(
         "UPDATE complex SET lat=?, lon=?, geocoded_at=? WHERE complex_id=?",
         (lat, lon, geocoded_at, complex_id),
+    )
+
+
+def complexes_without_building(conn, lawd_cd: str | None = None,
+                               limit: int | None = None) -> list[sqlite3.Row]:
+    """건축물대장 정보가 아직 없는 단지(지번 있는 것만) - 조회 대상."""
+    q = ("SELECT complex_id, lawd_cd, umd_nm, apt_nm, jibun FROM complex "
+         "WHERE bldg_fetched_at IS NULL AND jibun IS NOT NULL")
+    args: list = []
+    if lawd_cd:
+        q += " AND lawd_cd=?"
+        args.append(lawd_cd)
+    q += " ORDER BY complex_id"
+    if limit:
+        q += " LIMIT ?"
+        args.append(limit)
+    return conn.execute(q, args).fetchall()
+
+
+def set_building(conn, complex_id, households, far, bcr, approval_date,
+                 fetched_at) -> None:
+    conn.execute(
+        "UPDATE complex SET households=?, far=?, bcr=?, approval_date=?, "
+        "bldg_fetched_at=? WHERE complex_id=?",
+        (households, far, bcr, approval_date, fetched_at, complex_id),
     )
