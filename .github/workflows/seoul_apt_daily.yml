@@ -34,6 +34,11 @@ jobs:
       - name: Install dependencies
         run: pip install -r seoul_apt/requirements.txt
 
+      - name: Restore DB from Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bash scripts/db_release.sh pull
+
       - name: Collect data
         env:
           DATA_GO_KR_KEY: ${{ secrets.DATA_GO_KR_KEY }}
@@ -62,6 +67,11 @@ jobs:
       - name: Sanity check
         run: |
           test -f docs/data/meta.json || { echo "meta.json 없음"; exit 1; }
+
+      - name: Save DB to Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bash scripts/db_release.sh push
 
       - name: Send alerts & digest (Telegram)
         if: ${{ (github.event.inputs.mode || 'collect') == 'collect' }}

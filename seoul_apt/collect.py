@@ -56,6 +56,12 @@ def collect_month(conn, client: MolitClient, lawd_cd: str, ymd: str) -> tuple[in
                        deal_gbn=s.get("deal_gbn"))
     db.record_fetch(conn, lawd_cd, ymd, "sale", fetched_at, len(sales))
 
+    # 전월세는 2011-01 이전 미제공 → 불필요한 호출 생략(fetch_log 로 재수집 skip)
+    if ymd < config.RENT_START_YM:
+        db.record_fetch(conn, lawd_cd, ymd, "rent", fetched_at, 0)
+        conn.commit()
+        return len(sales), 0
+
     rents = client.fetch_rents(lawd_cd, ymd)
     for r in rents:
         cid = db.upsert_complex(conn, lawd_cd, r["umd_nm"], r["apt_nm"],

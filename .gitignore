@@ -8,3 +8,8 @@ venv/
 # 공시가격 원본 대량 파일(용량 큼) - 파싱 결과만 DB로 커밋
 data/gongsi/
 .pytest_cache/
+
+# 누적 원천 DB: git 트리(100MB 제한) 대신 GitHub Release 자산으로 저장
+data/seoul_apt.sqlite
+data/seoul_apt.sqlite-*
+

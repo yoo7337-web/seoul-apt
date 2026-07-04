@@ -25,6 +25,11 @@ jobs:
       - name: Install dependencies
         run: pip install -r seoul_apt/requirements.txt
 
+      - name: Restore DB from Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bash scripts/db_release.sh pull
+
       - name: Weekly AI recommendation
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
