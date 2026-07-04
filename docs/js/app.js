@@ -122,6 +122,10 @@
     });
     // 이동/줌이 끝날 때마다 화면 안 버블만 다시 그린다
     kakao.maps.event.addListener(state.map, "idle", renderMarkers);
+    // 창 크기 변경 시 지도 크기 재계산
+    window.addEventListener("resize", debounce(() => {
+      if (state.map) state.map.relayout();
+    }, 200));
   }
 
   // ── 가격 버블 렌더링 (호갱노노 스타일 커스텀 오버레이) ──────────────
@@ -144,7 +148,7 @@
 
     const bounds = state.map.getBounds();
     let visible = filteredMarkers().filter((m) =>
-      bounds.contain(new kakao.maps.LatLng(m.lat, m.lon)));
+      m.sale && bounds.contain(new kakao.maps.LatLng(m.lat, m.lon)));
     if (visible.length > BUBBLE_CAP) {
       visible = visible.slice()
         .sort((a, b) => (b.sale || 0) - (a.sale || 0)).slice(0, BUBBLE_CAP);
