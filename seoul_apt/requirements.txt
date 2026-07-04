@@ -1,0 +1,5 @@
+# 서울 아파트 수집기 의존성
+requests>=2.31.0
+pandas>=2.0.0
+python-dotenv>=1.0.0
+openpyxl>=3.1.0   # 공시가격 XLSX 파싱

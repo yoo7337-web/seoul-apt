@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<response>
+  <header>
+    <resultCode>000</resultCode>
+    <resultMsg>OK</resultMsg>
+  </header>
+  <body>
+    <items>
+      <item>
+        <aptNm>래미안대치팰리스</aptNm>
+        <umdNm>대치동</umdNm>
+        <jibun>1</jibun>
+        <buildYear>2015</buildYear>
+        <excluUseAr>84.99</excluUseAr>
+        <floor>7</floor>
+        <deposit>180,000</deposit>
+        <monthlyRent>0</monthlyRent>
+        <dealYear>2026</dealYear>
+        <dealMonth>5</dealMonth>
+        <dealDay>8</dealDay>
+      </item>
+      <item>
+        <aptNm>은마</aptNm>
+        <umdNm>대치동</umdNm>
+        <jibun>316</jibun>
+        <buildYear>1979</buildYear>
+        <excluUseAr>76.79</excluUseAr>
+        <floor>5</floor>
+        <deposit>50,000</deposit>
+        <monthlyRent>120</monthlyRent>
+        <dealYear>2026</dealYear>
+        <dealMonth>5</dealMonth>
+        <dealDay>15</dealDay>
+      </item>
+    </items>
+    <numOfRows>1000</numOfRows>
+    <pageNo>1</pageNo>
+    <totalCount>2</totalCount>
+  </body>
+</response>
