@@ -67,8 +67,9 @@ button, input, select { font: inherit; color: inherit; }
 
 .chip-select, .chip-btn {
   height: 38px; padding: 0 14px; border-radius: 10px; border: 0;
-  background: var(--surface); box-shadow: var(--shadow); cursor: pointer;
-  font-weight: 500; white-space: nowrap;
+  background: var(--surface); color: var(--text); box-shadow: var(--shadow);
+  cursor: pointer; font-weight: 500; white-space: nowrap;
+  display: inline-flex; align-items: center;
 }
 .chip-select:hover, .chip-btn:hover { color: var(--accent); }
 .chip-btn .count {
