@@ -129,42 +129,72 @@
     SeoulCharts.line("trend-chart", labels, datasets);
   }
 
-  // ── 3) 신축→구축 ────────────────────────────────────────────────────
+  // ── 3) 신축↔구축 (전체 카테고리 + 정렬 토글) ────────────────────────
+  let noLawd = "", noOrder = "new";   // ""=전체 · new=신축순 / old=구축순
+  const noCache = {};                 // lawd_cd → 단지 목록(구별 캐시)
+  const NO_CAP = 300;                 // '전체'일 때 표 렌더 상한
+
   function initNewOld() {
     const sel = $("no-district");
+    sel.innerHTML = '<option value="">전체</option>';
     (meta.districts || []).forEach((d) => {
       const o = document.createElement("option");
       o.value = d.lawd_cd; o.textContent = d.name;
       sel.appendChild(o);
     });
-    sel.addEventListener("change", () => renderNewOld(sel.value));
-    if (meta.districts && meta.districts.length) {
-      sel.value = meta.districts[0].lawd_cd;
-      renderNewOld(sel.value);
-    }
+    sel.value = noLawd;
+    sel.addEventListener("change", () => { noLawd = sel.value; renderNewOld(); });
+    renderNewOld();
   }
 
-  async function renderNewOld(lawd) {
-    let d;
-    try { d = await fetchJSON(`${DATA}districts/${lawd}.json`); }
-    catch { $("no-table-wrap").innerHTML = '<div class="empty">데이터 없음</div>'; return; }
-    const list = (d.complexes || [])
-      .filter((c) => c.build_year)
-      .sort((a, b) => b.build_year - a.build_year);
-    let html = `<div class="sel-hint">단지 클릭 = 지도에 표시</div>
-      <table class="rank-table"><thead><tr>
-      <th>단지</th><th>법정동</th><th>준공</th><th>연차</th><th>세대수</th>
-      <th>매매중앙값</th><th>평단가</th></tr></thead><tbody>`;
+  async function loadDistrictComplexes(lawd) {
+    if (noCache[lawd]) return noCache[lawd];
+    const name = (meta.districts || []).find((d) => d.lawd_cd === lawd)?.name || "";
+    const d = await fetchJSON(`${DATA}districts/${lawd}.json`);
+    const list = (d.complexes || []).filter((c) => c.build_year)
+      .map((c) => ({ ...c, gu: name }));
+    noCache[lawd] = list;
+    return list;
+  }
+
+  async function renderNewOld() {
+    const wrap = $("no-table-wrap");
+    wrap.innerHTML = '<div class="empty">불러오는 중…</div>';
+    let list = [];
+    try {
+      if (noLawd) list = await loadDistrictComplexes(noLawd);
+      else {
+        const all = await Promise.all((meta.districts || [])
+          .map((d) => loadDistrictComplexes(d.lawd_cd).catch(() => [])));
+        list = all.flat();
+      }
+    } catch { wrap.innerHTML = '<div class="empty">데이터 없음</div>'; return; }
+
+    list = list.slice().sort((a, b) =>
+      noOrder === "new" ? b.build_year - a.build_year : a.build_year - b.build_year);
+    const total = list.length;
+    const rows = total > NO_CAP ? list.slice(0, NO_CAP) : list;
+    const showGu = !noLawd;
     const nowY = new Date().getFullYear();
-    list.forEach((c) => {
-      html += `<tr data-id="${c.id}"><td>${c.apt}</td><td>${c.umd || "-"}</td>
-        <td>${c.build_year}</td><td>${nowY - c.build_year}년</td>
+
+    let html = `<div class="sel-bar">
+      <button class="d-chip${noOrder === "new" ? " on" : ""}" data-order="new">신축순</button>
+      <button class="d-chip${noOrder === "old" ? " on" : ""}" data-order="old">구축순</button>
+      <span class="sel-hint">단지 클릭 = 지도에 표시${total > NO_CAP ? ` · 상위 ${NO_CAP}/${total.toLocaleString()}` : ""}</span>
+      </div>
+      <table class="rank-table"><thead><tr>
+      <th>단지</th>${showGu ? "<th>자치구</th>" : ""}<th>법정동</th><th>준공</th><th>연차</th>
+      <th>세대수</th><th>매매중앙값</th><th>평단가</th></tr></thead><tbody>`;
+    rows.forEach((c) => {
+      html += `<tr data-id="${c.id}"><td>${c.apt}</td>${showGu ? `<td>${c.gu}</td>` : ""}
+        <td>${c.umd || "-"}</td><td>${c.build_year}</td><td>${nowY - c.build_year}년</td>
         <td>${c.households ? c.households.toLocaleString() : "-"}</td>
         <td>${SeoulCharts.fmt(c.sale_median)}</td>
         <td>${c.ppy_median ? Math.round(c.ppy_median).toLocaleString() : "-"}</td></tr>`;
     });
-    const wrap = $("no-table-wrap");
     wrap.innerHTML = html + "</tbody></table>";
+    wrap.querySelectorAll("[data-order]").forEach((b) =>
+      b.addEventListener("click", () => { noOrder = b.dataset.order; renderNewOld(); }));
     wrap.querySelectorAll("tr[data-id]").forEach((tr) =>
       tr.addEventListener("click", () => {
         if (window.SeoulMap) window.SeoulMap.focusComplex(+tr.dataset.id);
