@@ -227,8 +227,10 @@
       + (info && info.stale ? " stale" : "")
       + (mk.id === state.selectedId ? " selected" : "");
     const pyTag = (info && info.py) ? `<span class="pb-py">${info.py}평</span>` : "";
+    const staleIcon = (info && info.stale)
+      ? `<span class="pb-stale" title="최근 1년 내 실거래 없음 · 오래된 가격">🕒</span>` : "";
     el.innerHTML =
-      `<div class="pb-price">${bubblePrice(info ? info.price : null)}${pyTag}</div>` +
+      `<div class="pb-price">${staleIcon}${bubblePrice(info ? info.price : null)}${pyTag}</div>` +
       `<div class="pb-name">${escapeHtml(mk.apt)}</div>`;
     el.addEventListener("click", () => {
       state.selectedId = mk.id;

@@ -299,7 +299,8 @@ table.rank-table tbody tr[data-id]:hover { background: var(--accent-soft); }
 .pb-py {                                /* 대표/선택 평형 병기 */
   margin-left: 4px; font-size: 10px; font-weight: 600; opacity: .82;
 }
-.price-bubble.stale { opacity: .5; }    /* 1년 내 거래 없음(가격 오래됨) */
+.price-bubble.stale { opacity: .62; }   /* 1년 내 거래 없음(가격 오래됨) */
+.pb-stale { margin-right: 3px; font-size: 10px; vertical-align: middle; }
 
 .price-bubble.peak .pb-price { background: var(--up); }
 .price-bubble.peak .pb-price::after { border-top-color: var(--up); }
