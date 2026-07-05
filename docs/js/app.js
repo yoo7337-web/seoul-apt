@@ -265,7 +265,14 @@
         if (f.max != null && p > f.max * 10000) return false;
       }
       if (f.jr && !(m.jeonse_ratio >= +f.jr)) return false;
-      if (f.drop && !(m.drop != null && m.drop <= -f.drop)) return false;
+      if (f.drop) {
+        // 고점대비 하락 밴드. drop 은 음수(신고가=0). 신고가/데이터없음 제외.
+        if (m.drop == null || m.drop >= 0) return false;
+        const [lo, hi] = f.drop.split("_");   // "0_10","10_20","20_30","30_"
+        const d = -m.drop;                    // 하락폭(양수 %)
+        if (hi === "") { if (!(d > +lo)) return false; }          // 30_ → 30%↑
+        else if (!(d > +lo && d <= +hi)) return false;            // lo<d<=hi
+      }
       if (f.peak && !m.is_peak) return false;
       if (f.age) {
         if (!m.by) return false;
@@ -302,7 +309,7 @@
       f.min = $("f-min").value === "" ? null : +$("f-min").value;
       f.max = $("f-max").value === "" ? null : +$("f-max").value;
       f.jr = $("f-jr").value;
-      f.drop = $("f-drop").value ? +$("f-drop").value : "";
+      f.drop = $("f-drop").value;            // 밴드 문자열 "lo_hi"
       f.age = $("f-age").value;
       f.hh = $("f-hh").value;
       f.far = $("f-far").value;

@@ -157,9 +157,10 @@ def complex_list(conn, lawd_cd: str) -> list[dict]:
         peak = max((r["amount_manwon"] for r in recent_sales), default=None)
         last_amount = recent_sales[0]["amount_manwon"] if recent_sales else None
         # 최근 1년 거래 건수(활발도 필터) + 고점대비 하락률(%)
+        # 고점대비는 '최근 1건 거래' 기준 → 신고가(is_peak)면 0%가 되어 하락 필터에서 제외
         n1y = sum(1 for r in recent_sales if r["deal_date"] >= year_ago)
-        drop_pct = (round((sale_med - peak) / peak * 100, 1)
-                    if peak and sale_med else None)
+        drop_pct = (round((last_amount - peak) / peak * 100, 1)
+                    if peak and last_amount else None)
 
         jeonse_rows = conn.execute(
             "SELECT exclu_area, deposit_manwon FROM rent_txn "
