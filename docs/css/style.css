@@ -86,7 +86,7 @@ button, input, select { font: inherit; color: inherit; }
 }
 
 .nav-spacer { flex: 1; }
-.nav-group { display: inline-flex; gap: 8px; margin-left: auto; }
+.nav-right { margin-left: auto; }   /* 어느 줄에 있든 그 줄 오른쪽 끝으로 */
 a.nav-link { text-decoration: none; display: inline-flex; align-items: center; }
 a.nav-link.active { color: var(--accent); font-weight: 700; }
 .count.hidden { display: none; }
