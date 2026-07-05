@@ -153,6 +153,10 @@ def complex_list(conn, lawd_cd: str) -> list[dict]:
                        for r in recent if r["exclu_area"]])
         # 평형(전용면적 버킷)별 최근 거래 중앙값 - 지도에서 평형 선택 시 사용
         sale_by_area = _amount_by_area(recent_sales, "amount_manwon")
+        # 단지 전용면적 범위(㎡) - 슬라이더 평형 필터용
+        areas = [r["exclu_area"] for r in recent_sales if r["exclu_area"]]
+        area_min = round(min(areas), 1) if areas else None
+        area_max = round(max(areas), 1) if areas else None
         # 역대 최고가(신고가 하이라이트용)
         peak = max((r["amount_manwon"] for r in recent_sales), default=None)
         last_amount = recent_sales[0]["amount_manwon"] if recent_sales else None
@@ -182,6 +186,8 @@ def complex_list(conn, lawd_cd: str) -> list[dict]:
             "lon": c["lon"],
             "sale_median": sale_med,
             "sale_by_area": sale_by_area,
+            "area_min": area_min,
+            "area_max": area_max,
             "ppy_median": round(ppy, 0) if ppy else None,
             "sale_count": len(recent_sales),
             "sale_1y": n1y,

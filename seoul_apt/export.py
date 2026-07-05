@@ -87,6 +87,8 @@ def export_all(conn, kakao_js_key: str | None = None) -> dict:
                     "far": c["far"],             # 용적률(%)
                     "n1y": c["sale_1y"],         # 최근 1년 매매 건수
                     "drop": c["drop_pct"],       # 고점대비 %(음수=하락)
+                    "am": c["area_min"],         # 전용면적 최소(㎡)
+                    "ax": c["area_max"],         # 전용면적 최대(㎡)
                 })
 
     _write_json(export_dir / "markers.json", {"markers": markers})

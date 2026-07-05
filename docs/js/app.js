@@ -7,6 +7,28 @@
   const BUBBLE_CAP = 250;            // 화면에 동시에 그릴 최대 단지 버블 수
   const REGION_LEVEL = 7;            // 이 레벨 이상(축소)이면 구 단위 버블 표시
 
+  // 필터 슬라이더 정의(듀얼 레인지). hi==max 이면 상한 없음(N↑), lo==min 이면 하한 없음
+  const M2_PER_PY = 3.305785;       // 1평 = 3.305785㎡
+  const F_SLIDERS = [
+    { key: "area", label: "평형", min: 0, max: 80, step: 1, u: "평",
+      ticks: ["0", "20", "40", "60", "80+"] },
+    { key: "price", label: "가격", min: 0, max: 40, step: 0.5, u: "억",
+      ticks: ["0", "5억", "10억", "20억", "40억+"] },
+    { key: "age", label: "입주년차", min: 0, max: 30, step: 1, u: "년",
+      ticks: ["0", "10년", "20년", "30년+"] },
+    { key: "hh", label: "세대수", min: 0, max: 5000, step: 100, u: "세대",
+      ticks: ["0", "1000", "3000", "5000+"] },
+    { key: "jr", label: "전세가율", min: 0, max: 200, step: 5, u: "%",
+      ticks: ["0", "50%", "100%", "150%", "200%+"] },
+    { key: "gap", label: "갭가격", min: 0, max: 15, step: 0.5, u: "억",
+      ticks: ["0", "3억", "6억", "9억", "15억+"] },
+    { key: "far", label: "용적률", min: 0, max: 600, step: 10, u: "%",
+      ticks: ["0", "200%", "400%", "600%+"] },
+    { key: "n1y", label: "거래활발도(1년)", min: 0, max: 50, step: 1, u: "건",
+      ticks: ["0", "10건", "30건", "50건+"] },
+  ];
+  const F_CFG = Object.fromEntries(F_SLIDERS.map((s) => [s.key, s]));
+
   // 자치구 중심 좌표(구청 기준) - 저줌 지역 버블용
   const DISTRICT_CENTERS = {
     "11110": [37.5735, 126.9790], "11140": [37.5641, 126.9979],
@@ -28,9 +50,9 @@
     meta: null, markers: [], map: null,
     overlays: [], selectedId: null, districts: new Set(), search: "", area: "",
     dealType: "sale",   // 지도 말풍선 기준: 'sale'(매매) | 'jeonse'(전세)
-    // 상세 필터(8종). null/""/false = 미적용
-    filters: { min: null, max: null, jr: "", drop: "", age: "",
-               hh: "", far: "", n1y: "", peak: false },
+    // 슬라이더 범위 {lo,hi} + 토글. lo==min && hi==max 이면 미적용
+    range: Object.fromEntries(F_SLIDERS.map((s) => [s.key, { lo: s.min, hi: s.max }])),
+    minusGap: false, peak: false, dropBand: "",
     favorites: loadFavorites(), currentDetail: null, chartMode: "sale",
     detailArea: "",   // 상세 패널 면적(평형) 선택 ("" = 전체)
     favDistricts: loadFavDistricts(),   // 관심구(lawd_cd Set)
@@ -274,86 +296,159 @@
   }
 
   function filteredMarkers() {
-    const f = state.filters;
-    const nowYear = new Date().getFullYear();
+    const R = state.range, nowYear = new Date().getFullYear();
+    const active = (k) => R[k].lo > F_CFG[k].min || R[k].hi < F_CFG[k].max;
+    const inR = (k, v) => {   // 값이 범위 내인지(값 없으면 제외)
+      const r = R[k], c = F_CFG[k];
+      if (v == null) return false;
+      if (r.lo > c.min && v < r.lo) return false;
+      if (r.hi < c.max && v > r.hi) return false;
+      return true;
+    };
     return state.markers.filter((m) => {
       if (state.districts.size && !state.districts.has(m.lawd_cd)) return false;
       if (state.search && !m.apt.includes(state.search)) return false;
 
-      // ── 상세 필터 (값 없는 단지는 해당 필터 사용 시 제외) ──
-      if (f.min != null || f.max != null) {
-        const p = markerPrice(m);            // 현재 매매/전세×평형 기준 가격(만원)
-        if (!p) return false;
-        if (f.min != null && p < f.min * 10000) return false;
-        if (f.max != null && p > f.max * 10000) return false;
+      // 평형(단지 면적범위 ㎡→평, 슬라이더 구간과 겹치면 표시)
+      if (active("area")) {
+        if (m.am == null || m.ax == null) return false;
+        const r = R.area, cxLo = m.am / M2_PER_PY, cxHi = m.ax / M2_PER_PY;
+        if (r.lo > 0 && cxHi < r.lo) return false;
+        if (r.hi < 80 && cxLo > r.hi) return false;
       }
-      if (f.jr && !(m.jeonse_ratio >= +f.jr)) return false;
-      if (f.drop) {
-        // 고점대비 하락 밴드. drop 은 음수(신고가=0). 신고가/데이터없음 제외.
+      if (active("price")) {
+        const p = markerPrice(m);
+        if (!inR("price", p == null ? null : p / 10000)) return false;   // 억
+      }
+      if (active("age") && !inR("age", m.by ? nowYear - m.by : null)) return false;
+      if (active("hh") && !inR("hh", m.hh)) return false;
+      if (active("jr") && !inR("jr", m.jeonse_ratio)) return false;
+      if (active("far") && !inR("far", m.far)) return false;
+      if (active("n1y") && !inR("n1y", m.n1y)) return false;
+      // 갭가격(억): 마이너스갭 토글 우선
+      if (state.minusGap) {
+        if (m.sale == null || m.jeonse == null || (m.sale - m.jeonse) >= 0) return false;
+      } else if (active("gap")) {
+        const g = (m.sale != null && m.jeonse != null) ? (m.sale - m.jeonse) / 10000 : null;
+        if (!inR("gap", g)) return false;
+      }
+      if (state.peak && !m.is_peak) return false;
+      if (state.dropBand) {   // 고점대비 하락 밴드(drop 음수, 신고가=0 제외)
         if (m.drop == null || m.drop >= 0) return false;
-        const [lo, hi] = f.drop.split("_");   // "0_10","10_20","20_30","30_"
-        const d = -m.drop;                    // 하락폭(양수 %)
-        if (hi === "") { if (!(d > +lo)) return false; }          // 30_ → 30%↑
-        else if (!(d > +lo && d <= +hi)) return false;            // lo<d<=hi
+        const [lo, hi] = state.dropBand.split("_");
+        const d = -m.drop;
+        if (hi === "") { if (!(d > +lo)) return false; }
+        else if (!(d > +lo && d <= +hi)) return false;
       }
-      if (f.peak && !m.is_peak) return false;
-      if (f.age) {
-        if (!m.by) return false;
-        const age = nowYear - m.by;
-        if (f.age === "new5" && age > 5) return false;
-        if (f.age === "new10" && age > 10) return false;
-        if (f.age === "mid" && (age <= 10 || age > 30)) return false;
-        if (f.age === "old30" && age < 30) return false;
-      }
-      if (f.hh && !(m.hh >= +f.hh)) return false;
-      if (f.far && !(m.far && m.far <= +f.far)) return false;
-      if (f.n1y && !(m.n1y >= +f.n1y)) return false;
       return true;
     });
   }
 
   function activeFilterCount() {
-    const f = state.filters;
     let n = 0;
-    if (f.min != null || f.max != null) n++;
-    ["jr", "drop", "age", "hh", "far", "n1y"].forEach((k) => { if (f[k]) n++; });
-    if (f.peak) n++;
+    F_SLIDERS.forEach((s) => {
+      if (s.key === "gap" && state.minusGap) return;   // 마이너스갭이 갭슬라이더 대체
+      if (state.range[s.key].lo > s.min || state.range[s.key].hi < s.max) n++;
+    });
+    if (state.minusGap) n++;
+    if (state.peak) n++;
+    if (state.dropBand) n++;
     return n;
   }
 
-  function bindFilterUI() {
-    const panel = $("filter-panel");
-    $("btn-filter").addEventListener("click", () =>
-      panel.classList.toggle("hidden"));
-    $("f-close").addEventListener("click", () => panel.classList.add("hidden"));
-
-    const onChange = () => {
-      const f = state.filters;
-      f.min = $("f-min").value === "" ? null : +$("f-min").value;
-      f.max = $("f-max").value === "" ? null : +$("f-max").value;
-      f.jr = $("f-jr").value;
-      f.drop = $("f-drop").value;            // 밴드 문자열 "lo_hi"
-      f.age = $("f-age").value;
-      f.hh = $("f-hh").value;
-      f.far = $("f-far").value;
-      f.n1y = $("f-n1y").value;
-      f.peak = $("f-peak").checked;
-      updateFilterBadge();
-      applyFilters();
+  // ── 필터 패널(슬라이더 생성 + 바인딩) ───────────────────────────────
+  function fmtValNum(s, v) {
+    return (s.key === "hh" ? v.toLocaleString() : v) + s.u;
+  }
+  function paintRange(s) {
+    const r = state.range[s.key];
+    const pct = (v) => ((v - s.min) / (s.max - s.min)) * 100;
+    const fill = $("rfill-" + s.key);
+    if (fill) { fill.style.left = pct(r.lo) + "%"; fill.style.width = (pct(r.hi) - pct(r.lo)) + "%"; }
+    const val = $("fv-" + s.key);
+    if (val) {
+      const full = r.lo <= s.min && r.hi >= s.max;
+      val.textContent = full ? "전체"
+        : `${fmtValNum(s, r.lo)} ~ ${fmtValNum(s, r.hi)}${r.hi >= s.max ? "↑" : ""}`;
+    }
+  }
+  function rangeHtml(s) {
+    const r = state.range[s.key];
+    return `<div class="fs-item">
+      <div class="fs-head"><span class="fs-label">${s.label}</span>
+        <span class="fs-val" id="fv-${s.key}"></span></div>
+      <div class="range"><div class="rtrack"></div><div class="rfill" id="rfill-${s.key}"></div>
+        <input type="range" id="rlo-${s.key}" min="${s.min}" max="${s.max}" step="${s.step}" value="${r.lo}">
+        <input type="range" id="rhi-${s.key}" min="${s.min}" max="${s.max}" step="${s.step}" value="${r.hi}">
+      </div>
+      <div class="range-ticks">${s.ticks.map((t) => `<span>${t}</span>`).join("")}</div>
+    </div>`;
+  }
+  function bindRange(s) {
+    const lo = $("rlo-" + s.key), hi = $("rhi-" + s.key);
+    const upd = (commit) => {
+      let a = +lo.value, b = +hi.value;
+      if (a > b) {   // 교차 방지
+        if (document.activeElement === lo) { b = a; hi.value = b; }
+        else { a = b; lo.value = a; }
+      }
+      state.range[s.key] = { lo: a, hi: b };
+      paintRange(s);
+      if (commit) onFilterChange();
     };
-    ["f-jr", "f-drop", "f-age", "f-hh", "f-far", "f-n1y", "f-peak"].forEach((id) =>
-      $(id).addEventListener("change", onChange));
-    ["f-min", "f-max"].forEach((id) =>
-      $(id).addEventListener("input", debounce(onChange, 400)));
-
-    $("f-reset").addEventListener("click", () => {
-      ["f-min", "f-max"].forEach((id) => { $(id).value = ""; });
-      ["f-jr", "f-drop", "f-age", "f-hh", "f-far", "f-n1y"].forEach((id) => {
-        $(id).value = "";
-      });
-      $("f-peak").checked = false;
-      onChange();
+    lo.addEventListener("input", () => upd(false));
+    hi.addEventListener("input", () => upd(false));
+    lo.addEventListener("change", () => upd(true));
+    hi.addEventListener("change", () => upd(true));
+    paintRange(s);
+  }
+  function buildFilterUI() {
+    let html = F_SLIDERS.map(rangeHtml).join("");
+    html += `<label class="fs-toggle"><input type="checkbox" id="f-minusgap"> 마이너스 갭 보기 (전세>매매)</label>`;
+    html += `<label class="fs-toggle"><input type="checkbox" id="f-peak"> 신고가 단지만</label>`;
+    html += `<div class="fs-select"><label>고점대비 하락</label>
+      <select id="f-drop">
+        <option value="">전체</option>
+        <option value="0_10">0 ~ -10%</option>
+        <option value="10_20">-10 ~ -20%</option>
+        <option value="20_30">-20 ~ -30%</option>
+        <option value="30_">-30% 이상 하락</option>
+      </select></div>`;
+    $("filter-body").innerHTML = html;
+    F_SLIDERS.forEach(bindRange);
+    $("f-minusgap").addEventListener("change", (e) => { state.minusGap = e.target.checked; onFilterChange(); });
+    $("f-peak").addEventListener("change", (e) => { state.peak = e.target.checked; onFilterChange(); });
+    $("f-drop").addEventListener("change", (e) => { state.dropBand = e.target.value; onFilterChange(); });
+  }
+  function resetFilters() {
+    F_SLIDERS.forEach((s) => {
+      state.range[s.key] = { lo: s.min, hi: s.max };
+      const lo = $("rlo-" + s.key), hi = $("rhi-" + s.key);
+      if (lo) { lo.value = s.min; hi.value = s.max; }
+      paintRange(s);
     });
+    state.minusGap = state.peak = false; state.dropBand = "";
+    if ($("f-minusgap")) $("f-minusgap").checked = false;
+    if ($("f-peak")) $("f-peak").checked = false;
+    if ($("f-drop")) $("f-drop").value = "";
+    onFilterChange();
+  }
+  function onFilterChange() { updateFilterBadge(); applyFilters(); }
+
+  function toggleFilter(force) {
+    const open = typeof force === "boolean"
+      ? force : !document.body.classList.contains("filter-open");
+    document.body.classList.toggle("filter-open", open);
+    $("filter-panel").classList.toggle("hidden", !open);
+    setTimeout(() => { if (state.map) state.map.relayout(); }, 80);
+  }
+
+  function bindFilterUI() {
+    buildFilterUI();
+    $("btn-filter").addEventListener("click", () => toggleFilter());
+    $("filter-close").addEventListener("click", () => toggleFilter(false));
+    $("f-close").addEventListener("click", () => toggleFilter(false));
+    $("f-reset").addEventListener("click", resetFilters);
   }
 
   function updateFilterBadge() {

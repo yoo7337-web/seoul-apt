@@ -6,7 +6,7 @@
   <title>서울 아파트 시세 지도</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=15">
+  <link rel="stylesheet" href="css/style.css?v=16">
 </head>
 <body>
   <!-- 풀스크린 지도 -->
@@ -75,83 +75,18 @@
   </aside>
   <div id="dash-resizer" class="dash-resizer hidden" title="드래그해서 너비 조절"></div>
 
-  <!-- 필터 패널 -->
-  <div id="filter-panel" class="filter-panel hidden">
-    <div class="fp-grid">
-      <div class="fp-item fp-wide">
-        <label>가격대(억) — 현재 매매/전세 기준</label>
-        <div class="fp-range">
-          <input id="f-min" type="number" min="0" step="0.5" placeholder="최소">
-          <span>~</span>
-          <input id="f-max" type="number" min="0" step="0.5" placeholder="최대">
-        </div>
-      </div>
-      <div class="fp-item">
-        <label>전세가율</label>
-        <select id="f-jr">
-          <option value="">전체</option>
-          <option value="50">50% 이상</option>
-          <option value="60">60% 이상</option>
-          <option value="70">70% 이상</option>
-          <option value="80">80% 이상</option>
-        </select>
-      </div>
-      <div class="fp-item">
-        <label>고점대비</label>
-        <select id="f-drop">
-          <option value="">전체</option>
-          <option value="0_10">0 ~ -10%</option>
-          <option value="10_20">-10 ~ -20%</option>
-          <option value="20_30">-20 ~ -30%</option>
-          <option value="30_">-30% 이상 하락</option>
-        </select>
-      </div>
-      <div class="fp-item">
-        <label>준공연차</label>
-        <select id="f-age">
-          <option value="">전체</option>
-          <option value="new5">신축(5년 이내)</option>
-          <option value="new10">10년 이내</option>
-          <option value="mid">10~30년</option>
-          <option value="old30">30년 이상(재건축)</option>
-        </select>
-      </div>
-      <div class="fp-item">
-        <label>세대수</label>
-        <select id="f-hh">
-          <option value="">전체</option>
-          <option value="300">300세대 이상</option>
-          <option value="500">500세대 이상</option>
-          <option value="1000">1,000세대 이상</option>
-        </select>
-      </div>
-      <div class="fp-item">
-        <label>용적률</label>
-        <select id="f-far">
-          <option value="">전체</option>
-          <option value="150">150% 이하</option>
-          <option value="200">200% 이하</option>
-          <option value="250">250% 이하</option>
-        </select>
-      </div>
-      <div class="fp-item">
-        <label>거래 활발도(1년)</label>
-        <select id="f-n1y">
-          <option value="">전체</option>
-          <option value="5">5건 이상</option>
-          <option value="10">10건 이상</option>
-          <option value="30">30건 이상</option>
-        </select>
-      </div>
-      <div class="fp-item fp-check">
-        <label><input id="f-peak" type="checkbox"> 신고가 단지만</label>
-      </div>
+  <!-- 필터 패널(오른쪽 분할, 슬라이더는 JS 생성) -->
+  <aside id="filter-panel" class="filter-panel hidden">
+    <div class="dash-head">
+      <h1>🔍 필터</h1>
+      <button id="filter-close" class="dash-close" title="닫기">✕</button>
     </div>
+    <div id="filter-body"></div>
     <div class="fp-actions">
       <button id="f-reset" class="ghost">초기화</button>
       <button id="f-close" class="filled">닫기</button>
     </div>
-  </div>
+  </aside>
 
   <div class="updated" id="updated-label">데이터 기준일: —</div>
 
@@ -178,6 +113,6 @@
   <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
   <script src="js/charts.js?v=6"></script>
   <script src="js/dashboard.js?v=8"></script>
-  <script src="js/app.js?v=19"></script>
+  <script src="js/app.js?v=20"></script>
 </body>
 </html>
