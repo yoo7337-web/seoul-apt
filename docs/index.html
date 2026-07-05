@@ -6,7 +6,7 @@
   <title>서울 아파트 시세 지도</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=6">
+  <link rel="stylesheet" href="css/style.css?v=7">
 </head>
 <body>
   <!-- 풀스크린 지도 -->
@@ -15,8 +15,6 @@
   <!-- 플로팅 상단 컨트롤 (호갱노노 스타일) -->
   <header class="float-bar">
     <div class="brand-chip"><span class="logo">🏙️</span><b>서울아파트</b></div>
-    <a class="chip-btn nav-link" href="dashboard.html">📊 대시보드</a>
-    <a class="chip-btn nav-link" href="devlog.html">📝 개발일지</a>
     <div class="search-box">
       <span class="s-icon">🔍</span>
       <input id="search-input" type="search" placeholder="단지명 검색" autocomplete="off">
@@ -38,6 +36,11 @@
     <button id="btn-filter" class="chip-btn">필터 <span id="filter-count" class="count hidden">0</span> ▾</button>
     <button id="btn-rankings" class="chip-btn">구별 랭킹</button>
     <button id="btn-favorites" class="chip-btn">★ 관심단지 <span id="fav-count" class="count">0</span></button>
+    <span class="nav-spacer"></span>
+    <div class="nav-group">
+      <a class="chip-btn nav-link" href="dashboard.html">📊 대시보드</a>
+      <a class="chip-btn nav-link" href="devlog.html">📝 개발일지</a>
+    </div>
   </header>
 
   <!-- 필터 패널 -->

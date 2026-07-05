@@ -86,6 +86,7 @@ button, input, select { font: inherit; color: inherit; }
 }
 
 .nav-spacer { flex: 1; }
+.nav-group { display: inline-flex; gap: 8px; margin-left: auto; }
 a.nav-link { text-decoration: none; display: inline-flex; align-items: center; }
 a.nav-link.active { color: var(--accent); font-weight: 700; }
 .count.hidden { display: none; }
@@ -139,6 +140,34 @@ body.page { overflow: auto; }
 }
 .d-chip.on { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
 .table-scroll { max-height: 420px; overflow-y: auto; }
+
+/* 예정/아이디어 위젯 */
+.idea-input { display: flex; gap: 8px; margin-bottom: 10px; }
+.idea-input input {
+  flex: 1; height: 38px; border-radius: 10px; border: 1px solid var(--border);
+  background: var(--bg); padding: 0 12px; font-size: 13.5px;
+}
+.idea-input button { height: 38px; padding: 0 18px; border-radius: 10px; border: 0;
+  background: var(--accent); color: #fff; font-weight: 700; cursor: pointer; }
+.idea-list { list-style: none; padding: 0; margin: 0; }
+.idea-list li {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 4px; border-bottom: 1px solid var(--border); font-size: 13.5px;
+}
+.idea-list li.done .idea-txt { text-decoration: line-through; color: var(--muted); }
+.idea-list .idea-txt { flex: 1; }
+.idea-list .idea-del {
+  border: 0; background: transparent; color: var(--muted); cursor: pointer; font-size: 13px;
+}
+.idea-list .idea-del:hover { color: var(--up); }
+.idea-list .idea-empty { color: var(--muted); justify-content: center; border: 0; }
+.idea-actions { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
+.idea-actions button {
+  padding: 6px 14px; border-radius: 8px; border: 1px solid var(--border);
+  background: var(--surface); color: var(--text); cursor: pointer; font-size: 12.5px;
+}
+.idea-copied { color: var(--accent); font-size: 12px; font-weight: 600; }
+.idea-copied.hidden { display: none; }
 
 /* 개발일지 마크다운 */
 .md-body { line-height: 1.7; font-size: 14px; }

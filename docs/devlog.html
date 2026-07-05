@@ -6,7 +6,7 @@
   <title>개발일지 - 서울 아파트 시세 지도</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=6">
+  <link rel="stylesheet" href="css/style.css?v=7">
 </head>
 <body class="page">
   <header class="float-bar">
@@ -19,17 +19,75 @@
 
   <main class="page-wrap">
     <section class="page-section">
+      <h2>📌 예정 / 아이디어</h2>
+      <div class="desc">앞으로 개발할 내용을 적어두세요. 이 브라우저에 저장됩니다.
+        📋 복사로 <code>devlog.md</code>에 반영하거나 저에게 붙여넣어 주세요.</div>
+      <div class="idea-input">
+        <input id="idea-text" type="text" placeholder="아이디어 입력 후 Enter 또는 [추가]">
+        <button id="idea-add" class="filled">추가</button>
+      </div>
+      <ul id="idea-list" class="idea-list"></ul>
+      <div class="idea-actions">
+        <button id="idea-copy" class="ghost">📋 목록 복사</button>
+        <span id="idea-copied" class="idea-copied hidden">복사됨!</span>
+      </div>
+    </section>
+
+    <section class="page-section">
       <div id="md" class="md-body">불러오는 중…</div>
     </section>
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/marked@12.0.0/marked.min.js"></script>
   <script>
-    fetch("devlog.md").then(r => r.text()).then(t => {
+    // ── 완료 내역 마크다운 렌더 (항상 최신) ──
+    fetch("devlog.md", { cache: "no-store" }).then(r => r.text()).then(t => {
       document.getElementById("md").innerHTML = marked.parse(t);
     }).catch(() => {
       document.getElementById("md").textContent = "devlog.md 를 불러오지 못했습니다.";
     });
+
+    // ── 예정/아이디어: localStorage 기반 기재 ──
+    (function () {
+      const KEY = "seoul_apt_ideas";
+      const $ = (id) => document.getElementById(id);
+      const load = () => { try { return JSON.parse(localStorage.getItem(KEY) || "[]"); } catch { return []; } };
+      const save = (a) => localStorage.setItem(KEY, JSON.stringify(a));
+      let ideas = load();
+
+      function render() {
+        const ul = $("idea-list");
+        if (!ideas.length) { ul.innerHTML = '<li class="idea-empty">아직 없음 — 위에 입력해 추가하세요.</li>'; return; }
+        ul.innerHTML = ideas.map((it, i) =>
+          `<li class="${it.done ? "done" : ""}">
+             <input type="checkbox" data-i="${i}" ${it.done ? "checked" : ""}>
+             <span class="idea-txt">${esc(it.text)}</span>
+             <button class="idea-del" data-i="${i}" title="삭제">✕</button>
+           </li>`).join("");
+        ul.querySelectorAll(".idea-del").forEach((b) =>
+          b.addEventListener("click", () => { ideas.splice(+b.dataset.i, 1); save(ideas); render(); }));
+        ul.querySelectorAll('input[type=checkbox]').forEach((c) =>
+          c.addEventListener("change", () => { ideas[+c.dataset.i].done = c.checked; save(ideas); render(); }));
+      }
+      function esc(s) { return String(s).replace(/[&<>"']/g, (c) =>
+        ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
+      function add() {
+        const v = $("idea-text").value.trim();
+        if (!v) return;
+        ideas.unshift({ text: v, done: false });
+        save(ideas); $("idea-text").value = ""; render();
+      }
+      $("idea-add").addEventListener("click", add);
+      $("idea-text").addEventListener("keydown", (e) => { if (e.key === "Enter") add(); });
+      $("idea-copy").addEventListener("click", () => {
+        const md = ideas.map((it) => `- [${it.done ? "x" : " "}] ${it.text}`).join("\n");
+        navigator.clipboard.writeText(md || "").then(() => {
+          const c = $("idea-copied"); c.classList.remove("hidden");
+          setTimeout(() => c.classList.add("hidden"), 1500);
+        });
+      });
+      render();
+    })();
   </script>
 </body>
 </html>
