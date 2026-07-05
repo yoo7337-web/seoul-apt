@@ -296,6 +296,11 @@ table.rank-table tbody tr[data-id]:hover { background: var(--accent-soft); }
   .pb-name { background: rgba(34, 36, 41, .92); color: #cfd3d8; }
 }
 
+.pb-py {                                /* 대표/선택 평형 병기 */
+  margin-left: 4px; font-size: 10px; font-weight: 600; opacity: .82;
+}
+.price-bubble.stale { opacity: .5; }    /* 1년 내 거래 없음(가격 오래됨) */
+
 .price-bubble.peak .pb-price { background: var(--up); }
 .price-bubble.peak .pb-price::after { border-top-color: var(--up); }
 
@@ -382,6 +387,8 @@ table.rank-table tbody tr[data-id]:hover { background: var(--accent-soft); }
 .price-cards .label { color: var(--muted); font-size: 11px; margin-bottom: 3px; }
 .price-cards .value { font-size: 17px; font-weight: 800; color: var(--accent-dark); }
 .price-cards .value.small { font-size: 14.5px; font-weight: 700; color: var(--text); }
+.stale-tag { font-size: 10px; font-weight: 600; color: var(--muted);
+  vertical-align: middle; }
 
 .info-row {
   display: flex; gap: 8px; margin-top: 8px;

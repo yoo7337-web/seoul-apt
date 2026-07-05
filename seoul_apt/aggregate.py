@@ -24,30 +24,54 @@ def _month(deal_date: str) -> str:
     return deal_date[:7]  # 'YYYY-MM'
 
 
-# 지도 평형별 대표가 산출 시 버킷당 사용할 최근 거래 수
-AREA_MARKER_RECENT = 30
+def _by_area(rows: list, amount_key: str, since: str) -> dict:
+    """전용면적 버킷별 '최근' 대표가. 거래 있는 버킷만 포함.
 
+    각 버킷에서 since(최근 1년) 이후 거래의 중앙값(만원)과 중앙 전용면적(평)을
+    산출한다. 1년 내 거래가 없으면 가장 최근 1건으로 대체하고 s(오래됨)=1 표시.
+    '최근 N건'이 아닌 기간 기준이라 단지마다 '최근'의 의미가 일관된다.
 
-def _amount_by_area(rows: list, amount_key: str) -> dict:
-    """전용면적 버킷별 최근 거래 중앙값(만원). 거래 있는 버킷만 포함.
-
-    rows 는 deal_date DESC 로 정렬돼 있다고 가정(매매는 canceled=0).
-    각 버킷의 최근 AREA_MARKER_RECENT 건만 취해 중앙값을 낸다.
+    rows 는 deal_date DESC 정렬 가정(매매는 canceled=0).
     amount_key: 매매는 'amount_manwon', 전세는 'deposit_manwon'.
+    반환 {버킷: {"p": 가격(만원), "py": 평, "s": 1?}}.
     """
     by_bucket: dict[str, list] = defaultdict(list)
     for r in rows:
         if r["exclu_area"] is None:
             continue
-        b = config.area_bucket(r["exclu_area"])
-        if len(by_bucket[b]) < AREA_MARKER_RECENT:
-            by_bucket[b].append(r[amount_key])
+        by_bucket[config.area_bucket(r["exclu_area"])].append(r)
     out = {}
-    for b, amounts in by_bucket.items():
-        m = _median(amounts)
-        if m is not None:
-            out[b] = m
+    for b, rs in by_bucket.items():          # rs: deal_date DESC
+        recent = [r for r in rs if r["deal_date"] >= since]
+        use = recent or rs[:1]
+        p = _median([r[amount_key] for r in use])
+        if p is None:
+            continue
+        py = _median([_pyeong(r["exclu_area"]) for r in use])
+        item = {"p": round(p), "py": round(py) if py else None}
+        if not recent:
+            item["s"] = 1                      # 1년 내 거래 없음(가격 오래됨)
+        out[b] = item
     return out
+
+
+# 단지 대표 평형 동률 시 우선순위(국민평형대 우선)
+_REP_PRIORITY = {"60~85㎡": 0, "85~135㎡": 1, "~60㎡": 2, "135㎡~": 3}
+
+
+def _rep_bucket(rows: list) -> str | None:
+    """단지 대표 평형 - 전체 거래에서 가장 많이 거래된 전용면적 버킷.
+
+    지도에서 '전체 평형'일 때 이 대표 평형의 최근가를 말풍선에 표시한다
+    (전 면적 혼합 중앙값 대신). 동률이면 국민평형대(60~85㎡)를 우선한다.
+    """
+    counts: dict[str, int] = defaultdict(int)
+    for r in rows:
+        if r["exclu_area"] is not None:
+            counts[config.area_bucket(r["exclu_area"])] += 1
+    if not counts:
+        return None
+    return max(counts, key=lambda b: (counts[b], -_REP_PRIORITY.get(b, 9)))
 
 
 def representative_months(monthly: list[dict]) -> list[dict]:
@@ -151,8 +175,9 @@ def complex_list(conn, lawd_cd: str) -> list[dict]:
         sale_med = _median([r["amount_manwon"] for r in recent])
         ppy = _median([r["amount_manwon"] / _pyeong(r["exclu_area"])
                        for r in recent if r["exclu_area"]])
-        # 평형(전용면적 버킷)별 최근 거래 중앙값 - 지도에서 평형 선택 시 사용
-        sale_by_area = _amount_by_area(recent_sales, "amount_manwon")
+        # 평형(전용면적 버킷)별 최근 대표가 - 지도 평형 선택 시 사용
+        sale_by_area = _by_area(recent_sales, "amount_manwon", year_ago)
+        rep = _rep_bucket(recent_sales)       # 대표 평형(전체 평형 표시용)
         # 단지 전용면적 범위(㎡) - 슬라이더 평형 필터용
         areas = [r["exclu_area"] for r in recent_sales if r["exclu_area"]]
         area_min = round(min(areas), 1) if areas else None
@@ -167,11 +192,12 @@ def complex_list(conn, lawd_cd: str) -> list[dict]:
                     if peak and last_amount else None)
 
         jeonse_rows = conn.execute(
-            "SELECT exclu_area, deposit_manwon FROM rent_txn "
+            "SELECT deal_date, exclu_area, deposit_manwon FROM rent_txn "
             "WHERE complex_id=? AND rent_type='jeonse' "
             "ORDER BY deal_date DESC", (cid,)).fetchall()
         jeonse_med = _median([r["deposit_manwon"] for r in jeonse_rows[:30]])
-        jeonse_by_area = _amount_by_area(jeonse_rows, "deposit_manwon")
+        jeonse_by_area = _by_area(jeonse_rows, "deposit_manwon", year_ago)
+        jrep = _rep_bucket(jeonse_rows)       # 전세 대표 평형
 
         gongsi = conn.execute(
             "SELECT year, price_manwon FROM gongsi_price "
@@ -186,6 +212,7 @@ def complex_list(conn, lawd_cd: str) -> list[dict]:
             "lon": c["lon"],
             "sale_median": sale_med,
             "sale_by_area": sale_by_area,
+            "rep": rep,
             "area_min": area_min,
             "area_max": area_max,
             "ppy_median": round(ppy, 0) if ppy else None,
@@ -199,6 +226,7 @@ def complex_list(conn, lawd_cd: str) -> list[dict]:
             "is_peak": bool(last_amount and peak and last_amount >= peak),
             "jeonse_median": jeonse_med,
             "jeonse_by_area": jeonse_by_area,
+            "jrep": jrep,
             "jeonse_ratio": round(jeonse_med / sale_med * 100, 1)
             if jeonse_med and sale_med else None,
             "gongsi_price": gongsi["price_manwon"] if gongsi else None,

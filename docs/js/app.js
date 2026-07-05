@@ -221,11 +221,14 @@
 
   function makeBubble(mk) {
     const el = document.createElement("div");
+    const info = markerInfo(mk);
     el.className = "price-bubble"
       + (mk.is_peak && state.dealType === "sale" ? " peak" : "")
+      + (info && info.stale ? " stale" : "")
       + (mk.id === state.selectedId ? " selected" : "");
+    const pyTag = (info && info.py) ? `<span class="pb-py">${info.py}평</span>` : "";
     el.innerHTML =
-      `<div class="pb-price">${bubblePrice(markerPrice(mk))}</div>` +
+      `<div class="pb-price">${bubblePrice(info ? info.price : null)}${pyTag}</div>` +
       `<div class="pb-name">${escapeHtml(mk.apt)}</div>`;
     el.addEventListener("click", () => {
       state.selectedId = mk.id;
@@ -272,12 +275,19 @@
     });
   }
 
-  // 거래유형(매매/전세) + 선택 평형에 따른 말풍선 가격
+  // 거래유형(매매/전세)+평형에 따른 대표 거래 정보.
+  // 전체 평형이면 단지 대표 평형(rep/jrep)의 최근가, 특정 평형이면 그 평형의 최근가.
+  // (전 면적 혼합 중앙값 대신 '어떤 평형의 가격'인지 명확히)
+  function markerInfo(mk) {
+    const jeonse = state.dealType === "jeonse";
+    const byArea = jeonse ? mk.jeonse_area : mk.sale_area;
+    const bucket = state.area || (jeonse ? mk.jrep : mk.rep);
+    const o = (byArea && bucket) ? byArea[bucket] : null;
+    return o ? { price: o.p, py: o.py, stale: !!o.s, bucket } : null;
+  }
   function markerPrice(mk) {
-    if (state.dealType === "jeonse") {
-      return state.area ? (mk.jeonse_area ? mk.jeonse_area[state.area] : null) : mk.jeonse;
-    }
-    return state.area ? (mk.sale_area ? mk.sale_area[state.area] : null) : mk.sale;
+    const info = markerInfo(mk);
+    return info ? info.price : null;
   }
 
   function bubblePrice(manwon) {
@@ -564,8 +574,20 @@
     renderPanel();
   }
 
+  // 상세 패널: 선택 평형(없으면 대표 평형) 기준 최근 매매/전세가
+  function detailInfo(d, jeonse) {
+    const byArea = jeonse ? d.jeonse_area : d.sale_area;
+    const bucket = state.detailArea || (jeonse ? d.jrep : d.rep);
+    const o = (byArea && bucket) ? byArea[bucket] : null;
+    return o ? { price: o.p, py: o.py, stale: !!o.s } : null;
+  }
+  const cardArea = (info) => (info && info.py ? ` · ${info.py}평` : "");
+  const staleTag = (info) =>
+    (info && info.stale ? ' <span class="stale-tag">1년+</span>' : "");
+
   function renderPanel() {
     const d = state.currentDetail;
+    const si = detailInfo(d, false), ji = detailInfo(d, true);
     const isFav = state.favorites.some((f) => f.id === d.id);
     const gongsi = latestGongsi(d);
     const el = $("panel-content");
@@ -573,12 +595,12 @@
       <h2>${d.apt} ${d.is_peak ? '<span class="badge peak">신고가</span>' : ""}</h2>
       <div class="sub">${districtName(d.lawd_cd)}${d.umd ? " " + d.umd : ""} · ${buildYearText(d)}</div>
       <div class="price-cards">
-        <div class="card"><div class="label">최근 매매 중앙값</div>
-          <div class="value">${fmt(d.sale)}</div></div>
+        <div class="card"><div class="label">최근 매매${cardArea(si)}</div>
+          <div class="value">${si ? fmt(si.price) : "-"}${staleTag(si)}</div></div>
         <div class="card"><div class="label">평단가(만원/평)</div>
           <div class="value small">${d.ppy ? Math.round(d.ppy).toLocaleString() : "-"}</div></div>
-        <div class="card"><div class="label">전세 중앙값</div>
-          <div class="value small">${fmt(medianJeonse(d))}</div></div>
+        <div class="card"><div class="label">최근 전세${cardArea(ji)}</div>
+          <div class="value small">${ji ? fmt(ji.price) : "-"}${staleTag(ji)}</div></div>
         <div class="card"><div class="label">전세가율</div>
           <div class="value small">${d.jeonse_ratio != null ? d.jeonse_ratio + "%" : "-"}</div></div>
         <div class="card"><div class="label">공시가격 ${gongsi ? "(" + gongsi.year + ")" : ""}</div>
@@ -828,14 +850,6 @@
   function gongsiRatio(d, g) {
     if (!g || !d.sale) return "-";
     return Math.round(g.price / d.sale * 100) + "%";
-  }
-  function medianJeonse(d) {
-    const s = d.jeonse_series || {};
-    const all = [];
-    Object.values(s).forEach((arr) => arr.forEach((p) => p.median && all.push(p.median)));
-    if (!all.length) return null;
-    all.sort((a, b) => a - b);
-    return all[Math.floor(all.length / 2)];
   }
   function ppyOf(d) {
     const last = d.recent_sales && d.recent_sales[0];

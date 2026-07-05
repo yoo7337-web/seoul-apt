@@ -108,9 +108,34 @@ def test_sale_by_area_buckets():
     conn.commit()
     cx = aggregate.complex_list(conn, "11680")[0]
     sba = cx["sale_by_area"]
-    assert sba["~60㎡"] == 210000        # median(200000, 220000)
-    assert sba["60~85㎡"] == 310000      # median(300000, 320000)
-    assert "85~135㎡" not in sba         # 해제 건뿐이라 버킷 없음
+    assert sba["~60㎡"]["p"] == 210000        # median(200000, 220000)
+    assert sba["60~85㎡"]["p"] == 310000      # median(300000, 320000)
+    assert "85~135㎡" not in sba              # 해제 건뿐이라 버킷 없음
+    assert sba["~60㎡"]["py"] > 0             # 중앙 전용면적(평) 병기
+    # 대표 평형: ~60㎡·60~85㎡ 각 2건 동률 → 국민평형대(60~85㎡) 우선
+    assert cx["rep"] == "60~85㎡"
+    conn.close()
+
+
+def test_by_area_jeonse_and_stale():
+    """전세 평형별 대표가(deal_date 필요)와 1년+ 오래된 거래 stale 표시 검증."""
+    from datetime import date, timedelta
+    conn = db.connect(":memory:")
+    cid = db.upsert_complex(conn, "11680", "대치동", "은마", 1979, "316")
+    recent = (date.today() - timedelta(days=20)).isoformat()
+    old = (date.today() - timedelta(days=800)).isoformat()   # 1년 밖
+    # 60~85㎡: 최근 매매 → stale 아님
+    db.insert_sale(conn, cid, recent, 76.79, 5, 300000)
+    # ~60㎡: 1년 넘은 매매뿐 → 최근가 대체 + s=1
+    db.insert_sale(conn, cid, old, 49.5, 3, 150000)
+    # 전세(60~85㎡) 최근 1건 - deal_date 를 쓰므로 쿼리에 컬럼 포함돼야 함
+    db.insert_rent(conn, cid, recent, 76.79, 4, 200000, 0)   # 월세 0 → 전세
+    conn.commit()
+    cx = aggregate.complex_list(conn, "11680")[0]
+    assert cx["sale_by_area"]["60~85㎡"].get("s") is None      # 최근 → 정상
+    assert cx["sale_by_area"]["~60㎡"]["s"] == 1               # 오래됨
+    assert cx["jeonse_by_area"]["60~85㎡"]["p"] == 200000      # 전세 대표가
+    assert cx["jrep"] == "60~85㎡"
     conn.close()
 
 
@@ -146,14 +171,15 @@ def test_complex_list_filter_fields_and_peak_share():
     from datetime import date, timedelta
     recent = [(date.today() - timedelta(days=10 * i)).isoformat() for i in (3, 2, 1)]
     db.insert_sale(conn, cid, recent[0], 76.79, 7, 250000)
-    db.insert_sale(conn, cid, recent[1], 76.79, 9, 260000)
-    db.insert_sale(conn, cid, recent[2], 76.79, 11, 300000)   # 역대 최고가
+    db.insert_sale(conn, cid, recent[1], 76.79, 9, 300000)   # 역대 최고가(중간)
+    db.insert_sale(conn, cid, recent[2], 76.79, 11, 260000)  # 최근 1건(고점 아래)
     conn.commit()
 
     cx = aggregate.complex_list(conn, "11680")[0]
     assert cx["sale_1y"] == 3                     # 최근 1년 거래만 카운트
     assert cx["households"] is None               # 건축물대장 미수집 상태
-    # 고점(300000) 대비 중앙값 하락률(음수)
+    # 최근 1건(260000)이 고점(300000) 대비 하락 → drop_pct 음수, 신고가 아님
+    assert cx["is_peak"] is False
     assert cx["drop_pct"] is not None and cx["drop_pct"] < 0
 
     ps = aggregate.district_peak_share(conn, days=90)

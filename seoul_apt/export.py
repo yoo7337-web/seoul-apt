@@ -77,8 +77,10 @@ def export_all(conn, kakao_js_key: str | None = None) -> dict:
                     "lat": c["lat"], "lon": c["lon"],
                     "ppy": c["ppy_median"], "sale": c["sale_median"],
                     "sale_area": c["sale_by_area"],
+                    "rep": c["rep"],             # 매매 대표 평형(전체 표시용)
                     "jeonse": c["jeonse_median"],
                     "jeonse_area": c["jeonse_by_area"],
+                    "jrep": c["jrep"],           # 전세 대표 평형
                     "jeonse_ratio": c["jeonse_ratio"],
                     "is_peak": c["is_peak"],
                     # 필터용 부가 필드(짧은 키로 용량 절약)
