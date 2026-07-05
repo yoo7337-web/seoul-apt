@@ -91,10 +91,11 @@ a.nav-link { text-decoration: none; display: inline-flex; align-items: center; }
 a.nav-link.active { color: var(--accent); font-weight: 700; }
 .count.hidden { display: none; }
 
-/* ── 대시보드 분할 패널(지도 왼쪽) ─────────────────────────────────── */
+/* ── 대시보드 분할 패널(지도 왼쪽, 드래그로 너비 조절) ───────────────── */
+:root { --dash-w: 460px; }
 .dash-panel {
   position: absolute; left: 0; top: 0; bottom: 0; z-index: 30;
-  width: 460px; max-width: 92vw;
+  width: var(--dash-w); max-width: 92vw;
   background: var(--bg); box-shadow: var(--shadow-lg);
   overflow-y: auto; padding: 14px 14px 30px;
 }
@@ -109,14 +110,28 @@ a.nav-link.active { color: var(--accent); font-weight: 700; }
   width: 30px; height: 30px; border-radius: 8px; cursor: pointer;
   font-size: 14px; color: var(--muted);
 }
+/* 너비 조절 핸들(패널 오른쪽 가장자리) */
+.dash-resizer {
+  position: absolute; top: 0; bottom: 0; left: var(--dash-w);
+  width: 10px; margin-left: -5px; z-index: 31; cursor: ew-resize;
+}
+.dash-resizer.hidden { display: none; }
+.dash-resizer::after {
+  content: ""; position: absolute; top: 0; bottom: 0; left: 4px; width: 2px;
+  background: var(--border); transition: background .12s;
+}
+.dash-resizer:hover::after, body.resizing .dash-resizer::after { background: var(--accent); width: 3px; }
+body.resizing { cursor: ew-resize; user-select: none; }
+body.resizing #map { pointer-events: none; }
 /* 분할 시 지도·상단바·상세패널을 패널 오른쪽으로 */
-body.dash-open #map { left: 460px; }
-body.dash-open .float-bar { left: 472px; }
-body.dash-open #panel { left: 472px; }
+body.dash-open #map { left: var(--dash-w); }
+body.dash-open .float-bar { left: calc(var(--dash-w) + 12px); }
+body.dash-open #panel { left: calc(var(--dash-w) + 12px); }
 @media (max-width: 680px) {
   body.dash-open #map { left: 0; }        /* 모바일은 지도 위 오버레이 */
   body.dash-open .float-bar { left: 8px; }
-  .dash-panel { width: 100%; }
+  .dash-panel { width: 100%; max-width: 100%; }
+  .dash-resizer { display: none; }        /* 모바일은 리사이즈 비활성 */
 }
 
 /* ── 필터 패널 ─────────────────────────────────────────────────────── */

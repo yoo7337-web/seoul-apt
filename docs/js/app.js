@@ -73,6 +73,7 @@
     $("btn-favorites").addEventListener("click", showFavorites);
     $("btn-dashboard").addEventListener("click", toggleDashboard);
     $("dash-close").addEventListener("click", () => toggleDashboard(false));
+    bindDashResizer();
     bindFilterUI();
     $("panel-close").addEventListener("click", () => $("panel").classList.add("hidden"));
     $("modal-close").addEventListener("click", () => $("modal").classList.add("hidden"));
@@ -341,9 +342,48 @@
       ? force : !document.body.classList.contains("dash-open");
     document.body.classList.toggle("dash-open", open);
     $("dash-panel").classList.toggle("hidden", !open);
+    $("dash-resizer").classList.toggle("hidden", !open);
     if (open && window.SeoulDash) SeoulDash.open();
     // 지도 컨테이너 크기가 바뀌었으니 카카오 지도 재계산
     setTimeout(() => { if (state.map) state.map.relayout(); }, 80);
+  }
+
+  // 대시보드 패널 너비를 드래그로 조절
+  const DASH_MIN = 320;
+  function setDashWidth(px, relayout) {
+    const max = Math.round(window.innerWidth * 0.8);
+    px = Math.max(DASH_MIN, Math.min(Math.round(px), max));
+    document.documentElement.style.setProperty("--dash-w", px + "px");
+    if (relayout && state.map) state.map.relayout();
+    return px;
+  }
+  function bindDashResizer() {
+    const saved = parseInt(localStorage.getItem("seoul_apt_dash_w"), 10);
+    if (saved) setDashWidth(saved, false);
+    const rz = $("dash-resizer");
+    let dragging = false, raf = 0;
+    rz.addEventListener("pointerdown", (e) => {
+      dragging = true; rz.setPointerCapture(e.pointerId);
+      document.body.classList.add("resizing"); e.preventDefault();
+    });
+    rz.addEventListener("pointermove", (e) => {
+      if (!dragging) return;
+      const x = e.clientX;
+      if (raf) return;
+      raf = requestAnimationFrame(() => { raf = 0; setDashWidth(x, true); });
+    });
+    const end = (e) => {
+      if (!dragging) return;
+      dragging = false;
+      try { rz.releasePointerCapture(e.pointerId); } catch (_) {}
+      document.body.classList.remove("resizing");
+      const w = parseInt(getComputedStyle(document.documentElement)
+        .getPropertyValue("--dash-w"), 10);
+      if (w) localStorage.setItem("seoul_apt_dash_w", w);
+      if (state.map) state.map.relayout();
+    };
+    rz.addEventListener("pointerup", end);
+    rz.addEventListener("pointercancel", end);
   }
 
   function panToDistrict() {
