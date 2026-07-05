@@ -6,21 +6,35 @@
   const COLORS = ["#ff7e00", "#2563eb", "#10b981", "#a855f7", "#ef4444",
                   "#0ea5e9", "#f59e0b", "#84cc16", "#ec4899", "#64748b"];
 
-  let meta = null, dash = null;
+  let meta = null, dash = null, inited = false;
   const trendOn = new Set();   // 켜져 있는 구 lawd_cd
 
-  document.addEventListener("DOMContentLoaded", init);
-
   async function init() {
+    if (inited) return true;
     [meta, dash] = await Promise.all([
       fetchJSON(DATA + "meta.json").catch(() => null),
       fetchJSON(DATA + "dashboard.json").catch(() => null),
     ]);
-    if (!meta) return;
+    if (!meta) return false;
+    inited = true;
     renderRankTable();
     initTrend();
     initNewOld();
     renderPeakShare();
+    return true;
+  }
+
+  // 지도 페이지의 분할 패널에서 호출: 최초 1회 데이터 로드 + 차트 크기 재계산
+  window.SeoulDash = {
+    open: async () => {
+      const ok = await init();
+      if (ok) setTimeout(() => { renderTrend(); renderPeakShare(); }, 60);
+    },
+  };
+
+  // 독립 대시보드 페이지(body.page)면 자동 렌더
+  if (document.body.classList.contains("page")) {
+    document.addEventListener("DOMContentLoaded", init);
   }
 
   // ── 1) 구별 랭킹 ────────────────────────────────────────────────────

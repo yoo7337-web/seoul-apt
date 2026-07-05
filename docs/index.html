@@ -15,7 +15,7 @@
   <!-- 플로팅 상단 컨트롤 (호갱노노 스타일) -->
   <header class="float-bar">
     <div class="brand-chip"><span class="logo">🏙️</span><b>서울아파트</b></div>
-    <a class="chip-btn nav-link" href="dashboard.html">📊 대시보드</a>
+    <button id="btn-dashboard" class="chip-btn nav-link">📊 대시보드</button>
     <div class="search-box">
       <span class="s-icon">🔍</span>
       <input id="search-input" type="search" placeholder="단지명 검색" autocomplete="off">
@@ -39,6 +39,36 @@
     <button id="btn-favorites" class="chip-btn">★ 관심단지 <span id="fav-count" class="count">0</span></button>
     <a class="chip-btn nav-link nav-right" href="devlog.html">📝 개발일지</a>
   </header>
+
+  <!-- 대시보드 분할 패널 -->
+  <aside id="dash-panel" class="dash-panel hidden">
+    <div class="dash-head">
+      <h1>📊 대시보드</h1>
+      <button id="dash-close" class="dash-close" title="닫기">✕</button>
+    </div>
+    <section class="page-section">
+      <h2>구별 평단가 랭킹</h2>
+      <div class="desc" id="rank-desc">만원/평</div>
+      <div class="table-scroll" id="rank-table-wrap"></div>
+    </section>
+    <section class="page-section">
+      <h2>구별 평단가 추이</h2>
+      <div class="desc">월별 매매 평단가(만원/평) · 칩을 눌러 구 토글</div>
+      <div class="chip-row" id="trend-chips"></div>
+      <div class="chart-tall"><canvas id="trend-chart"></canvas></div>
+    </section>
+    <section class="page-section">
+      <h2>신축 → 구축 단지</h2>
+      <div class="desc">준공연도 내림차순 · 구 선택</div>
+      <select id="no-district" class="chip-select" style="margin-bottom:10px"></select>
+      <div class="table-scroll" id="no-table-wrap"></div>
+    </section>
+    <section class="page-section">
+      <h2>지역별 신고가 비중 <span id="ps-days" style="font-weight:400;font-size:12px;color:var(--muted)"></span></h2>
+      <div class="desc">최근 거래 중 역대 최고가 갱신 비율 — 높을수록 최근 상승세</div>
+      <div class="chart-tall" style="height:560px"><canvas id="peak-chart"></canvas></div>
+    </section>
+  </aside>
 
   <!-- 필터 패널 -->
   <div id="filter-panel" class="filter-panel hidden">
@@ -140,6 +170,7 @@
   <!-- 차트 -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <script src="js/charts.js?v=4"></script>
-  <script src="js/app.js?v=10"></script>
+  <script src="js/dashboard.js?v=2"></script>
+  <script src="js/app.js?v=11"></script>
 </body>
 </html>
