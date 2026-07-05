@@ -21,6 +21,7 @@
     initTrend();
     initNewOld();
     renderPeakShare();
+    renderRebChart();
     return true;
   }
 
@@ -28,7 +29,7 @@
   window.SeoulDash = {
     open: async () => {
       const ok = await init();
-      if (ok) setTimeout(() => { renderTrend(); renderPeakShare(); }, 60);
+      if (ok) setTimeout(() => { renderTrend(); renderPeakShare(); renderRebChart(); }, 60);
     },
   };
 
@@ -139,6 +140,29 @@
       rows.map((r) => `${r.name} (${r.peaks}/${r.total})`),
       rows.map((r) => r.share),
       { horizontal: true, label: "신고가 비중", unit: "%" });
+  }
+
+  // ── 5) 부동산원 가격지수(서울) ──────────────────────────────────────
+  let rebData = null;
+  async function renderRebChart() {
+    if (!document.getElementById("reb-chart")) return;
+    if (!rebData) {
+      try { rebData = await fetchJSON(DATA + "reb/seoul_index.json"); }
+      catch { return; }
+    }
+    const stats = Object.keys(rebData || {});
+    if (!stats.length || !window.SeoulCharts) return;
+    const colors = ["#ff7e00", "#2563eb"];
+    let labels = [];
+    const datasets = [];
+    stats.forEach((stat, i) => {
+      const regions = rebData[stat];
+      const seoul = regions["서울"] || regions[Object.keys(regions)[0]] || [];
+      if (seoul.length > labels.length) labels = seoul.map((p) => p.period);
+      datasets.push({ label: stat, color: colors[i % colors.length],
+        data: seoul.map((p) => p.value) });
+    });
+    SeoulCharts.line("reb-chart", labels, datasets);
   }
 
   async function fetchJSON(url) {

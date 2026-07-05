@@ -70,7 +70,6 @@
       applyFilters();                       // 지도 말풍선을 선택 평형 가격으로 갱신
       if (state.currentDetail) renderChart();
     });
-    $("btn-rankings").addEventListener("click", showRankings);
     $("btn-favorites").addEventListener("click", showFavorites);
     $("btn-dashboard").addEventListener("click", toggleDashboard);
     $("dash-close").addEventListener("click", () => toggleDashboard(false));
@@ -548,57 +547,6 @@
   }
 
   // ── 구별 랭킹 + 부동산원 지수 ───────────────────────────────────────
-  function showRankings() {
-    const ranks = (state.meta && state.meta.rankings) || [];
-    let html = "<h2>자치구 평단가 랭킹</h2>";
-    if (!ranks.length) {
-      html += '<div class="empty">랭킹 데이터가 아직 없습니다.</div>';
-      openModal(html); return;
-    }
-    html += `<table class="rank-table"><thead><tr>
-      <th>#</th><th>자치구</th><th>평단가(만원/평)</th><th>6개월 변동</th><th>거래건수</th>
-      </tr></thead><tbody>`;
-    ranks.forEach((r, i) => {
-      const chg = r.change_6m;
-      const cls = chg > 0 ? "chg-up" : chg < 0 ? "chg-down" : "";
-      html += `<tr data-lawd="${r.lawd_cd}">
-        <td>${i + 1}</td><td>${r.name}</td>
-        <td>${r.ppy_median ? Math.round(r.ppy_median).toLocaleString() : "-"}</td>
-        <td class="${cls}">${chg != null ? (chg > 0 ? "+" : "") + chg + "%" : "-"}</td>
-        <td>${(r.sale_count || 0).toLocaleString()}</td></tr>`;
-    });
-    html += "</tbody></table>";
-    html += '<div class="section-title">부동산원 가격지수 (서울)</div>' +
-            '<div class="chart-wrap"><canvas id="reb-chart"></canvas></div>';
-    openModal(html);
-    document.querySelectorAll("#modal-content tr[data-lawd]").forEach((tr) =>
-      tr.addEventListener("click", () => {
-        state.district = tr.dataset.lawd;
-        $("district-select").value = state.district;
-        applyFilters(); panToDistrict();
-        $("modal").classList.add("hidden");
-      }));
-    renderRebChart();
-  }
-
-  async function renderRebChart() {
-    let reb;
-    try { reb = await fetchJSON(DATA + "reb/seoul_index.json"); } catch { return; }
-    const stats = Object.keys(reb || {});
-    if (!stats.length || !window.SeoulCharts) return;
-    const colors = ["#ff7e00", "#2563eb"];
-    let labels = [];
-    const datasets = [];
-    stats.forEach((stat, i) => {
-      const regions = reb[stat];
-      const seoul = regions["서울"] || regions[Object.keys(regions)[0]] || [];
-      if (seoul.length > labels.length) labels = seoul.map((p) => p.period);
-      datasets.push({ label: stat, color: colors[i % colors.length],
-        data: seoul.map((p) => p.value) });
-    });
-    SeoulCharts.line("reb-chart", labels, datasets);
-  }
-
   // ── CSV ─────────────────────────────────────────────────────────────
   function downloadCSV(d) {
     const rows = d.recent_sales || [];
