@@ -26,6 +26,8 @@
       ticks: ["0", "200%", "400%", "600%+"] },
     { key: "n1y", label: "거래활발도(1년)", min: 0, max: 50, step: 1, u: "건",
       ticks: ["0", "10건", "30건", "50건+"] },
+    { key: "drop", label: "고점대비 하락", min: 0, max: 50, step: 5, u: "%",
+      ticks: ["0", "10%", "20%", "30%", "50%+"] },
   ];
   const F_CFG = Object.fromEntries(F_SLIDERS.map((s) => [s.key, s]));
 
@@ -52,7 +54,7 @@
     dealType: "sale",   // 지도 말풍선 기준: 'sale'(매매) | 'jeonse'(전세)
     // 슬라이더 범위 {lo,hi} + 토글. lo==min && hi==max 이면 미적용
     range: Object.fromEntries(F_SLIDERS.map((s) => [s.key, { lo: s.min, hi: s.max }])),
-    minusGap: false, peak: false, dropBand: "",
+    minusGap: false, peak: false,
     favorites: loadFavorites(), currentDetail: null, chartMode: "sale",
     detailArea: "",   // 상세 패널 면적(평형) 선택 ("" = 전체)
     favDistricts: loadFavDistricts(),   // 관심구(lawd_cd Set)
@@ -333,13 +335,8 @@
         if (!inR("gap", g)) return false;
       }
       if (state.peak && !m.is_peak) return false;
-      if (state.dropBand) {   // 고점대비 하락 밴드(drop 음수, 신고가=0 제외)
-        if (m.drop == null || m.drop >= 0) return false;
-        const [lo, hi] = state.dropBand.split("_");
-        const d = -m.drop;
-        if (hi === "") { if (!(d > +lo)) return false; }
-        else if (!(d > +lo && d <= +hi)) return false;
-      }
+      // 고점대비 하락(%): drop은 음수(하락)/0(신고가) → 하락폭 -drop 으로 비교
+      if (active("drop") && !inR("drop", m.drop == null ? null : -m.drop)) return false;
       return true;
     });
   }
@@ -352,7 +349,6 @@
     });
     if (state.minusGap) n++;
     if (state.peak) n++;
-    if (state.dropBand) n++;
     return n;
   }
 
@@ -406,19 +402,10 @@
     let html = F_SLIDERS.map(rangeHtml).join("");
     html += `<label class="fs-toggle"><input type="checkbox" id="f-minusgap"> 마이너스 갭 보기 (전세>매매)</label>`;
     html += `<label class="fs-toggle"><input type="checkbox" id="f-peak"> 신고가 단지만</label>`;
-    html += `<div class="fs-select"><label>고점대비 하락</label>
-      <select id="f-drop">
-        <option value="">전체</option>
-        <option value="0_10">0 ~ -10%</option>
-        <option value="10_20">-10 ~ -20%</option>
-        <option value="20_30">-20 ~ -30%</option>
-        <option value="30_">-30% 이상 하락</option>
-      </select></div>`;
     $("filter-body").innerHTML = html;
     F_SLIDERS.forEach(bindRange);
     $("f-minusgap").addEventListener("change", (e) => { state.minusGap = e.target.checked; onFilterChange(); });
     $("f-peak").addEventListener("change", (e) => { state.peak = e.target.checked; onFilterChange(); });
-    $("f-drop").addEventListener("change", (e) => { state.dropBand = e.target.value; onFilterChange(); });
   }
   function resetFilters() {
     F_SLIDERS.forEach((s) => {
@@ -427,10 +414,9 @@
       if (lo) { lo.value = s.min; hi.value = s.max; }
       paintRange(s);
     });
-    state.minusGap = state.peak = false; state.dropBand = "";
+    state.minusGap = state.peak = false;
     if ($("f-minusgap")) $("f-minusgap").checked = false;
     if ($("f-peak")) $("f-peak").checked = false;
-    if ($("f-drop")) $("f-drop").value = "";
     onFilterChange();
   }
   function onFilterChange() { updateFilterBadge(); applyFilters(); }
