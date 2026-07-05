@@ -241,6 +241,7 @@
       const ov = new kakao.maps.CustomOverlay({
         position: new kakao.maps.LatLng(c[0], c[1]),
         content: el, yAnchor: .5, clickable: true,
+        zIndex: isFav ? 10 : 1,   // 관심구는 겹쳐도 앞으로
       });
       ov.setMap(state.map);
       state.overlays.push(ov);
@@ -637,42 +638,91 @@
     renderPanel();
   }
 
+  // 관심(관심구 + 관심단지) 통합 모달
   function showFavorites() {
+    // ── 관심구 섹션(동기) ──
+    const rankByCd = {};
+    (state.meta && state.meta.rankings || []).forEach((r) => { rankByCd[r.lawd_cd] = r; });
+    let dHtml = '<div class="fav-sec-title">⭐ 관심구</div>';
+    const favD = [...state.favDistricts];
+    if (!favD.length) {
+      dHtml += '<div class="empty">지도에서 구 버블을 우클릭해 관심구를 추가하세요.</div>';
+    } else {
+      dHtml += `<table class="rank-table"><thead><tr>
+        <th>자치구</th><th>평단가</th><th>6개월</th><th></th></tr></thead><tbody>`;
+      favD.forEach((cd) => {
+        const r = rankByCd[cd] || {};
+        const chg = r.change_6m;
+        const cls = chg > 0 ? "chg-up" : chg < 0 ? "chg-down" : "";
+        dHtml += `<tr class="fav-d-row" data-lawd="${cd}">
+          <td>★ ${districtName(cd)}</td>
+          <td>${r.ppy_median ? Math.round(r.ppy_median).toLocaleString() : "-"}</td>
+          <td class="${cls}">${chg != null ? (chg > 0 ? "+" : "") + chg + "%" : "-"}</td>
+          <td class="fav-del" data-kind="d" data-lawd="${cd}">✕</td></tr>`;
+      });
+      dHtml += "</tbody></table>";
+    }
+
+    const finish = (cHtml) => {
+      openModal(`<h2>★ 관심</h2>${dHtml}<div class="fav-sec-title">🏢 관심단지</div>${cHtml}`);
+      bindFavModal();
+    };
+
+    // ── 관심단지 섹션(비동기) ──
     const favs = state.favorites;
-    let html = "<h2>관심단지 비교</h2>";
     if (!favs.length) {
-      html += '<div class="empty">관심단지가 없습니다. 단지 상세에서 ☆를 눌러 추가하세요.</div>';
-      openModal(html); return;
+      finish('<div class="empty">단지 상세에서 ☆를 눌러 추가하세요.</div>');
+      return;
     }
     Promise.all(favs.map((f) =>
       fetchJSON(`${DATA}complex/${f.lawd_cd}/${f.id}.json`)
         .then((d) => ({ f, d })).catch(() => null)
     )).then((results) => {
       const valid = results.filter(Boolean);
-      html += `<table class="rank-table"><thead><tr>
-        <th>단지</th><th>자치구</th><th>최근매매</th><th>평단가</th><th>공시가격</th><th></th>
+      let c = `<table class="rank-table"><thead><tr>
+        <th>단지</th><th>자치구</th><th>최근매매</th><th>평단가</th><th></th>
         </tr></thead><tbody>`;
       valid.forEach(({ f, d }) => {
-        const g = latestGongsi(d);
         const lastSale = d.recent_sales && d.recent_sales[0];
-        html += `<tr data-id="${f.id}" data-lawd="${f.lawd_cd}">
+        c += `<tr class="fav-c-row" data-id="${f.id}" data-lawd="${f.lawd_cd}">
           <td>${f.apt}</td><td>${districtName(f.lawd_cd)}</td>
           <td>${lastSale ? fmt(lastSale.amount) : "-"}</td>
           <td>${ppyOf(d)}</td>
-          <td>${g ? fmt(g.price) : "-"}</td>
-          <td>✕</td></tr>`;
+          <td class="fav-del" data-kind="c" data-id="${f.id}">✕</td></tr>`;
       });
-      html += "</tbody></table>";
-      openModal(html);
-      document.querySelectorAll("#modal-content tr[data-id]").forEach((tr) => {
-        tr.querySelector("td:last-child").addEventListener("click", (e) => {
-          e.stopPropagation();
-          const id = +tr.dataset.id;
-          state.favorites = state.favorites.filter((x) => x.id !== id);
-          saveFavorites(state.favorites); updateFavCount(); showFavorites();
-        });
-      });
+      finish(c + "</tbody></table>");
     });
+  }
+
+  function bindFavModal() {
+    // 관심구 행 클릭 → 지도에서 그 구 선택 + 모달 닫기
+    document.querySelectorAll("#modal-content tr.fav-d-row").forEach((tr) =>
+      tr.addEventListener("click", () => {
+        setSelectedDistricts(new Set([tr.dataset.lawd]));
+        $("modal").classList.add("hidden");
+      }));
+    // 관심단지 행 클릭 → 그 단지 지도 표시
+    document.querySelectorAll("#modal-content tr.fav-c-row").forEach((tr) =>
+      tr.addEventListener("click", () => {
+        $("modal").classList.add("hidden");
+        focusComplex(+tr.dataset.id);
+      }));
+    // ✕ 해제(구/단지)
+    document.querySelectorAll("#modal-content .fav-del").forEach((td) =>
+      td.addEventListener("click", (e) => {
+        e.stopPropagation();
+        if (td.dataset.kind === "d") {
+          state.favDistricts.delete(td.dataset.lawd);
+          localStorage.setItem("seoul_apt_fav_districts", JSON.stringify([...state.favDistricts]));
+          renderMarkers();
+          if (window.SeoulDash && SeoulDash.refresh) SeoulDash.refresh();
+        } else {
+          state.favorites = state.favorites.filter((x) => x.id !== +td.dataset.id);
+          saveFavorites(state.favorites);
+        }
+        updateFavCount();
+        showFavorites();
+      }));
   }
 
   // ── 구별 랭킹 + 부동산원 지수 ───────────────────────────────────────
@@ -726,7 +776,9 @@
     n.classList.remove("hidden");
   }
   function hideNotice() { $("map-notice").classList.add("hidden"); }
-  function updateFavCount() { $("fav-count").textContent = state.favorites.length; }
+  function updateFavCount() {
+    $("fav-count").textContent = state.favDistricts.size + state.favorites.length;
+  }
   function loadFavorites() {
     try { return JSON.parse(localStorage.getItem("seoul_apt_favs") || "[]"); }
     catch { return []; }
@@ -743,6 +795,7 @@
     on ? state.favDistricts.add(lawd) : state.favDistricts.delete(lawd);
     localStorage.setItem("seoul_apt_fav_districts", JSON.stringify([...state.favDistricts]));
     toast(`${name} 관심구 ${on ? "설정 ★" : "해제"}`);
+    updateFavCount();
     renderMarkers();
     if (window.SeoulDash && SeoulDash.refresh) SeoulDash.refresh();   // 랭킹 별표 갱신
   }

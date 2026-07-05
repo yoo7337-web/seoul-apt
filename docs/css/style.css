@@ -291,13 +291,25 @@ table.rank-table tbody tr[data-id]:hover { background: var(--accent-soft); }
   transition: transform .08s ease;
 }
 .region-bubble:hover { transform: scale(1.08); background: rgba(239, 108, 0, .95); }
-/* 관심구: 금색 테두리 + 별표 */
-.region-bubble.fav { border-color: #ffd400; box-shadow: 0 0 0 3px rgba(255, 212, 0, .55), 0 3px 10px rgba(0, 0, 0, .3); }
-.rb-star {
-  position: absolute; top: -9px; right: -7px; font-size: 18px; color: #ffd400;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, .5); pointer-events: none;
+/* 관심구: 오렌지 버블 사이에서 확 띄도록 보라색 + 글로우 + 별표 */
+.region-bubble.fav {
+  background: rgba(124, 58, 237, .95); border-color: #fff;
+  box-shadow: 0 0 0 4px rgba(124, 58, 237, .4), 0 0 16px 3px rgba(124, 58, 237, .6),
+              0 4px 14px rgba(0, 0, 0, .35);
+  transform: scale(1.06);
 }
-.fav-star { color: #f5b301; }
+.region-bubble.fav:hover { background: rgba(109, 40, 217, 1); transform: scale(1.12); }
+.rb-star {
+  position: absolute; top: -10px; right: -8px; font-size: 20px; color: #ffd400;
+  text-shadow: 0 0 4px rgba(0, 0, 0, .6); pointer-events: none;
+}
+.fav-star { color: #7c3aed; }
+/* 관심 모달 섹션 제목 */
+.fav-sec-title { font-size: 14px; font-weight: 700; margin: 14px 0 8px; }
+.fav-sec-title:first-of-type { margin-top: 4px; }
+.rank-table .fav-del { cursor: pointer; color: var(--muted); text-align: center; }
+.rank-table .fav-del:hover { color: var(--up); }
+.fav-d-row, .fav-c-row { cursor: pointer; }
 /* 우클릭 안내 토스트 */
 .toast {
   position: fixed; bottom: 26px; left: 50%; z-index: 200;
