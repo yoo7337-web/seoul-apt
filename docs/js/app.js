@@ -682,7 +682,7 @@
   }
   function saveFavorites(f) { localStorage.setItem("seoul_apt_favs", JSON.stringify(f)); }
   async function fetchJSON(url) {
-    const r = await fetch(url);
+    const r = await fetch(url, { cache: "no-store" });  // 매일 갱신 데이터 → 항상 최신
     if (!r.ok) throw new Error(r.status);
     return r.json();
   }

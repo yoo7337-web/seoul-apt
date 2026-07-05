@@ -193,20 +193,28 @@
     const stats = Object.keys(rebData || {});
     if (!stats.length || !window.SeoulCharts) return;
     const colors = ["#ff7e00", "#2563eb"];
-    let labels = [];
-    const datasets = [];
-    stats.forEach((stat, i) => {
+    // period(월) 합집합을 라벨로 → 지표별 시작 시점이 달라도 정확히 정렬
+    // (매매 2006~, 전세 2014~ 처럼 길이가 다르면 인덱스 정렬 시 어긋남)
+    const seoulByStat = {};
+    const monthSet = new Set();
+    stats.forEach((stat) => {
       const regions = rebData[stat];
       const seoul = regions["서울"] || regions[Object.keys(regions)[0]] || [];
-      if (seoul.length > labels.length) labels = seoul.map((p) => p.period);
-      datasets.push({ label: stat, color: colors[i % colors.length],
-        data: seoul.map((p) => p.value) });
+      seoulByStat[stat] = seoul;
+      seoul.forEach((p) => monthSet.add(p.period));
+    });
+    const labels = [...monthSet].sort();
+    const datasets = stats.map((stat, i) => {
+      const map = {};
+      seoulByStat[stat].forEach((p) => { map[p.period] = p.value; });
+      return { label: stat, color: colors[i % colors.length],
+        data: labels.map((m) => (m in map ? map[m] : null)) };
     });
     SeoulCharts.line("reb-chart", labels, datasets);
   }
 
   async function fetchJSON(url) {
-    const r = await fetch(url);
+    const r = await fetch(url, { cache: "no-store" });  // 매일 갱신 데이터 → 항상 최신
     if (!r.ok) throw new Error(r.status);
     return r.json();
   }
