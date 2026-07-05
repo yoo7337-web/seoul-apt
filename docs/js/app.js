@@ -32,7 +32,21 @@
     filters: { min: null, max: null, jr: "", drop: "", age: "",
                hh: "", far: "", n1y: "", peak: false },
     favorites: loadFavorites(), currentDetail: null, chartMode: "sale",
+    detailArea: "",   // 상세 패널 면적(평형) 선택 ("" = 전체)
   };
+
+  const BUCKET_ORDER = ["~60㎡", "60~85㎡", "85~135㎡", "135㎡~"];
+  function areaBucket(area) {
+    if (area < 60) return "~60㎡";
+    if (area < 85) return "60~85㎡";
+    if (area < 135) return "85~135㎡";
+    return "135㎡~";
+  }
+  function detailBuckets(d) {   // 이 단지가 보유한 면적 버킷(표준 순서)
+    const s = new Set([...Object.keys(d.sale_series || {}),
+                       ...Object.keys(d.jeonse_series || {})]);
+    return BUCKET_ORDER.filter((b) => s.has(b));
+  }
 
   const $ = (id) => document.getElementById(id);
   const fmt = (v) => (window.SeoulCharts ? SeoulCharts.fmt(v) : v);
@@ -454,6 +468,9 @@
       return;
     }
     state.currentDetail = Object.assign({}, mk, detail);
+    // 상세 면적 선택: 전역 평형 필터를 상속(해당 단지에 있으면), 없으면 전체
+    const bks = detailBuckets(state.currentDetail);
+    state.detailArea = (state.area && bks.includes(state.area)) ? state.area : "";
     renderPanel();
   }
 
@@ -493,12 +510,13 @@
         <button data-mode="sale" class="${state.chartMode === "sale" ? "active" : ""}">매매</button>
         <button data-mode="jeonse" class="${state.chartMode === "jeonse" ? "active" : ""}">전세</button>
       </div>
+      ${areaTabs(d)}
       <div class="chart-wrap"><canvas id="detail-chart"></canvas></div>
 
-      <div class="section-title">최근 매매 실거래</div>
+      <div class="section-title">최근 매매 실거래${areaLabel()}</div>
       ${recentTxnsTable(d)}
 
-      <div class="section-title">최근 전월세 실거래</div>
+      <div class="section-title">최근 전월세 실거래${areaLabel()}</div>
       ${recentRentsTable(d)}
     `;
     $("panel").classList.remove("hidden");
@@ -506,7 +524,21 @@
     $("csv-btn").addEventListener("click", () => downloadCSV(d));
     el.querySelectorAll(".chart-tabs button").forEach((b) =>
       b.addEventListener("click", () => { state.chartMode = b.dataset.mode; renderPanel(); }));
+    el.querySelectorAll("[data-area]").forEach((b) =>
+      b.addEventListener("click", () => { state.detailArea = b.dataset.area; renderPanel(); }));
     renderChart();
+  }
+
+  // 면적(평형) 선택 칩. 이 단지가 보유한 버킷만 + 전체
+  function areaTabs(d) {
+    const bks = detailBuckets(d);
+    if (bks.length <= 1) return "";   // 버킷이 하나뿐이면 선택 불필요
+    const chip = (val, txt) =>
+      `<button class="d-chip${state.detailArea === val ? " on" : ""}" data-area="${val}">${txt}</button>`;
+    return `<div class="area-tabs">${chip("", "전체")}${bks.map((b) => chip(b, b)).join("")}</div>`;
+  }
+  function areaLabel() {
+    return state.detailArea ? ` <span class="area-tag">${state.detailArea}</span>` : "";
   }
 
   function renderChart() {
@@ -515,7 +547,7 @@
     const series = state.chartMode === "sale" ? d.sale_series : d.jeonse_series;
     if (!series) return;
     let buckets = Object.keys(series);
-    if (state.area && buckets.includes(state.area)) buckets = [state.area];
+    if (state.detailArea && buckets.includes(state.detailArea)) buckets = [state.detailArea];
     const months = new Set();
     buckets.forEach((b) => series[b].forEach((p) => months.add(p.month)));
     const labels = [...months].sort();
@@ -531,8 +563,10 @@
   }
 
   function recentTxnsTable(d) {
-    const rows = (d.recent_sales || []).slice(0, 20);
-    if (!rows.length) return '<div class="empty">최근 매매 거래 없음</div>';
+    let rows = d.recent_sales || [];
+    if (state.detailArea) rows = rows.filter((r) => areaBucket(r.area) === state.detailArea);
+    rows = rows.slice(0, 20);
+    if (!rows.length) return '<div class="empty">해당 면적 매매 거래 없음</div>';
     // 신고가는 해제되지 않은 거래 기준
     const valid = rows.filter((r) => !r.canceled);
     const peak = valid.length ? Math.max(...valid.map((r) => r.amount)) : null;
@@ -545,8 +579,10 @@
   }
 
   function recentRentsTable(d) {
-    const rows = (d.recent_rents || []).slice(0, 20);
-    if (!rows.length) return '<div class="empty">최근 전월세 거래 없음</div>';
+    let rows = d.recent_rents || [];
+    if (state.detailArea) rows = rows.filter((r) => areaBucket(r.area) === state.detailArea);
+    rows = rows.slice(0, 20);
+    if (!rows.length) return '<div class="empty">해당 면적 전월세 거래 없음</div>';
     return `<table class="txns"><thead><tr>
         <th>계약일</th><th>구분</th><th>면적</th><th>층</th><th>보증금 / 월세</th></tr></thead><tbody>
       ${rows.map((r) => {

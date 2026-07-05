@@ -345,6 +345,12 @@ table.rank-table tbody tr[data-id]:hover { background: var(--accent-soft); }
 .chart-tabs button.active {
   background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 700;
 }
+.area-tabs { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 8px; }
+.area-tabs .d-chip { padding: 3px 10px; font-size: 11.5px; }
+.area-tag {
+  font-size: 11px; font-weight: 600; color: var(--accent-dark);
+  background: var(--accent-soft); border-radius: 8px; padding: 1px 7px; margin-left: 4px;
+}
 
 table.txns { width: 100%; border-collapse: collapse; font-size: 12.5px; }
 table.txns th, table.txns td { padding: 6px 4px; text-align: right; border-bottom: 1px solid var(--border); }
