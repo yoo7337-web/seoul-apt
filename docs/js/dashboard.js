@@ -32,6 +32,12 @@
       const ok = await init();
       if (ok) setTimeout(() => { renderTrend(); renderPeakShare(); renderRebChart(); }, 60);
     },
+    refresh: () => { if (inited) renderRankTable(); },   // 관심구 별표 갱신
+  };
+
+  const favDistricts = () => {
+    try { return new Set(JSON.parse(localStorage.getItem("seoul_apt_fav_districts") || "[]")); }
+    catch { return new Set(); }
   };
 
   // 독립 대시보드 페이지(body.page)면 자동 렌더
@@ -75,11 +81,13 @@
     html += `<table class="rank-table"><thead><tr>
       <th>#</th><th>자치구</th><th>평단가</th><th>6개월</th><th>거래</th>
       </tr></thead><tbody>`;
+    const fav = favDistricts();
     ranks.forEach((r, i) => {
       const chg = r.change_6m;
       const cls = chg > 0 ? "chg-up" : chg < 0 ? "chg-down" : "";
+      const star = fav.has(r.lawd_cd) ? '<span class="fav-star">★</span> ' : "";
       html += `<tr data-lawd="${r.lawd_cd}" class="${sel.has(r.lawd_cd) ? "sel" : ""}">
-        <td>${i + 1}</td><td>${r.name}</td>
+        <td>${i + 1}</td><td>${star}${r.name}</td>
         <td>${r.ppy_median ? Math.round(r.ppy_median).toLocaleString() : "-"}</td>
         <td class="${cls}">${chg != null ? (chg > 0 ? "+" : "") + chg + "%" : "-"}</td>
         <td>${(r.sale_count || 0).toLocaleString()}</td></tr>`;

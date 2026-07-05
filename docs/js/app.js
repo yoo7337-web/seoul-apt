@@ -33,6 +33,7 @@
                hh: "", far: "", n1y: "", peak: false },
     favorites: loadFavorites(), currentDetail: null, chartMode: "sale",
     detailArea: "",   // 상세 패널 면적(평형) 선택 ("" = 전체)
+    favDistricts: loadFavDistricts(),   // 관심구(lawd_cd Set)
   };
 
   const BUCKET_ORDER = ["~60㎡", "60~85㎡", "85~135㎡", "135㎡~"];
@@ -220,9 +221,11 @@
     list.forEach((d) => {
       const c = DISTRICT_CENTERS[d.lawd_cd];
       if (!c) return;
+      const isFav = state.favDistricts.has(d.lawd_cd);
       const el = document.createElement("div");
-      el.className = "region-bubble";
+      el.className = "region-bubble" + (isFav ? " fav" : "");
       el.innerHTML =
+        (isFav ? '<span class="rb-star">★</span>' : "") +
         `<div class="rb-name">${d.name}</div>` +
         `<div class="rb-ppy">${d.ppy_median ? Math.round(d.ppy_median).toLocaleString() : "-"}</div>` +
         `<div class="rb-unit">만원/평</div>`;
@@ -230,6 +233,11 @@
         state.map.setLevel(5);
         state.map.setCenter(new kakao.maps.LatLng(c[0], c[1]));
       });
+      el.addEventListener("contextmenu", (e) => {   // 우클릭 = 관심구 토글
+        e.preventDefault();
+        toggleFavDistrict(d.lawd_cd, d.name);
+      });
+      el.title = "우클릭: 관심구 " + (isFav ? "해제" : "설정");
       const ov = new kakao.maps.CustomOverlay({
         position: new kakao.maps.LatLng(c[0], c[1]),
         content: el, yAnchor: .5, clickable: true,
@@ -724,6 +732,30 @@
     catch { return []; }
   }
   function saveFavorites(f) { localStorage.setItem("seoul_apt_favs", JSON.stringify(f)); }
+
+  // ── 관심구 ──────────────────────────────────────────────────────────
+  function loadFavDistricts() {
+    try { return new Set(JSON.parse(localStorage.getItem("seoul_apt_fav_districts") || "[]")); }
+    catch { return new Set(); }
+  }
+  function toggleFavDistrict(lawd, name) {
+    const on = !state.favDistricts.has(lawd);
+    on ? state.favDistricts.add(lawd) : state.favDistricts.delete(lawd);
+    localStorage.setItem("seoul_apt_fav_districts", JSON.stringify([...state.favDistricts]));
+    toast(`${name} 관심구 ${on ? "설정 ★" : "해제"}`);
+    renderMarkers();
+    if (window.SeoulDash && SeoulDash.refresh) SeoulDash.refresh();   // 랭킹 별표 갱신
+  }
+
+  let toastTimer;
+  function toast(msg) {
+    let el = $("toast");
+    if (!el) { el = document.createElement("div"); el.id = "toast"; el.className = "toast"; document.body.appendChild(el); }
+    el.textContent = msg; el.classList.add("show");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => el.classList.remove("show"), 1600);
+  }
+
   async function fetchJSON(url) {
     const r = await fetch(url, { cache: "no-store" });  // 매일 갱신 데이터 → 항상 최신
     if (!r.ok) throw new Error(r.status);
