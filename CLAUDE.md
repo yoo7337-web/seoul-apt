@@ -46,3 +46,6 @@ Gemini 주간 자동추천과 별개로, 구독 Claude를 활용한 수동 큐�
   매매 `A_2024_00178` / 전세 `A_2024_00182` (표 메타용 `SttsApiTbl.do` 아님).
 - `.env`는 gitignore. `docs/js/config.js`에 카카오 JS 키가 주입되는데 이는
   도메인 제한이 걸린 공개용 키라 Actions가 커밋해도 무방(다른 키는 절대 커밋 금지).
+- 청약·분양(`subscription` 명령)은 data.go.kr **청약홈 API 2종 활용신청 승인**이
+  필요(분양정보 15098547, 경쟁률 15098905 — 기존 DATA_GO_KR_KEY 그대로).
+  미승인이면 401 로그만 남기고 건너뛴다. 필드명 확인은 `subscription --debug`.

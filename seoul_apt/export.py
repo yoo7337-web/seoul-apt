@@ -14,6 +14,7 @@ from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
 from . import config, aggregate
+from .subscription import extract_gu
 
 KST = timezone(timedelta(hours=9))
 
@@ -96,6 +97,11 @@ def export_all(conn, kakao_js_key: str | None = None) -> dict:
     _write_json(export_dir / "markers.json", {"markers": markers})
     _write_json(export_dir / "reb" / "seoul_index.json",
                 aggregate.reb_series(conn))
+    # 청약·분양(진행중 + 최근 1년 마감분)
+    _write_json(export_dir / "subscription.json", {
+        "generated": now.isoformat(timespec="seconds"),
+        "items": subscription_items(conn, now.date().isoformat()),
+    })
     # 대시보드 전용 데이터(구별 평단가 추이 + 신고가 비중)
     _write_json(export_dir / "dashboard.json", {
         "generated": now.isoformat(timespec="seconds"),
@@ -114,6 +120,49 @@ def export_all(conn, kakao_js_key: str | None = None) -> dict:
 
     _write_config_js(kakao_js_key)
     return {"markers": len(markers), **totals}
+
+
+def subscription_items(conn, today: str) -> list[dict]:
+    """청약·분양 export 항목 - 접수 예정/진행중 + 최근 1년 내 마감 공고.
+
+    주택형(models)·경쟁률(cmpet)을 공고에 병합한다. 상태 계산은 프런트에서
+    날짜로 수행하므로 여기서는 원자료만 담는다.
+    """
+    cutoff = (datetime.fromisoformat(today) - timedelta(days=365)) \
+        .date().isoformat()
+    rows = conn.execute(
+        """SELECT * FROM subscription
+           WHERE rcept_endde IS NULL OR rcept_endde >= ?
+           ORDER BY rcept_bgnde DESC""", (cutoff,)).fetchall()
+    items = []
+    for r in rows:
+        hmn = r["house_manage_no"]
+        models = [{
+            "ty": m["house_ty"], "ar": m["suply_ar"],
+            "hh": m["suply_hshldco"], "shh": m["spsply_hshldco"],
+            "price": m["top_amount"],
+        } for m in conn.execute(
+            "SELECT * FROM subscription_model WHERE house_manage_no=? "
+            "ORDER BY suply_ar", (hmn,))]
+        cmpet = [{
+            "ty": c["house_ty"], "resd": c["reside_secd"],
+            "req": c["req_cnt"], "rate": c["cmpet_rate"],
+        } for c in conn.execute(
+            "SELECT * FROM subscription_cmpet WHERE house_manage_no=? "
+            "ORDER BY house_ty", (hmn,))]
+        items.append({
+            "id": hmn, "kind": r["kind"], "name": r["house_nm"],
+            "adres": r["adres"], "gu": extract_gu(r["adres"]),
+            "lat": r["lat"], "lon": r["lon"],
+            "tot": r["tot_suply"],
+            "rcrit": r["rcrit_de"],
+            "rcept_bgn": r["rcept_bgnde"], "rcept_end": r["rcept_endde"],
+            "przwner": r["przwner_de"],
+            "cntrct_bgn": r["cntrct_bgnde"], "cntrct_end": r["cntrct_endde"],
+            "mvn": r["mvn_ym"], "cnstrct": r["cnstrct_nm"], "url": r["url"],
+            "models": models, "cmpet": cmpet,
+        })
+    return items
 
 
 def _write_config_js(kakao_js_key: str | None) -> None:

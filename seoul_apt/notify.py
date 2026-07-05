@@ -12,12 +12,14 @@
 import json
 import time
 from collections import defaultdict
+from datetime import date
 
 import requests
 import yaml
 
 from . import config
 from .aggregate import _median, _pyeong
+from .subscription import extract_gu
 
 TG_API = "https://api.telegram.org/bot{token}/sendMessage"
 TG_MAX_LEN = 3900          # 텔레그램 4096 한도 여유분
@@ -211,6 +213,57 @@ def build_message(conn, wl: dict, rows: list) -> str:
     return "\n".join(lines)
 
 
+# ── 청약·분양 소식 ──────────────────────────────────────────────────────
+def watch_gu_names(wl: dict) -> set[str]:
+    """워치리스트의 구 이름 집합(청약 공고 주소 매칭용)."""
+    return {config.SEOUL_DISTRICTS[w["lawd_cd"]]
+            for w in wl.get("watches", [])
+            if w.get("lawd_cd") in config.SEOUL_DISTRICTS}
+
+
+def subscription_news(conn, known_ids: set, today: str,
+                      watch_gus: set[str]) -> tuple[list[str], set]:
+    """청약 소식 라인 + 이번에 새로 알게 된 공고 id 집합.
+
+    ① 신규 모집공고(known_ids에 없는 것) ② 오늘 청약접수 시작.
+    워치리스트 구의 공고는 ⭐ 강조. subscription 테이블이 비어 있으면 조용히 통과.
+    """
+    rows = conn.execute(
+        """SELECT house_manage_no, kind, house_nm, adres, tot_suply,
+                  rcept_bgnde, rcept_endde, url
+           FROM subscription
+           WHERE rcept_endde IS NULL OR rcept_endde >= ?
+           ORDER BY rcept_bgnde""", (today,)).fetchall()
+    lines: list[str] = []
+    new_ids: set = set()
+
+    def _line(r) -> str:
+        gu = extract_gu(r["adres"]) or ""
+        star = "⭐ " if gu in watch_gus else ""
+        kind = " (무순위)" if r["kind"] == "remndr" else ""
+        tot = f" {r['tot_suply']:,}세대" if r["tot_suply"] else ""
+        period = ""
+        if r["rcept_bgnde"]:
+            period = f" · 접수 {r['rcept_bgnde']}~{r['rcept_endde'] or ''}"
+        return f" · {star}{gu} {r['house_nm']}{kind}{tot}{period}"
+
+    fresh = [r for r in rows if r["house_manage_no"] not in known_ids]
+    if fresh:
+        lines.append(f"🏷️ <b>신규 분양공고</b> ({len(fresh)}건)")
+        lines.extend(_line(r) for r in fresh[:10])
+        if len(fresh) > 10:
+            lines.append(f"   … 외 {len(fresh) - 10}건")
+        new_ids = {r["house_manage_no"] for r in fresh}
+
+    opening = [r for r in rows if r["rcept_bgnde"] == today
+               and r["house_manage_no"] in known_ids]
+    if opening:
+        lines.append("🔔 <b>오늘 청약접수 시작</b>")
+        lines.extend(_line(r) for r in opening)
+
+    return lines, new_ids
+
+
 # ── 텔레그램 발송 (deal-radar 패턴) ─────────────────────────────────────
 def _split(text: str, limit: int = TG_MAX_LEN) -> list[str]:
     chunks, cur = [], ""
@@ -255,21 +308,45 @@ def run_alerts(conn, dry_run: bool = False) -> dict:
     state = load_state()
     since = state.get("last_sale_id", 0)
     rows = new_sales(conn, since)
-    stats = {"new": len(rows), "sent": False}
-    if not rows:
-        print("[alerts] 신규 거래 없음 - 발송 생략")
+    today = date.today().isoformat()
+
+    # 청약 소식. 첫 실행(상태에 키 없음)이면 현재 공고 전체를 베이스라인으로
+    # 잡고 알림은 생략(과거 공고가 한꺼번에 '신규'로 쏟아지는 것 방지).
+    sub_first_run = "known_sub_ids" not in state
+    known_subs = set(state.get("known_sub_ids") or [])
+    if sub_first_run:
+        all_ids = {r["house_manage_no"] for r in conn.execute(
+            "SELECT house_manage_no FROM subscription")}
+        sub_lines: list[str] = []
+        new_sub_ids = all_ids
+        if all_ids:
+            print(f"[alerts] 청약 첫 실행 - 공고 {len(all_ids)}건 베이스라인 설정")
+    else:
+        sub_lines, new_sub_ids = subscription_news(
+            conn, known_subs, today, watch_gu_names(wl))
+
+    stats = {"new": len(rows), "sub_news": len(sub_lines), "sent": False}
+    if not rows and not sub_lines:
+        print("[alerts] 신규 거래·청약 소식 없음 - 발송 생략")
+        if sub_first_run and new_sub_ids and not dry_run:
+            state["known_sub_ids"] = sorted(known_subs | new_sub_ids)
+            save_state(state)
         return stats
 
     # 첫 실행(또는 상태 유실) 시 누적 전체가 '신규'로 잡히는 것을 방지:
     # 알림 없이 현재 최대 id 를 베이스라인으로 저장하고 끝낸다.
-    if since == 0 and len(rows) > FIRST_RUN_LIMIT:
+    if rows and since == 0 and len(rows) > FIRST_RUN_LIMIT:
         max_id = max(r["id"] for r in rows)
         print(f"[alerts] 첫 실행 - 베이스라인 설정(last_id={max_id}), 발송 생략")
         if not dry_run:
-            save_state({"last_sale_id": max_id})
+            state["last_sale_id"] = max_id
+            state["known_sub_ids"] = sorted(known_subs | new_sub_ids)
+            save_state(state)
         return stats
 
     msg = build_message(conn, wl, rows)
+    if sub_lines:
+        msg += "\n\n" + "\n".join(sub_lines)
 
     if dry_run:
         print("[alerts] --dry-run 미리보기 ↓")
@@ -284,7 +361,10 @@ def run_alerts(conn, dry_run: bool = False) -> dict:
 
     send_telegram(msg, token, chat)
     stats["sent"] = True
-    state["last_sale_id"] = max(r["id"] for r in rows)
+    if rows:
+        state["last_sale_id"] = max(r["id"] for r in rows)
+    state["known_sub_ids"] = sorted(known_subs | new_sub_ids)
     save_state(state)
-    print(f"[alerts] 발송 완료: 신규 {len(rows)}건, last_id={state['last_sale_id']}")
+    print(f"[alerts] 발송 완료: 신규 거래 {len(rows)}건, "
+          f"청약 소식 {len(sub_lines)}줄")
     return stats

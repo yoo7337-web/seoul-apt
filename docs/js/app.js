@@ -58,6 +58,9 @@
     favorites: loadFavorites(), currentDetail: null, chartMode: "sale",
     detailArea: "",   // 상세 패널 면적(평형) 선택 ("" = 전체)
     favDistricts: loadFavDistricts(),   // 관심구(lawd_cd Set)
+    subs: [],          // 청약·분양 공고(subscription.json)
+    subOverlays: [],   // 청약 마커(실거래 오버레이와 별도 관리)
+    showSubs: localStorage.getItem("seoul_apt_show_subs") !== "0",
   };
 
   const BUCKET_ORDER = ["~60㎡", "60~85㎡", "85~135㎡", "135㎡~"];
@@ -90,6 +93,7 @@
     loadKakao(() => {
       initMap();
       loadMarkers();
+      loadSubs();
     });
   }
 
@@ -111,6 +115,7 @@
       if (state.currentDetail) renderChart();
     });
     $("btn-favorites").addEventListener("click", showFavorites);
+    $("btn-subs").addEventListener("click", toggleSubs);
     $("btn-dashboard").addEventListener("click", toggleDashboard);
     $("dash-close").addEventListener("click", () => toggleDashboard(false));
     bindDashResizer();
@@ -558,8 +563,142 @@
       new Set((state.meta && state.meta.districts || []).map((d) => d.lawd_cd))),
     clear: () => setSelectedDistricts(new Set()),
     focusComplex,
+    focusLatLng: (lat, lon) => {          // 대시보드 청약 행 클릭 → 지도 이동
+      if (!state.map || !lat || !lon) return false;
+      state.map.setLevel(4);
+      state.map.setCenter(new kakao.maps.LatLng(lat, lon));
+      return true;
+    },
     onChange: null,   // dashboard.js 가 등록: (Set) => void
   };
+
+  // ── 청약·분양 마커 ──────────────────────────────────────────────────
+  async function loadSubs() {
+    try {
+      const j = await fetchJSON(DATA + "subscription.json");
+      state.subs = j.items || [];
+    } catch {
+      state.subs = [];
+    }
+    renderSubMarkers();
+    updateSubsBtn();
+  }
+
+  function todayStr() {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  }
+
+  // 공고 상태: 예정(D-n) → 접수중 → 발표대기 → 완료
+  function subStatus(it) {
+    const t = todayStr();
+    if (it.rcept_bgn && t < it.rcept_bgn) {
+      const days = Math.ceil((new Date(it.rcept_bgn) - new Date(t)) / 86400000);
+      return { k: "upcoming", label: days <= 30 ? `D-${days}` : "예정" };
+    }
+    if (it.rcept_end && t <= it.rcept_end) return { k: "open", label: "접수중" };
+    if (it.przwner && t < it.przwner) return { k: "wait", label: "발표대기" };
+    return { k: "done", label: "완료" };
+  }
+
+  function subVisibleOnMap(it) {
+    if (!it.lat || !it.lon) return false;
+    const st = subStatus(it);
+    if (st.k !== "done") return true;
+    // 완료 공고는 접수마감 90일까지만 표시
+    if (!it.rcept_end) return false;
+    return (new Date(todayStr()) - new Date(it.rcept_end)) / 86400000 <= 90;
+  }
+
+  function renderSubMarkers() {
+    state.subOverlays.forEach((o) => o.setMap(null));
+    state.subOverlays = [];
+    if (!state.showSubs || !state.map) return;
+    state.subs.filter(subVisibleOnMap).forEach((it) => {
+      const st = subStatus(it);
+      const el = document.createElement("div");
+      el.className = `sub-bubble ${st.k}`;
+      el.innerHTML =
+        `<div class="sb-price"><span class="sb-badge">${st.label}</span>청약</div>` +
+        `<div class="pb-name">${escapeHtml(it.name)}</div>`;
+      el.addEventListener("click", () => showSubDetail(it));
+      const ov = new kakao.maps.CustomOverlay({
+        position: new kakao.maps.LatLng(it.lat, it.lon),
+        content: el, yAnchor: 1, clickable: true, zIndex: 5,
+      });
+      ov.setMap(state.map);
+      state.subOverlays.push(ov);
+    });
+  }
+
+  function toggleSubs() {
+    state.showSubs = !state.showSubs;
+    localStorage.setItem("seoul_apt_show_subs", state.showSubs ? "1" : "0");
+    renderSubMarkers();
+    updateSubsBtn();
+  }
+
+  function updateSubsBtn() {
+    const btn = $("btn-subs"), cnt = $("subs-count");
+    if (!btn) return;
+    btn.classList.toggle("active", state.showSubs);
+    const n = state.subs.filter((it) => {
+      const k = subStatus(it).k;
+      return k === "upcoming" || k === "open";
+    }).length;
+    cnt.textContent = n;
+    cnt.classList.toggle("hidden", !n);
+  }
+
+  function showSubDetail(it) {
+    const st = subStatus(it);
+    const kindTxt = it.kind === "remndr" ? "무순위/잔여세대" : "APT 분양";
+    const sched = [
+      ["모집공고", it.rcrit], ["청약접수", fmtRange(it.rcept_bgn, it.rcept_end)],
+      ["당첨자발표", it.przwner], ["계약", fmtRange(it.cntrct_bgn, it.cntrct_end)],
+      ["입주예정", it.mvn ? `${it.mvn.slice(0, 4)}.${it.mvn.slice(4)}` : null],
+    ].filter((r) => r[1]);
+    let html = `<h2>${escapeHtml(it.name)} <span class="badge sub-badge-${st.k}">${st.label}</span></h2>
+      <div class="sub">${kindTxt}${it.gu ? " · " + it.gu : ""}${it.tot ? ` · ${it.tot.toLocaleString()}세대` : ""}${it.cnstrct ? " · " + escapeHtml(it.cnstrct) : ""}</div>
+      <div class="sub" style="margin-top:2px">${escapeHtml(it.adres || "")}</div>
+      <table class="rank-table" style="margin-top:12px"><tbody>
+        ${sched.map(([k, v]) => `<tr><td style="color:var(--muted)">${k}</td><td>${v}</td></tr>`).join("")}
+      </tbody></table>`;
+    if (it.models && it.models.length) {
+      html += `<div class="section-title">주택형별 공급</div>
+        <table class="rank-table"><thead><tr>
+          <th>주택형</th><th>공급면적</th><th>일반</th><th>특별</th><th>분양가(최고)</th>
+        </tr></thead><tbody>` +
+        it.models.map((m) => `<tr>
+          <td>${escapeHtml(m.ty)}</td><td>${m.ar ? m.ar + "㎡" : "-"}</td>
+          <td>${m.hh ?? "-"}</td><td>${m.shh ?? "-"}</td>
+          <td>${m.price ? fmt(m.price) : "-"}</td></tr>`).join("") +
+        `</tbody></table>`;
+    }
+    if (it.cmpet && it.cmpet.length) {
+      html += `<div class="section-title">청약 경쟁률</div>
+        <table class="rank-table"><thead><tr>
+          <th>주택형</th><th>구분</th><th>접수</th><th>경쟁률</th>
+        </tr></thead><tbody>` +
+        it.cmpet.map((c) => `<tr>
+          <td>${escapeHtml(c.ty)}</td><td>${escapeHtml(c.resd || "-")}</td>
+          <td>${c.req != null ? c.req.toLocaleString() : "-"}</td>
+          <td>${escapeHtml(c.rate || "-")}</td></tr>`).join("") +
+        `</tbody></table>`;
+    }
+    if (it.url) {
+      html += `<div class="btn-row" style="margin-top:12px">
+        <a class="chip-btn" href="${escapeHtml(it.url)}" target="_blank" rel="noopener">청약홈 공고 보기 ↗</a></div>`;
+    }
+    $("modal-content").innerHTML = html;
+    $("modal").classList.remove("hidden");
+  }
+
+  function fmtRange(a, b) {
+    if (!a && !b) return null;
+    if (a && b && a !== b) return `${a} ~ ${b}`;
+    return a || b;
+  }
 
   // ── 단지 상세 패널 ──────────────────────────────────────────────────
   async function openComplex(mk) {

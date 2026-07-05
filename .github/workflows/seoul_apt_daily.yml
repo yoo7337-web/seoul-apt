@@ -59,6 +59,7 @@ jobs:
           python -m seoul_apt.cli building
           python -m seoul_apt.cli gongsi
           python -m seoul_apt.cli reb
+          python -m seoul_apt.cli subscription || echo "청약 수집 실패(계속 진행)"
 
       - name: Export JSON
         env:

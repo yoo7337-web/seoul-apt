@@ -23,6 +23,7 @@
     initNewOld();
     renderPeakShare();
     renderRebChart();
+    renderSubs();
     return true;
   }
 
@@ -249,6 +250,76 @@
         data: labels.map((m) => (m in map ? map[m] : null)) };
     });
     SeoulCharts.line("reb-chart", labels, datasets);
+  }
+
+  // ── 6) 청약·분양 (서울) ─────────────────────────────────────────────
+  function subStatus(it) {
+    const d = new Date();
+    const t = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    if (it.rcept_bgn && t < it.rcept_bgn) return { k: "upcoming", label: "예정" };
+    if (it.rcept_end && t <= it.rcept_end) return { k: "open", label: "접수중" };
+    if (it.przwner && t < it.przwner) return { k: "wait", label: "발표대기" };
+    return { k: "done", label: "완료" };
+  }
+
+  async function renderSubs() {
+    const wrap = $("subs-table-wrap"), cwrap = $("subs-cmpet-wrap");
+    if (!wrap) return;
+    let items = [];
+    try { items = (await fetchJSON(DATA + "subscription.json")).items || []; }
+    catch { wrap.innerHTML = '<div class="empty">청약 데이터 없음</div>'; return; }
+
+    // 진행중·예정 목록(접수 시작일 오름차순)
+    const active = items.filter((it) => ["upcoming", "open", "wait"].includes(subStatus(it).k))
+      .sort((a, b) => (a.rcept_bgn || "9999") < (b.rcept_bgn || "9999") ? -1 : 1);
+    if (!active.length) {
+      wrap.innerHTML = '<div class="empty">진행중·예정 청약 없음</div>';
+    } else {
+      let html = `<table class="rank-table"><thead><tr>
+        <th>상태</th><th>주택명</th><th>구</th><th>세대</th><th>접수기간</th><th>최고분양가</th>
+        </tr></thead><tbody>`;
+      active.forEach((it) => {
+        const st = subStatus(it);
+        const top = Math.max(0, ...(it.models || []).map((m) => m.price || 0));
+        html += `<tr data-lat="${it.lat || ""}" data-lon="${it.lon || ""}">
+          <td><span class="badge sub-badge-${st.k}">${st.label}</span></td>
+          <td>${it.name}${it.kind === "remndr" ? ' <span class="sel-hint">(무순위)</span>' : ""}</td>
+          <td>${it.gu || "-"}</td><td>${it.tot ? it.tot.toLocaleString() : "-"}</td>
+          <td>${it.rcept_bgn || "-"} ~ ${it.rcept_end || "-"}</td>
+          <td>${top ? SeoulCharts.fmt(top) : "-"}</td></tr>`;
+      });
+      wrap.innerHTML = html + "</tbody></table>";
+      wrap.querySelectorAll("tr[data-lat]").forEach((tr) =>
+        tr.addEventListener("click", () => {
+          if (window.SeoulMap && tr.dataset.lat) {
+            window.SeoulMap.focusLatLng(+tr.dataset.lat, +tr.dataset.lon);
+          }
+        }));
+    }
+
+    // 최근 마감 경쟁률 상위(주택형 최고 경쟁률 기준)
+    if (!cwrap) return;
+    const rated = items
+      .map((it) => {
+        const best = Math.max(0, ...(it.cmpet || [])
+          .map((c) => parseFloat(c.rate) || 0));
+        return { it, best };
+      })
+      .filter((x) => x.best > 0)
+      .sort((a, b) => b.best - a.best)
+      .slice(0, 15);
+    if (!rated.length) {
+      cwrap.innerHTML = '<div class="empty">경쟁률 데이터 없음</div>';
+      return;
+    }
+    let ch = `<table class="rank-table"><thead><tr>
+      <th>주택명</th><th>구</th><th>접수마감</th><th>최고 경쟁률</th>
+      </tr></thead><tbody>`;
+    rated.forEach(({ it, best }) => {
+      ch += `<tr><td>${it.name}</td><td>${it.gu || "-"}</td>
+        <td>${it.rcept_end || "-"}</td><td>${best.toLocaleString()} : 1</td></tr>`;
+    });
+    cwrap.innerHTML = ch + "</tbody></table>";
   }
 
   async function fetchJSON(url) {

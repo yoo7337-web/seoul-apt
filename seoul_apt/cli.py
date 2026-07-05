@@ -16,7 +16,8 @@ import sys
 
 from dotenv import load_dotenv
 
-from . import config, db, collect, export, geocode, gongsi, notify, reb_api, building
+from . import (config, db, collect, export, geocode, gongsi, notify, reb_api,
+               building, subscription)
 
 
 def _kst_now_ym() -> str:
@@ -61,6 +62,18 @@ def cmd_building(conn, args):
     stats = building.collect_buildings(conn, data_key, kakao_key,
                                        args.district, args.limit)
     print(f"[building] 조회 {stats['tried']} / 정보확보 {stats['filled']}")
+
+
+def cmd_subscription(conn, args):
+    data_key = config.get_key(config.ENV_DATA_GO_KR)
+    kakao_key = config.get_key(config.ENV_KAKAO_REST, required=False)
+    stats = subscription.collect_subscriptions(
+        conn, data_key, kakao_key,
+        since=getattr(args, "since", None),
+        debug=getattr(args, "debug", False))
+    print(f"[subscription] APT {stats['apt']} / 무순위 {stats['remndr']} "
+          f"/ 주택형 {stats['models']} / 경쟁률 {stats['cmpet']} "
+          f"/ 지오코딩 {stats['geocoded']}")
 
 
 def cmd_reb(conn, args):
@@ -117,6 +130,10 @@ def cmd_all(conn, args):
     cmd_building(conn, args)
     cmd_gongsi(conn, args)
     cmd_reb(conn, args)
+    try:
+        cmd_subscription(conn, args)
+    except Exception as e:          # 청약은 부가 기능 - 실패해도 export 진행
+        print(f"[subscription] 실패(계속 진행): {e}")
     cmd_export(conn, args)
 
 
@@ -147,6 +164,12 @@ def build_parser() -> argparse.ArgumentParser:
     bd.add_argument("--district", default=None, help="특정 구 LAWD_CD")
     bd.add_argument("--limit", type=int, default=None, help="처리 개수 제한")
     bd.set_defaults(func=cmd_building)
+
+    sb = sub.add_parser("subscription", help="청약홈 분양정보·경쟁률 수집")
+    sb.add_argument("--since", default=None, help="모집공고일 시작 YYYY-MM-DD")
+    sb.add_argument("--debug", action="store_true",
+                    help="첫 응답의 필드명 목록 출력(API 필드 확인용)")
+    sb.set_defaults(func=cmd_subscription)
 
     r = sub.add_parser("reb", help="부동산원 지수 수집")
     r.add_argument("--from", dest="from_ym", default=None)

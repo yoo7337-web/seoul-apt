@@ -311,6 +311,42 @@ table.rank-table tbody tr[data-id]:hover { background: var(--accent-soft); }
 }
 .price-bubble.selected .pb-price::after { border-top-color: var(--accent); }
 
+/* ── 청약·분양 마커 ───────────────────────────────────────────────── */
+.sub-bubble {
+  position: relative; transform: translateY(-6px);
+  display: flex; flex-direction: column; align-items: center;
+  cursor: pointer; user-select: none;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, .25));
+}
+.sub-bubble:hover { transform: translateY(-8px) scale(1.06); z-index: 50; }
+.sb-price {
+  background: #7c3aed; color: #fff;
+  padding: 4px 10px; border-radius: 17px;
+  font-size: 12px; font-weight: 800; letter-spacing: -.3px; line-height: 1.35;
+  border: 2px solid #fff; white-space: nowrap;
+  display: flex; align-items: center; gap: 5px;
+}
+.sb-price::after {
+  content: ""; position: absolute; left: 50%; top: 100%;
+  transform: translateX(-50%) translateY(-2px);
+  border: 5px solid transparent; border-top-color: #7c3aed;
+}
+.sb-badge {
+  background: rgba(255, 255, 255, .25); border-radius: 8px;
+  padding: 0 6px; font-size: 10px; font-weight: 700;
+}
+.sub-bubble.open .sb-price { background: #059669; }        /* 접수중=초록 */
+.sub-bubble.open .sb-price::after { border-top-color: #059669; }
+.sub-bubble.done .sb-price { background: #6b7280; }        /* 완료=회색 */
+.sub-bubble.done .sb-price::after { border-top-color: #6b7280; }
+/* 상세 모달 상태 뱃지 */
+.badge.sub-badge-upcoming { background: #7c3aed; color: #fff; }
+.badge.sub-badge-open { background: #059669; color: #fff; }
+.badge.sub-badge-wait { background: #d97706; color: #fff; }
+.badge.sub-badge-done { background: #6b7280; color: #fff; }
+/* 청약 토글 버튼 활성 상태 */
+.chip-btn.active { color: #7c3aed; font-weight: 800; }
+
 /* ── 지역(구) 버블 - 저줌 ─────────────────────────────────────────── */
 .region-bubble {
   position: relative;

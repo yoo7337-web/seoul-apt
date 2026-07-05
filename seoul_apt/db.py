@@ -83,6 +83,46 @@ CREATE TABLE IF NOT EXISTS fetch_log (
     PRIMARY KEY (lawd_cd, deal_ymd, kind)
 );
 
+CREATE TABLE IF NOT EXISTS subscription (
+    house_manage_no TEXT PRIMARY KEY, -- 청약홈 주택관리번호
+    pblanc_no       TEXT,             -- 공고번호
+    kind            TEXT NOT NULL,    -- 'apt' | 'remndr'(무순위/잔여)
+    house_nm        TEXT NOT NULL,    -- 주택명
+    adres           TEXT,             -- 공급위치 주소
+    tot_suply       INTEGER,          -- 공급규모(세대)
+    rcrit_de        TEXT,             -- 모집공고일 'YYYY-MM-DD'
+    rcept_bgnde     TEXT,             -- 청약접수 시작
+    rcept_endde     TEXT,             -- 청약접수 종료
+    przwner_de      TEXT,             -- 당첨자발표일
+    cntrct_bgnde    TEXT,             -- 계약 시작
+    cntrct_endde    TEXT,             -- 계약 종료
+    mvn_ym          TEXT,             -- 입주예정월 'YYYYMM'
+    cnstrct_nm      TEXT,             -- 시공사
+    url             TEXT,             -- 공고 상세 URL
+    lat             REAL,
+    lon             REAL,
+    fetched_at      TEXT
+);
+
+CREATE TABLE IF NOT EXISTS subscription_model (
+    house_manage_no TEXT NOT NULL REFERENCES subscription(house_manage_no),
+    house_ty        TEXT NOT NULL,    -- 주택형(예: 084.9800A)
+    suply_ar        REAL,             -- 공급면적(㎡)
+    suply_hshldco   INTEGER,          -- 일반공급 세대수
+    spsply_hshldco  INTEGER,          -- 특별공급 세대수
+    top_amount      INTEGER,          -- 분양최고금액(만원)
+    PRIMARY KEY (house_manage_no, house_ty)
+);
+
+CREATE TABLE IF NOT EXISTS subscription_cmpet (
+    house_manage_no TEXT NOT NULL REFERENCES subscription(house_manage_no),
+    house_ty        TEXT NOT NULL,
+    reside_secd     TEXT NOT NULL DEFAULT '',  -- 거주지역 구분(해당지역 등)
+    req_cnt         INTEGER,          -- 접수건수
+    cmpet_rate      TEXT,             -- 경쟁률(문자열: '12.5', '△5' 형태 존재)
+    PRIMARY KEY (house_manage_no, house_ty, reside_secd)
+);
+
 CREATE INDEX IF NOT EXISTS idx_sale_complex_date ON sale_txn(complex_id, deal_date);
 CREATE INDEX IF NOT EXISTS idx_rent_complex_date ON rent_txn(complex_id, deal_date);
 CREATE INDEX IF NOT EXISTS idx_complex_lawd ON complex(lawd_cd);
@@ -270,4 +310,70 @@ def set_building(conn, complex_id, households, far, bcr, approval_date,
         "UPDATE complex SET households=?, far=?, bcr=?, approval_date=?, "
         "bldg_fetched_at=? WHERE complex_id=?",
         (households, far, bcr, approval_date, fetched_at, complex_id),
+    )
+
+
+# ── 청약·분양 ────────────────────────────────────────────────────────────
+def upsert_subscription(conn, s: dict) -> None:
+    """분양공고 upsert. 일정 변경(접수일 연기 등)이 재수집 시 반영되도록
+    좌표를 제외한 필드는 항상 최신값으로 갱신한다."""
+    conn.execute(
+        """INSERT INTO subscription
+           (house_manage_no, pblanc_no, kind, house_nm, adres, tot_suply,
+            rcrit_de, rcept_bgnde, rcept_endde, przwner_de,
+            cntrct_bgnde, cntrct_endde, mvn_ym, cnstrct_nm, url, fetched_at)
+           VALUES (:house_manage_no, :pblanc_no, :kind, :house_nm, :adres,
+                   :tot_suply, :rcrit_de, :rcept_bgnde, :rcept_endde,
+                   :przwner_de, :cntrct_bgnde, :cntrct_endde, :mvn_ym,
+                   :cnstrct_nm, :url, :fetched_at)
+           ON CONFLICT(house_manage_no) DO UPDATE SET
+             pblanc_no=excluded.pblanc_no, kind=excluded.kind,
+             house_nm=excluded.house_nm, adres=excluded.adres,
+             tot_suply=excluded.tot_suply, rcrit_de=excluded.rcrit_de,
+             rcept_bgnde=excluded.rcept_bgnde, rcept_endde=excluded.rcept_endde,
+             przwner_de=excluded.przwner_de, cntrct_bgnde=excluded.cntrct_bgnde,
+             cntrct_endde=excluded.cntrct_endde, mvn_ym=excluded.mvn_ym,
+             cnstrct_nm=excluded.cnstrct_nm, url=excluded.url,
+             fetched_at=excluded.fetched_at""",
+        s,
+    )
+
+
+def upsert_subscription_model(conn, m: dict) -> None:
+    conn.execute(
+        """INSERT INTO subscription_model
+           (house_manage_no, house_ty, suply_ar, suply_hshldco,
+            spsply_hshldco, top_amount)
+           VALUES (:house_manage_no, :house_ty, :suply_ar, :suply_hshldco,
+                   :spsply_hshldco, :top_amount)
+           ON CONFLICT(house_manage_no, house_ty) DO UPDATE SET
+             suply_ar=excluded.suply_ar, suply_hshldco=excluded.suply_hshldco,
+             spsply_hshldco=excluded.spsply_hshldco,
+             top_amount=excluded.top_amount""",
+        m,
+    )
+
+
+def upsert_subscription_cmpet(conn, c: dict) -> None:
+    conn.execute(
+        """INSERT INTO subscription_cmpet
+           (house_manage_no, house_ty, reside_secd, req_cnt, cmpet_rate)
+           VALUES (:house_manage_no, :house_ty, :reside_secd, :req_cnt,
+                   :cmpet_rate)
+           ON CONFLICT(house_manage_no, house_ty, reside_secd) DO UPDATE SET
+             req_cnt=excluded.req_cnt, cmpet_rate=excluded.cmpet_rate""",
+        c,
+    )
+
+
+def subscriptions_without_coords(conn) -> list[sqlite3.Row]:
+    return conn.execute(
+        "SELECT house_manage_no, house_nm, adres FROM subscription "
+        "WHERE lat IS NULL AND adres IS NOT NULL").fetchall()
+
+
+def set_subscription_coords(conn, house_manage_no, lat, lon) -> None:
+    conn.execute(
+        "UPDATE subscription SET lat=?, lon=? WHERE house_manage_no=?",
+        (lat, lon, house_manage_no),
     )
