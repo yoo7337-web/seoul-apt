@@ -7,7 +7,7 @@
                   "#0ea5e9", "#f59e0b", "#84cc16", "#ec4899", "#64748b"];
 
   let meta = null, dash = null, inited = false;
-  const trendOn = new Set();   // 켜져 있는 구 lawd_cd
+  const localSel = new Set();   // 독립 페이지(지도 없음)용 로컬 선택
 
   async function init() {
     if (inited) return true;
@@ -17,8 +17,9 @@
     ]);
     if (!meta) return false;
     inited = true;
-    renderRankTable();
-    initTrend();
+    // 지도(app.js)의 선택 변경을 대시보드에 반영
+    if (window.SeoulMap) window.SeoulMap.onChange = () => refresh();
+    refresh();
     initNewOld();
     renderPeakShare();
     renderRebChart();
@@ -38,55 +39,88 @@
     document.addEventListener("DOMContentLoaded", init);
   }
 
-  // ── 1) 구별 랭킹 ────────────────────────────────────────────────────
+  // ── 공유 선택(지도 있으면 SeoulMap, 없으면 로컬) ────────────────────
+  const hasMap = () => !!window.SeoulMap;
+  const getSel = () => hasMap() ? window.SeoulMap.getSelected() : new Set(localSel);
+  function applySel(set) {
+    if (hasMap()) window.SeoulMap.setSelected(set);   // → onChange → refresh
+    else { localSel.clear(); set.forEach((x) => localSel.add(x)); refresh(); }
+  }
+  function toggleSel(lawd) {
+    const s = getSel(); s.has(lawd) ? s.delete(lawd) : s.add(lawd); applySel(s);
+  }
+  const allLawds = () => (meta.rankings || []).map((r) => r.lawd_cd);
+  function selectAllToggle() {
+    const all = allLawds();
+    applySel(getSel().size >= all.length ? new Set() : new Set(all));
+  }
+  // 선택 변경 시 랭킹·추이를 다시 그린다(차트/표만, 지도는 app.js가 처리)
+  function refresh() { renderRankTable(); renderTrendControls(); renderTrend(); }
+
+  function chip(text, on) {
+    const b = document.createElement("button");
+    b.className = "d-chip" + (on ? " on" : "");
+    b.textContent = text;
+    return b;
+  }
+
+  // ── 1) 구별 랭킹(클릭=구 선택, 복수) ────────────────────────────────
   function renderRankTable() {
     const ranks = meta.rankings || [];
-    let html = `<table class="rank-table"><thead><tr>
-      <th>#</th><th>자치구</th><th>평단가(만원/평)</th><th>6개월 변동</th><th>거래건수</th>
+    const sel = getSel();
+    const allOn = sel.size > 0 && sel.size >= ranks.length;
+    let html = `<div class="sel-bar">
+      <button class="d-chip sel-all${allOn ? " on" : ""}">${allOn ? "전체 해제" : "전체 선택"}</button>
+      <span class="sel-hint">행 클릭 = 구 선택(복수) · 지도·추이 연동</span></div>`;
+    html += `<table class="rank-table"><thead><tr>
+      <th>#</th><th>자치구</th><th>평단가</th><th>6개월</th><th>거래</th>
       </tr></thead><tbody>`;
     ranks.forEach((r, i) => {
       const chg = r.change_6m;
       const cls = chg > 0 ? "chg-up" : chg < 0 ? "chg-down" : "";
-      html += `<tr><td>${i + 1}</td><td>${r.name}</td>
+      html += `<tr data-lawd="${r.lawd_cd}" class="${sel.has(r.lawd_cd) ? "sel" : ""}">
+        <td>${i + 1}</td><td>${r.name}</td>
         <td>${r.ppy_median ? Math.round(r.ppy_median).toLocaleString() : "-"}</td>
         <td class="${cls}">${chg != null ? (chg > 0 ? "+" : "") + chg + "%" : "-"}</td>
         <td>${(r.sale_count || 0).toLocaleString()}</td></tr>`;
     });
-    $("rank-table-wrap").innerHTML = html + "</tbody></table>";
-    $("rank-desc").textContent =
-      `기준: ${meta.last_updated_display || "-"} · 만원/평`;
+    const wrap = $("rank-table-wrap");
+    wrap.innerHTML = html + "</tbody></table>";
+    wrap.querySelector(".sel-all").addEventListener("click", selectAllToggle);
+    wrap.querySelectorAll("tr[data-lawd]").forEach((tr) =>
+      tr.addEventListener("click", () => toggleSel(tr.dataset.lawd)));
+    $("rank-desc").textContent = `기준: ${meta.last_updated_display || "-"} · 만원/평`;
   }
 
-  // ── 2) 평단가 추이 ──────────────────────────────────────────────────
-  function initTrend() {
-    if (!dash || !dash.ppy_trend) return;
+  // ── 2) 평단가 추이(선택 구 연동, 미선택 시 상위5 미리보기) ──────────
+  function renderTrendControls() {
     const ranks = meta.rankings || [];
-    // 기본: 랭킹 상위 5개 구 켜기
-    ranks.slice(0, 5).forEach((r) => trendOn.add(r.lawd_cd));
-    const chips = $("trend-chips");
+    const sel = getSel();
+    const allOn = sel.size > 0 && sel.size >= ranks.length;
+    const wrap = $("trend-chips");
+    wrap.innerHTML = "";
+    const all = chip(allOn ? "전체 해제" : "전체 선택", allOn);
+    all.classList.add("sel-all");
+    all.addEventListener("click", selectAllToggle);
+    wrap.appendChild(all);
     ranks.forEach((r) => {
-      const b = document.createElement("button");
-      b.className = "d-chip" + (trendOn.has(r.lawd_cd) ? " on" : "");
-      b.textContent = r.name;
-      b.addEventListener("click", () => {
-        if (trendOn.has(r.lawd_cd)) trendOn.delete(r.lawd_cd);
-        else trendOn.add(r.lawd_cd);
-        b.classList.toggle("on");
-        renderTrend();
-      });
-      chips.appendChild(b);
+      const b = chip(r.name, sel.has(r.lawd_cd));
+      b.addEventListener("click", () => toggleSel(r.lawd_cd));
+      wrap.appendChild(b);
     });
-    renderTrend();
   }
 
   function renderTrend() {
+    if (!dash || !dash.ppy_trend) return;
     const names = {};
     (meta.rankings || []).forEach((r) => { names[r.lawd_cd] = r.name; });
-    const sel = [...trendOn];
+    const sel = getSel();
+    const list = sel.size ? [...sel]
+      : (meta.rankings || []).slice(0, 5).map((r) => r.lawd_cd);   // 미선택 미리보기
     const months = new Set();
-    sel.forEach((cd) => (dash.ppy_trend[cd] || []).forEach((p) => months.add(p.m)));
+    list.forEach((cd) => (dash.ppy_trend[cd] || []).forEach((p) => months.add(p.m)));
     const labels = [...months].sort();
-    const datasets = sel.map((cd, i) => {
+    const datasets = list.map((cd, i) => {
       const map = {};
       (dash.ppy_trend[cd] || []).forEach((p) => { map[p.m] = p.p; });
       return { label: names[cd] || cd, color: COLORS[i % COLORS.length],
@@ -117,18 +151,24 @@
     const list = (d.complexes || [])
       .filter((c) => c.build_year)
       .sort((a, b) => b.build_year - a.build_year);
-    let html = `<table class="rank-table"><thead><tr>
+    let html = `<div class="sel-hint">단지 클릭 = 지도에 표시</div>
+      <table class="rank-table"><thead><tr>
       <th>단지</th><th>법정동</th><th>준공</th><th>연차</th><th>세대수</th>
       <th>매매중앙값</th><th>평단가</th></tr></thead><tbody>`;
     const nowY = new Date().getFullYear();
     list.forEach((c) => {
-      html += `<tr><td>${c.apt}</td><td>${c.umd || "-"}</td>
+      html += `<tr data-id="${c.id}"><td>${c.apt}</td><td>${c.umd || "-"}</td>
         <td>${c.build_year}</td><td>${nowY - c.build_year}년</td>
         <td>${c.households ? c.households.toLocaleString() : "-"}</td>
         <td>${SeoulCharts.fmt(c.sale_median)}</td>
         <td>${c.ppy_median ? Math.round(c.ppy_median).toLocaleString() : "-"}</td></tr>`;
     });
-    $("no-table-wrap").innerHTML = html + "</tbody></table>";
+    const wrap = $("no-table-wrap");
+    wrap.innerHTML = html + "</tbody></table>";
+    wrap.querySelectorAll("tr[data-id]").forEach((tr) =>
+      tr.addEventListener("click", () => {
+        if (window.SeoulMap) window.SeoulMap.focusComplex(+tr.dataset.id);
+      }));
   }
 
   // ── 4) 신고가 비중 ──────────────────────────────────────────────────

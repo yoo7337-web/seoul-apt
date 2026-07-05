@@ -26,7 +26,7 @@
 
   const state = {
     meta: null, markers: [], map: null,
-    overlays: [], selectedId: null, district: "", search: "", area: "",
+    overlays: [], selectedId: null, districts: new Set(), search: "", area: "",
     dealType: "sale",   // 지도 말풍선 기준: 'sale'(매매) | 'jeonse'(전세)
     // 상세 필터(8종). null/""/false = 미적용
     filters: { min: null, max: null, jr: "", drop: "", age: "",
@@ -56,7 +56,8 @@
 
   function bindUI() {
     $("district-select").addEventListener("change", (e) => {
-      state.district = e.target.value; applyFilters(); panToDistrict();
+      const v = e.target.value;   // 드롭다운 = 단일 선택 shortcut(공유 선택 갱신)
+      setSelectedDistricts(v ? new Set([v]) : new Set());
     });
     $("search-input").addEventListener("input", debounce((e) => {
       state.search = e.target.value.trim(); applyFilters();
@@ -153,7 +154,7 @@
     // 축소 상태 + 필터 없음 → 구 단위 요약 버블
     // 구 요약 버블은 매매·전체평형·필터없음일 때만(전세/평형/상세필터 시 단지 버블로 전환)
     const zoomedOut = state.map.getLevel() >= REGION_LEVEL;
-    if (zoomedOut && !state.district && !state.search && !state.area
+    if (zoomedOut && !state.districts.size && !state.search && !state.area
         && state.dealType === "sale" && activeFilterCount() === 0) {
       renderRegionBubbles();
       hideNotice();
@@ -253,7 +254,7 @@
     const f = state.filters;
     const nowYear = new Date().getFullYear();
     return state.markers.filter((m) => {
-      if (state.district && m.lawd_cd !== state.district) return false;
+      if (state.districts.size && !state.districts.has(m.lawd_cd)) return false;
       if (state.search && !m.apt.includes(state.search)) return false;
 
       // ── 상세 필터 (값 없는 단지는 해당 필터 사용 시 제외) ──
@@ -386,19 +387,56 @@
     rz.addEventListener("pointercancel", end);
   }
 
-  function panToDistrict() {
+  function panToSelected() {
     if (!state.map) return;
-    if (!state.district) {
+    if (!state.districts.size) {
       state.map.setCenter(new kakao.maps.LatLng(SEOUL_CENTER.lat, SEOUL_CENTER.lng));
       state.map.setLevel(8);
       return;
     }
-    const ms = state.markers.filter((m) => m.lawd_cd === state.district);
+    const ms = state.markers.filter((m) => state.districts.has(m.lawd_cd));
     if (!ms.length) return;
     const bounds = new kakao.maps.LatLngBounds();
     ms.forEach((m) => bounds.extend(new kakao.maps.LatLng(m.lat, m.lon)));
     state.map.setBounds(bounds);
   }
+
+  // ── 구 선택 공유(랭킹·추이·지도 연동) ───────────────────────────────
+  function setSelectedDistricts(set) {
+    state.districts = new Set(set);
+    const sel = $("district-select");
+    if (sel) sel.value = state.districts.size === 1 ? [...state.districts][0] : "";
+    applyFilters();
+    panToSelected();
+    if (window.SeoulMap.onChange) window.SeoulMap.onChange(new Set(state.districts));
+  }
+
+  function focusComplex(id) {
+    const mk = state.markers.find((m) => m.id === id);
+    if (!mk || !state.map) return false;
+    state.map.setLevel(4);
+    state.map.setCenter(new kakao.maps.LatLng(mk.lat, mk.lon));
+    state.selectedId = id;
+    openComplex(mk);
+    renderMarkers();
+    return true;
+  }
+
+  // 대시보드(dashboard.js)에서 지도를 제어하는 공유 API
+  window.SeoulMap = {
+    getSelected: () => new Set(state.districts),
+    setSelected: (set) => setSelectedDistricts(set),
+    toggle: (lawd) => {
+      const s = new Set(state.districts);
+      s.has(lawd) ? s.delete(lawd) : s.add(lawd);
+      setSelectedDistricts(s);
+    },
+    selectAll: () => setSelectedDistricts(
+      new Set((state.meta && state.meta.districts || []).map((d) => d.lawd_cd))),
+    clear: () => setSelectedDistricts(new Set()),
+    focusComplex,
+    onChange: null,   // dashboard.js 가 등록: (Set) => void
+  };
 
   // ── 단지 상세 패널 ──────────────────────────────────────────────────
   async function openComplex(mk) {

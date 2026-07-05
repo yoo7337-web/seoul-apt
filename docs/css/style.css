@@ -182,7 +182,16 @@ body.page { overflow: auto; }
   border: 1px solid var(--border); background: var(--surface); color: var(--muted);
 }
 .d-chip.on { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+.d-chip.sel-all { border-color: var(--accent); color: var(--accent-dark); font-weight: 700; }
+.d-chip.sel-all.on { color: #fff; }
 .table-scroll { max-height: 420px; overflow-y: auto; }
+.sel-bar { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+.sel-hint { font-size: 11px; color: var(--muted); margin-bottom: 6px; }
+/* 선택된 구 행 강조 + 클릭 가능 표시 */
+table.rank-table tbody tr[data-lawd], table.rank-table tbody tr[data-id] { cursor: pointer; }
+table.rank-table tbody tr.sel { background: var(--accent-soft); }
+table.rank-table tbody tr.sel td { color: var(--accent-dark); font-weight: 600; }
+table.rank-table tbody tr[data-id]:hover { background: var(--accent-soft); }
 
 /* 예정/아이디어 위젯 */
 .idea-input { display: flex; gap: 8px; margin-bottom: 10px; }
