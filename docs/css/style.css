@@ -176,6 +176,11 @@ body.page { overflow: auto; }
 .page-section h2 { font-size: 16px; font-weight: 800; margin-bottom: 12px; }
 .page-section .desc { color: var(--muted); font-size: 12px; margin: -6px 0 12px; }
 .chart-tall { position: relative; height: 320px; }
+/* 차트 기간 컨트롤(프리셋 + 초기화) */
+.chart-ctrl { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 8px; align-items: center; }
+.chart-ctrl .d-chip { padding: 3px 10px; font-size: 11.5px; }
+.chart-ctrl .d-chip.reset { margin-left: auto; color: var(--muted); }
+.chart-ctrl .d-chip.reset:hover { color: var(--accent); }
 .chip-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
 .d-chip {
   padding: 4px 11px; border-radius: 15px; font-size: 12px; cursor: pointer;
