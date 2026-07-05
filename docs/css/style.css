@@ -307,6 +307,10 @@ table.rank-table tbody tr[data-id]:hover { background: var(--accent-soft); }
 /* 관심 모달 섹션 제목 */
 .fav-sec-title { font-size: 14px; font-weight: 700; margin: 14px 0 8px; }
 .fav-sec-title:first-of-type { margin-top: 4px; }
+/* 관심단지 섹션은 관심구와 간격 + 구분선 */
+.fav-sec-title:not(:first-of-type) {
+  margin-top: 26px; padding-top: 16px; border-top: 1px solid var(--border);
+}
 .rank-table .fav-del { cursor: pointer; color: var(--muted); text-align: center; }
 .rank-table .fav-del:hover { color: var(--up); }
 .fav-d-row, .fav-c-row { cursor: pointer; }
