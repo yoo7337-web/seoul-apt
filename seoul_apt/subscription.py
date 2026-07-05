@@ -180,11 +180,16 @@ def _parse_model(raw: dict, house_manage_no: str) -> dict:
 
 
 def _parse_cmpet(raw: dict, house_manage_no: str) -> dict:
+    # 같은 주택형·지역에 1·2순위 행이 따로 오므로 순위를 구분 라벨에 포함
+    resd = (_field(raw, "RESIDE_SENM", "RESIDE_SECD_NM",
+                   "RESIDE_SECD") or "").strip()
+    rank = _to_int(_field(raw, "SUBSCRPT_RANK_CODE"))
+    if rank:
+        resd = f"{resd} {rank}순위".strip()
     return {
         "house_manage_no": house_manage_no,
         "house_ty": (_field(raw, "HOUSE_TY", "TP") or "-").strip(),
-        "reside_secd": (_field(raw, "RESIDE_SENM", "RESIDE_SECD_NM",
-                               "RESIDE_SECD") or "").strip(),
+        "reside_secd": resd,
         "req_cnt": _to_int(_field(raw, "REQ_CNT", "RCEPT_CNT")),
         "cmpet_rate": (str(_field(raw, "CMPET_RATE") or "").strip() or None),
     }

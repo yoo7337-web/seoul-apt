@@ -30,7 +30,8 @@ RAW_MODEL = {
 }
 RAW_CMPET = {
     "HOUSE_MANAGE_NO": "2026000123", "HOUSE_TY": "084.9700A",
-    "RESIDE_SENM": "해당지역", "REQ_CNT": "3,120", "CMPET_RATE": "26.0",
+    "RESIDE_SENM": "해당지역", "SUBSCRPT_RANK_CODE": 1,
+    "REQ_CNT": "3,120", "CMPET_RATE": "26.0",
 }
 
 
@@ -77,6 +78,7 @@ def test_models_cmpet_and_export_items():
     assert it["models"] == [{"ty": "084.9700A", "ar": 112.4, "hh": 120,
                              "shh": 80, "price": 215000}]
     assert it["cmpet"][0]["rate"] == "26.0"
+    assert it["cmpet"][0]["resd"] == "해당지역 1순위"   # 순위 병기(덮어쓰기 방지)
     # 1년 넘게 지난 마감 공고는 제외
     old = _parse_notice({**RAW_NOTICE, "HOUSE_MANAGE_NO": "9",
                          "RCEPT_ENDDE": "2024-01-05"}, "apt")
