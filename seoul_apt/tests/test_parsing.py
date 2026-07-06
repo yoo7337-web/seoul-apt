@@ -117,6 +117,17 @@ def test_sale_by_area_buckets():
     conn.close()
 
 
+def test_market_phase_classification():
+    """4국면 판정: 거래량×가격 모멘텀 조합."""
+    p = aggregate._phase
+    assert p(1.2, 5.0) == "boom"        # 거래↑ 가격↑
+    assert p(1.2, -5.0) == "recovery"   # 거래↑ 가격↓
+    assert p(0.8, 5.0) == "slowdown"    # 거래↓ 가격↑
+    assert p(0.8, -5.0) == "recession"  # 거래↓ 가격↓
+    assert p(1.0, 0.0) == "neutral"     # 경계
+    assert p(None, 5.0) == "neutral"    # 데이터 부족
+
+
 def test_bargain_deals():
     """급매 감지: 동일평형 중앙값 대비 -7%↓, 저층 제외."""
     from datetime import date

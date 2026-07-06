@@ -24,6 +24,7 @@
     renderPeakShare();
     renderRebChart();
     renderSubs();
+    renderMarketPhase();
     return true;
   }
 
@@ -250,6 +251,29 @@
         data: labels.map((m) => (m in map ? map[m] : null)) };
     });
     SeoulCharts.line("reb-chart", labels, datasets);
+  }
+
+  // ── 5b) 시장 국면 신호등 ────────────────────────────────────────────
+  const PHASE_LABEL = { boom: "과열", recovery: "회복", slowdown: "둔화",
+                        recession: "침체", neutral: "중립" };
+  function renderMarketPhase() {
+    const grid = $("phase-grid");
+    if (!grid || !dash || !dash.market_phase) return;
+    // 국면 정렬: 과열>둔화>중립>회복>침체 대략 강→약
+    const order = { boom: 0, slowdown: 1, neutral: 2, recovery: 3, recession: 4 };
+    const rows = dash.market_phase.slice()
+      .sort((a, b) => order[a.phase] - order[b.phase]);
+    grid.innerHTML = rows.map((r) => {
+      const prc = r.price_chg != null
+        ? `${r.price_chg > 0 ? "+" : ""}${r.price_chg}%` : "-";
+      return `<div class="phase-cell ${r.phase}" data-lawd="${r.lawd_cd}"
+        title="거래량 최근3개월/직전12개월 ${r.vol_ratio ?? "-"}배 · 가격 6개월 ${prc}">
+        <div class="pc-gu">${r.name}</div>
+        <div class="pc-label">${PHASE_LABEL[r.phase]}</div>
+        <div class="pc-sub">${prc}</div></div>`;
+    }).join("");
+    grid.querySelectorAll(".phase-cell").forEach((c) =>
+      c.addEventListener("click", () => toggleSel(c.dataset.lawd)));
   }
 
   // ── 6) 청약·분양 (서울) ─────────────────────────────────────────────

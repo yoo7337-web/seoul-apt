@@ -453,6 +453,49 @@ def district_peak_share(conn, days: int = 90) -> list[dict]:
 
 
 # ── 랭킹 / 부동산원 ──────────────────────────────────────────────────────
+def _phase(vol_ratio, price_chg) -> str:
+    """거래량 모멘텀 × 가격 모멘텀 → 부동산 시계 4국면.
+    거래량↑가격↑=과열 / 거래량↑가격↓=회복 / 거래량↓가격↑=둔화 / 거래량↓가격↓=침체.
+    경계(혼조)는 중립."""
+    if vol_ratio is None or price_chg is None:
+        return "neutral"
+    vol = 1 if vol_ratio >= 1.05 else (-1 if vol_ratio <= 0.95 else 0)
+    prc = 1 if price_chg >= 0.5 else (-1 if price_chg <= -0.5 else 0)
+    if vol > 0 and prc > 0:
+        return "boom"        # 과열(상승)
+    if vol > 0 and prc < 0:
+        return "recovery"    # 회복(거래 먼저 살아남)
+    if vol < 0 and prc > 0:
+        return "slowdown"    # 둔화(가격 관성, 거래 위축)
+    if vol < 0 and prc < 0:
+        return "recession"   # 침체
+    return "neutral"
+
+
+def market_phase(conn) -> list[dict]:
+    """구별 시장 국면 - 거래량 모멘텀(최근3개월/직전12개월 월평균)과
+    가격 6개월 변화율로 4국면 판정. 불완전 당월은 제외해 왜곡을 줄인다."""
+    ranks = {r["lawd_cd"]: r for r in district_rankings(conn)}
+    out = []
+    for lawd_cd, name in config.SEOUL_DISTRICTS.items():
+        monthly = district_monthly(conn, lawd_cd)   # 월 오름차순
+        counts = [m["sale_count"] for m in monthly]
+        if len(counts) < 16:
+            continue
+        recent = counts[-4:-1]          # 최근 3개월(당월 제외)
+        base = counts[-16:-4]           # 직전 12개월
+        base_avg = sum(base) / len(base) if base else 0
+        vol_ratio = round((sum(recent) / len(recent)) / base_avg, 2) \
+            if base_avg else None
+        price_chg = ranks.get(lawd_cd, {}).get("change_6m")
+        out.append({
+            "lawd_cd": lawd_cd, "name": name,
+            "vol_ratio": vol_ratio, "price_chg": price_chg,
+            "phase": _phase(vol_ratio, price_chg),
+        })
+    return out
+
+
 def district_rankings(conn) -> list[dict]:
     """구별 평단가 중앙값과 최근 6개월 상승률 랭킹."""
     out = []

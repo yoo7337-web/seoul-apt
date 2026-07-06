@@ -474,6 +474,33 @@ table.rank-table tbody tr[data-id]:hover { background: var(--accent-soft); }
 .val-sub { margin-top: 9px; font-size: 12px; color: var(--text); }
 .val-sub b { color: var(--accent-dark); }
 
+/* ── 시장 국면 신호등 ─────────────────────────────────────────────── */
+.phase-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(78px, 1fr));
+  gap: 6px;
+}
+.phase-cell {
+  border-radius: 9px; padding: 8px 6px; text-align: center; cursor: pointer;
+  color: #fff; transition: transform .1s;
+}
+.phase-cell:hover { transform: translateY(-2px); }
+.pc-gu { font-size: 12px; font-weight: 700; }
+.pc-label { font-size: 13px; font-weight: 800; margin-top: 2px; }
+.pc-sub { font-size: 10px; opacity: .85; }
+.phase-cell.boom, .ph.boom { background: #ef4444; }         /* 과열=빨강 */
+.phase-cell.slowdown, .ph.slowdown { background: #d97706; } /* 둔화=주황 */
+.phase-cell.recession, .ph.recession { background: #2563eb; } /* 침체=파랑 */
+.phase-cell.recovery, .ph.recovery { background: #059669; } /* 회복=초록 */
+.phase-cell.neutral, .ph.neutral { background: #9ca3af; }   /* 중립=회색 */
+.phase-legend {
+  display: flex; flex-wrap: wrap; gap: 12px; margin-top: 10px;
+  font-size: 11px; color: var(--muted);
+}
+.phase-legend span { display: inline-flex; align-items: center; gap: 4px; }
+.phase-legend .ph {
+  width: 11px; height: 11px; border-radius: 3px; display: inline-block;
+}
+
 .section-title { font-size: 14px; font-weight: 700; margin: 18px 0 8px; }
 .chart-wrap { position: relative; height: 200px; margin-bottom: 8px; }
 

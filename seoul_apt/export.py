@@ -120,6 +120,7 @@ def export_all(conn, kakao_js_key: str | None = None) -> dict:
         "ppy_trend": ppy_trend,
         "peak_share": aggregate.district_peak_share(conn, days=90),
         "peak_share_days": 90,
+        "market_phase": aggregate.market_phase(conn),
     })
     _write_json(export_dir / "meta.json", {
         "last_updated": now.isoformat(timespec="seconds"),

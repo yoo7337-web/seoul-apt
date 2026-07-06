@@ -6,7 +6,7 @@
   <title>서울 아파트 시세 지도</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=23">
+  <link rel="stylesheet" href="css/style.css?v=24">
 </head>
 <body>
   <!-- 풀스크린 지도 -->
@@ -50,6 +50,16 @@
       <h2>부동산원 가격지수 (서울)</h2>
       <div class="desc">한국부동산원 월간 아파트 매매·전세 가격지수</div>
       <div class="chart-tall"><canvas id="reb-chart"></canvas></div>
+    </section>
+    <section class="page-section">
+      <h2>시장 국면 신호등</h2>
+      <div class="desc">거래량 모멘텀 × 가격 6개월 변화 → 구별 사이클 국면</div>
+      <div id="phase-grid" class="phase-grid"></div>
+      <div class="phase-legend">
+        <span><i class="ph boom"></i>과열</span><span><i class="ph slowdown"></i>둔화</span>
+        <span><i class="ph recession"></i>침체</span><span><i class="ph recovery"></i>회복</span>
+        <span><i class="ph neutral"></i>중립</span>
+      </div>
     </section>
     <section class="page-section">
       <h2>구별 평단가 랭킹</h2>
@@ -120,7 +130,7 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
   <script src="js/charts.js?v=6"></script>
-  <script src="js/dashboard.js?v=10"></script>
+  <script src="js/dashboard.js?v=11"></script>
   <script src="js/app.js?v=26"></script>
 </body>
 </html>
