@@ -753,10 +753,10 @@
     const v = d.valuation;
     if (!v) return "";
     const pos = Math.max(0, Math.min(100, v.pos));
-    const jrHigh = v.jr_pct != null && v.jr_pct >= 65;
+    const jrStrong = v.jr != null && v.jr >= 60;   // 전세가율 60%+ = 하방 쿠션 두꺼움
     let verdict, cls;
-    if (pos <= 30 && jrHigh) {
-      verdict = "저평가 구간 · 전세가율 역대 상위로 하방 견고"; cls = "cheap";
+    if (pos <= 30 && jrStrong) {
+      verdict = "저평가 구간 · 전세가율 높아 하방 견고"; cls = "cheap";
     } else if (pos <= 30) {
       verdict = "5년 범위 하단 · 상대적 저가"; cls = "cheap";
     } else if (pos >= 80) {
@@ -766,8 +766,7 @@
     }
     const peak = v.vs_peak != null
       ? `역대 고점 대비 <b>${v.vs_peak > 0 ? "+" : ""}${v.vs_peak}%</b>` : "";
-    const jr = v.jr_pct != null
-      ? ` · 전세가율 ${v.jr_cur}%(역대 ${v.jr_pct}% 지점)` : "";
+    const jr = v.jr != null ? ` · 전세가율 ${v.jr}%` : "";
     return `<div class="valuation ${cls}">
       <div class="val-head">📊 밸류에이션 <span class="val-verdict">${verdict}</span></div>
       <div class="vg-track">

@@ -503,6 +503,12 @@ table.rank-table tbody tr[data-id]:hover { background: var(--accent-soft); }
 }
 /* 밸류에이션 히트맵 셀(색은 인라인) - 선택 시 테두리 강조 */
 .val-cell.on { outline: 2.5px solid var(--text); outline-offset: -1px; }
+/* 밸류에이션 평형대 슬라이더(필터 슬라이더 스타일 재사용) */
+.val-area { margin-bottom: 14px; }
+.val-area .fs-head { display: flex; justify-content: space-between;
+  align-items: baseline; margin-bottom: 8px; }
+.val-area .fs-label { font-size: 13px; font-weight: 700; }
+.val-area .fs-val { font-size: 13px; font-weight: 800; color: var(--accent); }
 
 .section-title { font-size: 14px; font-weight: 700; margin: 18px 0 8px; }
 .chart-wrap { position: relative; height: 200px; margin-bottom: 8px; }

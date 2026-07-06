@@ -171,25 +171,6 @@ def test_bargain_deals():
     conn.close()
 
 
-def test_valuation_gu_summary():
-    """구별 밸류에이션 요약: 판정 경계(30/80)·평균위치·정렬 검증."""
-    from seoul_apt import export
-    items = [
-        {"lawd": "11680", "pos": 30},   # 경계: 저평가
-        {"lawd": "11680", "pos": 80},   # 경계: 고점근접
-        {"lawd": "11680", "pos": 55},   # 중단
-        {"lawd": "11350", "pos": 10},
-        {"lawd": "11350", "pos": 20},
-    ]
-    gu = export._valuation_gu_summary(items)
-    nowon = next(g for g in gu if g["lawd_cd"] == "11350")
-    gangnam = next(g for g in gu if g["lawd_cd"] == "11680")
-    assert nowon["cheap"] == 2 and nowon["avg_pos"] == 15
-    assert gangnam == {"lawd_cd": "11680", "name": "강남구", "n": 3,
-                       "avg_pos": 55, "cheap": 1, "mid": 1, "hot": 1}
-    assert gu[0]["lawd_cd"] == "11350"   # 평균위치 낮은 구 먼저
-
-
 def test_matched_jeonse_ratio():
     """전세가율은 같은 크기(대표 전용면적 ±12%) 전세/매매로 산출, 혼합 왜곡 방지."""
     # 매매: 84㎡ 12억(3건), 대형 178㎡ 40억(섞임). 전세: 84㎡ 8억, 178㎡ 20억.
@@ -206,18 +187,17 @@ def test_matched_jeonse_ratio():
 
 
 def test_valuation_position():
-    """장기 평단가 위치(pos)·전세가율 백분위(jr_pct) 산출 검증."""
+    """장기 평단가 위치(pos)·절대 전세가율(jr) 산출 검증."""
     # 24개월 상승 후 하락: 최근가는 5년 범위 중하단
     ppy = [{"m": f"2024-{i:02d}", "v": 3000 + i * 100} for i in range(1, 13)]
     ppy += [{"m": f"2025-{i:02d}", "v": 4200 - i * 50} for i in range(1, 13)]
-    jr = [{"y": "2024", "v": 55.0}, {"y": "2025", "v": 70.0}]  # 최근이 역대 최고
-    v = aggregate._valuation(ppy, jr)
+    v = aggregate._valuation(ppy, 62.5)
     assert v["peak"] == 4200 and v["months"] == 24
     assert 0 <= v["pos"] <= 100
     assert v["vs_peak"] < 0                    # 최근가는 고점 아래
-    assert v["jr_cur"] == 70.0 and v["jr_pct"] == 100   # 현재가 역대 최고 전세가율
-    # 표본 부족 시 None
-    assert aggregate._valuation(ppy[:6], []) is None
+    assert v["jr"] == 62.5                     # 절대 전세가율 그대로 전달
+    # 표본 12개월 미만이면 None
+    assert aggregate._valuation(ppy[:6], None) is None
 
 
 def test_by_area_jeonse_and_stale():

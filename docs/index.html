@@ -6,7 +6,7 @@
   <title>서울 아파트 시세 지도</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=26">
+  <link rel="stylesheet" href="css/style.css?v=27">
 </head>
 <body>
   <!-- 풀스크린 지도 -->
@@ -63,11 +63,19 @@
     </section>
     <section class="page-section">
       <h2>밸류에이션 종합 <span id="val-meta" style="font-weight:400;font-size:12px;color:var(--muted)"></span></h2>
-      <div class="desc">단지별 5년 평단가 위치(0%=5년저점, 100%=5년고점) — 구 클릭 시 아래 리스트·산점도 필터</div>
+      <div class="desc">단지별 5년 평단가 위치(0%=5년저점, 100%=5년고점) — 평형대·구 선택 시 아래 전체 갱신</div>
+      <div class="val-area" id="val-area">
+        <div class="fs-head"><span class="fs-label">평형대</span><span class="fs-val" id="va-val">전체</span></div>
+        <div class="range"><div class="rtrack"></div><div class="rfill" id="va-fill"></div>
+          <input type="range" id="va-lo" min="0" max="80" step="1" value="0">
+          <input type="range" id="va-hi" min="0" max="80" step="1" value="80">
+        </div>
+        <div class="range-ticks" id="va-ticks"></div>
+      </div>
       <div id="val-grid" class="phase-grid"></div>
       <div class="chip-row" id="val-chips" style="margin-top:14px"></div>
       <div class="table-scroll" id="val-list-wrap"></div>
-      <div class="desc" style="margin-top:14px">산점도: 좌상=저평가+전세가율 견고(기회) · 우하=고점근접+전세 약함(주의) · 점 클릭=지도 이동</div>
+      <div class="desc" style="margin-top:14px">산점도: 좌상=저평가+전세가율 높음(기회) · 우하=고점근접+전세 낮음(주의) · 점 클릭=지도 이동</div>
       <div class="chart-tall"><canvas id="val-scatter"></canvas></div>
     </section>
     <section class="page-section">
@@ -154,7 +162,7 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
   <script src="js/charts.js?v=7"></script>
-  <script src="js/dashboard.js?v=15"></script>
-  <script src="js/app.js?v=28"></script>
+  <script src="js/dashboard.js?v=16"></script>
+  <script src="js/app.js?v=29"></script>
 </body>
 </html>
