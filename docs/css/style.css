@@ -174,8 +174,9 @@ body.filter-open .updated { right: calc(var(--filter-w) + 12px); }
   pointer-events: auto; width: 18px; height: 18px; border-radius: 50%;
   background: #fff; border: 2px solid var(--accent); cursor: pointer;
 }
-.range-ticks { display: flex; justify-content: space-between; margin: 4px 6px 0;
+.range-ticks { position: relative; height: 14px; margin: 4px 8px 0;
   font-size: 10.5px; color: var(--muted); }
+.range-ticks span { position: absolute; top: 0; white-space: nowrap; }
 .fs-toggle { display: flex; align-items: center; gap: 8px; padding: 12px 2px;
   font-size: 13px; cursor: pointer; }
 .fs-toggle input { width: 16px; height: 16px; }

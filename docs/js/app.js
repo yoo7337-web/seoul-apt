@@ -8,26 +8,27 @@
   const REGION_LEVEL = 7;            // 이 레벨 이상(축소)이면 구 단위 버블 표시
 
   // 필터 슬라이더 정의(듀얼 레인지). hi==max 이면 상한 없음(N↑), lo==min 이면 하한 없음
+  // ticks: [값, 라벨] - 라벨을 실제 값 위치에 배치해 슬라이더 바와 눈금을 일치시킨다.
   const M2_PER_PY = 3.305785;       // 1평 = 3.305785㎡
   const F_SLIDERS = [
     { key: "area", label: "평형", min: 0, max: 80, step: 1, u: "평",
-      ticks: ["0", "20", "40", "60", "80+"] },
+      ticks: [[0, "0"], [20, "20"], [40, "40"], [60, "60"], [80, "80+"]] },
     { key: "price", label: "가격", min: 0, max: 40, step: 0.5, u: "억",
-      ticks: ["0", "5억", "10억", "20억", "40억+"] },
+      ticks: [[0, "0"], [5, "5억"], [10, "10억"], [20, "20억"], [40, "40억+"]] },
     { key: "age", label: "입주년차", min: 0, max: 30, step: 1, u: "년",
-      ticks: ["0", "10년", "20년", "30년+"] },
+      ticks: [[0, "0"], [10, "10년"], [20, "20년"], [30, "30년+"]] },
     { key: "hh", label: "세대수", min: 0, max: 5000, step: 100, u: "세대",
-      ticks: ["0", "1000", "3000", "5000+"] },
+      ticks: [[0, "0"], [1000, "1000"], [3000, "3000"], [5000, "5000+"]] },
     { key: "jr", label: "전세가율", min: 0, max: 200, step: 5, u: "%",
-      ticks: ["0", "50%", "100%", "150%", "200%+"] },
+      ticks: [[0, "0"], [50, "50%"], [100, "100%"], [150, "150%"], [200, "200%+"]] },
     { key: "gap", label: "갭가격", min: 0, max: 15, step: 0.5, u: "억",
-      ticks: ["0", "3억", "6억", "9억", "15억+"] },
+      ticks: [[0, "0"], [3, "3억"], [6, "6억"], [9, "9억"], [15, "15억+"]] },
     { key: "far", label: "용적률", min: 0, max: 600, step: 10, u: "%",
-      ticks: ["0", "200%", "400%", "600%+"] },
+      ticks: [[0, "0"], [200, "200%"], [400, "400%"], [600, "600%+"]] },
     { key: "n1y", label: "거래활발도(1년)", min: 0, max: 50, step: 1, u: "건",
-      ticks: ["0", "10건", "30건", "50건+"] },
+      ticks: [[0, "0"], [10, "10건"], [30, "30건"], [50, "50건+"]] },
     { key: "drop", label: "고점대비 하락", min: 0, max: 50, step: 5, u: "%",
-      ticks: ["0", "10%", "20%", "30%", "50%+"] },
+      ticks: [[0, "0"], [10, "10%"], [20, "20%"], [30, "30%"], [50, "50%+"]] },
   ];
   const F_CFG = Object.fromEntries(F_SLIDERS.map((s) => [s.key, s]));
 
@@ -394,7 +395,11 @@
         <input type="range" id="rlo-${s.key}" min="${s.min}" max="${s.max}" step="${s.step}" value="${r.lo}">
         <input type="range" id="rhi-${s.key}" min="${s.min}" max="${s.max}" step="${s.step}" value="${r.hi}">
       </div>
-      <div class="range-ticks">${s.ticks.map((t) => `<span>${t}</span>`).join("")}</div>
+      <div class="range-ticks">${s.ticks.map(([v, t]) => {
+        const p = (v - s.min) / (s.max - s.min) * 100;   // 값의 실제 위치
+        const tx = p <= 0 ? "0" : p >= 100 ? "-100%" : "-50%";
+        return `<span style="left:${p}%;transform:translateX(${tx})">${t}</span>`;
+      }).join("")}</div>
     </div>`;
   }
   function bindRange(s) {
