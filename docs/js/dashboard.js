@@ -25,6 +25,7 @@
     renderRebChart();
     renderSubs();
     renderMarketPhase();
+    renderScreeners();
     return true;
   }
 
@@ -274,6 +275,71 @@
     }).join("");
     grid.querySelectorAll(".phase-cell").forEach((c) =>
       c.addEventListener("click", () => toggleSel(c.dataset.lawd)));
+  }
+
+  // ── 5c) 스크리너(재건축 후보 · 유동성) ──────────────────────────────
+  const GU_NAME = {};
+  async function renderScreeners() {
+    (meta.districts || []).forEach((d) => { GU_NAME[d.lawd_cd] = d.name; });
+    let mk = [];
+    try { mk = (await fetchJSON(DATA + "markers.json")).markers || []; }
+    catch { return; }
+    const nowY = new Date().getFullYear();
+    const focus = (id) => { if (window.SeoulMap) window.SeoulMap.focusComplex(id); };
+
+    // 재건축 후보: 연차 30+ · 용적률 50~200% · 150세대+. 용적률 낮고 오래될수록 상위.
+    // (용적률 50% 미만·소규모는 건축물대장 오류/비아파트라 제외)
+    const redev = mk.filter((m) => m.by && m.far != null && m.hh
+        && (nowY - m.by) >= 30 && m.far >= 50 && m.far < 200 && m.hh >= 150)
+      .sort((a, b) => (a.far - b.far) || (a.by - b.by)).slice(0, 40);
+    const rWrap = $("redev-wrap");
+    if (rWrap) {
+      if (redev.length) {
+        rWrap.innerHTML = screenerTable(redev, [
+          ["단지", (m) => m.apt], ["구", (m) => GU_NAME[m.lawd_cd] || "-"],
+          ["준공", (m) => m.by], ["연차", (m) => (nowY - m.by) + "년"],
+          ["용적률", (m) => m.far + "%"], ["세대", (m) => m.hh.toLocaleString()],
+          ["평단가", (m) => m.ppy ? Math.round(m.ppy).toLocaleString() : "-"],
+        ]);
+        bindRows(rWrap, focus);
+      } else {
+        rWrap.innerHTML = '<div class="empty">건축물대장 수집분에 조건 충족 단지 없음</div>';
+      }
+    }
+    const withFar = mk.filter((m) => m.far != null).length;
+    if ($("redev-desc")) $("redev-desc").textContent =
+      `연차 30년+ · 용적률 200% 미만 · 용적률 낮은 순 (건축물대장 수집 ${withFar.toLocaleString()}개 단지 대상)`;
+
+    // 유동성: 연간 거래 ÷ 세대수 회전율(%). 세대수·최근1년거래 보유 단지.
+    const liq = mk.filter((m) => m.hh && m.hh >= 100 && m.n1y != null)
+      .map((m) => ({ ...m, turn: +(m.n1y / m.hh * 100).toFixed(1) }))
+      .sort((a, b) => b.turn - a.turn).slice(0, 40);
+    const lWrap = $("liq-wrap");
+    if (lWrap) {
+      if (liq.length) {
+        lWrap.innerHTML = screenerTable(liq, [
+          ["단지", (m) => m.apt], ["구", (m) => GU_NAME[m.lawd_cd] || "-"],
+          ["세대", (m) => m.hh.toLocaleString()], ["1년거래", (m) => m.n1y],
+          ["회전율", (m) => `<b>${m.turn}%</b>`],
+          ["평단가", (m) => m.ppy ? Math.round(m.ppy).toLocaleString() : "-"],
+        ]);
+        bindRows(lWrap, focus);
+      } else {
+        lWrap.innerHTML = '<div class="empty">데이터 없음</div>';
+      }
+    }
+  }
+
+  function screenerTable(rows, cols) {
+    return `<table class="rank-table"><thead><tr>${
+      cols.map((c) => `<th>${c[0]}</th>`).join("")}</tr></thead><tbody>`
+      + rows.map((m) => `<tr data-id="${m.id}">${
+          cols.map((c) => `<td>${c[1](m)}</td>`).join("")}</tr>`).join("")
+      + "</tbody></table>";
+  }
+  function bindRows(wrap, onClick) {
+    wrap.querySelectorAll("tr[data-id]").forEach((tr) =>
+      tr.addEventListener("click", () => onClick(+tr.dataset.id)));
   }
 
   // ── 6) 청약·분양 (서울) ─────────────────────────────────────────────
