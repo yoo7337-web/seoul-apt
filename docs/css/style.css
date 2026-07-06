@@ -437,6 +437,37 @@ table.rank-table tbody tr[data-id]:hover { background: var(--accent-soft); }
 .info-label { color: var(--muted); font-size: 11px; }
 .info-value { font-size: 14px; font-weight: 700; }
 
+/* ── 밸류에이션 게이지 ─────────────────────────────────────────────── */
+.valuation {
+  margin: 12px 0 4px; padding: 12px 14px 14px; border-radius: 12px;
+  background: var(--bg); border-left: 4px solid var(--muted);
+}
+.valuation.cheap { border-left-color: #059669; }
+.valuation.hot { border-left-color: #ef4444; }
+.valuation.mid { border-left-color: #d97706; }
+.val-head { font-size: 13px; font-weight: 800; margin-bottom: 12px; }
+.val-verdict { font-weight: 600; font-size: 12px; color: var(--muted); margin-left: 4px; }
+.valuation.cheap .val-verdict { color: #059669; }
+.valuation.hot .val-verdict { color: #ef4444; }
+.vg-track {
+  position: relative; height: 7px; border-radius: 4px;
+  background: linear-gradient(90deg, #05966933, #d9770633, #ef444433);
+}
+.vg-marker {
+  position: absolute; top: 50%; width: 3px; height: 15px;
+  transform: translate(-50%, -50%); background: var(--text); border-radius: 2px;
+}
+.vg-marker span {
+  position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%);
+  font-size: 10px; font-weight: 800; white-space: nowrap;
+}
+.vg-labels {
+  display: flex; justify-content: space-between; margin-top: 6px;
+  font-size: 10px; color: var(--muted);
+}
+.val-sub { margin-top: 9px; font-size: 12px; color: var(--text); }
+.val-sub b { color: var(--accent-dark); }
+
 .section-title { font-size: 14px; font-weight: 700; margin: 18px 0 8px; }
 .chart-wrap { position: relative; height: 200px; margin-bottom: 8px; }
 

@@ -726,6 +726,36 @@
   const staleTag = (info) =>
     (info && info.stale ? ' <span class="stale-tag">1년+</span>' : "");
 
+  // 밸류에이션 게이지 - 장기 평단가 상 현재 위치 + 전세가율 하방 신호
+  function valuationCard(d) {
+    const v = d.valuation;
+    if (!v) return "";
+    const pos = Math.max(0, Math.min(100, v.pos));
+    const jrHigh = v.jr_pct != null && v.jr_pct >= 65;
+    let verdict, cls;
+    if (pos <= 30 && jrHigh) {
+      verdict = "저평가 구간 · 전세가율 역대 상위로 하방 견고"; cls = "cheap";
+    } else if (pos <= 30) {
+      verdict = "5년 범위 하단 · 상대적 저가"; cls = "cheap";
+    } else if (pos >= 80) {
+      verdict = "5년 범위 상단 · 고점 근접, 추격 주의"; cls = "hot";
+    } else {
+      verdict = "5년 범위 중단"; cls = "mid";
+    }
+    const peak = v.vs_peak != null
+      ? `역대 고점 대비 <b>${v.vs_peak > 0 ? "+" : ""}${v.vs_peak}%</b>` : "";
+    const jr = v.jr_pct != null
+      ? ` · 전세가율 ${v.jr_cur}%(역대 ${v.jr_pct}% 지점)` : "";
+    return `<div class="valuation ${cls}">
+      <div class="val-head">📊 밸류에이션 <span class="val-verdict">${verdict}</span></div>
+      <div class="vg-track">
+        <div class="vg-marker" style="left:${pos}%"><span>${pos}%</span></div></div>
+      <div class="vg-labels"><span>5년저점 ${v.lo5.toLocaleString()}</span>
+        <span>5년고점 ${v.hi5.toLocaleString()}</span></div>
+      <div class="val-sub">현재 <b>${v.cur_ppy.toLocaleString()}</b> 만원/평 · ${peak}${jr} · 표본 ${v.months}개월</div>
+    </div>`;
+  }
+
   function renderPanel() {
     const d = state.currentDetail;
     const si = detailInfo(d, false), ji = detailInfo(d, true);
@@ -749,6 +779,8 @@
         <div class="card"><div class="label">공시/실거래</div>
           <div class="value small">${gongsiRatio(d, gongsi)}</div></div>
       </div>
+
+      ${valuationCard(d)}
 
       ${buildingInfo(d)}
 

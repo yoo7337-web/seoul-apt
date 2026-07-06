@@ -237,8 +237,41 @@ def complex_list(conn, lawd_cd: str) -> list[dict]:
     return out
 
 
+def _valuation(ppy_series: list, jr_series: list) -> dict | None:
+    """장기 평단가·전세가율 상 '현재 위치'. 지금 싼가 비싼가를 한눈에.
+
+    ppy_series: [{"m": 'YYYY-MM', "v": 만원/평}], jr_series: [{"y": 'YYYY', "v": %}].
+    - pos: 최근 5년 범위에서 현재가 위치(0=5년저점, 100=5년고점)
+    - vs_peak: 역대 최고 평단가 대비 현재(%)
+    - jr_pct: 현재 전세가율의 역대 백분위(높을수록 하방 견고 신호)
+    표본이 12개월 미만이면 None(판단 유보).
+    """
+    if len(ppy_series) < 12:
+        return None
+    vals = [p["v"] for p in ppy_series]
+    cur = _median([p["v"] for p in ppy_series[-3:]])   # 최근 3개월로 안정화
+    peak = max(vals)
+    recent = vals[-60:]                                # 최근 5년(60개월)
+    lo, hi = min(recent), max(recent)
+    out = {
+        "cur_ppy": round(cur), "lo5": round(lo), "hi5": round(hi),
+        "pos": round((cur - lo) / (hi - lo) * 100) if hi > lo else 50,
+        "peak": round(peak),
+        "vs_peak": round((cur - peak) / peak * 100, 1) if peak else None,
+        "months": len(ppy_series),
+    }
+    if jr_series:
+        jrs = [j["v"] for j in jr_series]
+        cur_jr = jr_series[-1]["v"]
+        out.update({
+            "jr_cur": cur_jr, "jr_lo": min(jrs), "jr_hi": max(jrs),
+            "jr_pct": round(sum(1 for x in jrs if x <= cur_jr) / len(jrs) * 100),
+        })
+    return out
+
+
 def complex_detail(conn, complex_id: int) -> dict:
-    """단지의 면적버킷별 월별 매매/전세/월세 추세 + 최근 거래."""
+    """단지의 면적버킷별 월별 매매/전세/월세 추세 + 최근 거래 + 밸류에이션."""
     sales = conn.execute(
         "SELECT deal_date, exclu_area, floor, amount_manwon, canceled "
         "FROM sale_txn WHERE complex_id=? ORDER BY deal_date",
@@ -284,6 +317,31 @@ def complex_detail(conn, complex_id: int) -> dict:
         "type": r["rent_type"],
     } for r in sorted(rents, key=lambda x: x["deal_date"], reverse=True)[:40]]
 
+    # ── 밸류에이션용 시계열(전 면적 평단가 월별 + 전세가율 연도별) ──
+    ppy_by_m = defaultdict(list)
+    sale_ppy_by_y = defaultdict(list)
+    for s in sales:
+        if s["canceled"]:
+            continue
+        py = _pyeong(s["exclu_area"])
+        if py > 0:
+            ppy_by_m[_month(s["deal_date"])].append(s["amount_manwon"] / py)
+            sale_ppy_by_y[s["deal_date"][:4]].append(s["amount_manwon"] / py)
+    ppy_series = [{"m": m, "v": round(_median(v))}
+                  for m, v in sorted(ppy_by_m.items())]
+    jeonse_ppy_by_y = defaultdict(list)
+    for r in rents:
+        if r["rent_type"] != "jeonse":
+            continue
+        py = _pyeong(r["exclu_area"])
+        if py > 0:
+            jeonse_ppy_by_y[r["deal_date"][:4]].append(r["deposit_manwon"] / py)
+    jr_series = []
+    for y in sorted(sale_ppy_by_y):
+        sp, jp = _median(sale_ppy_by_y[y]), _median(jeonse_ppy_by_y.get(y, []))
+        if sp and jp:
+            jr_series.append({"y": y, "v": round(jp / sp * 100, 1)})
+
     gongsi = conn.execute(
         "SELECT year, exclu_area, price_manwon FROM gongsi_price "
         "WHERE complex_id=? ORDER BY year DESC", (complex_id,)).fetchall()
@@ -301,6 +359,8 @@ def complex_detail(conn, complex_id: int) -> dict:
         "approval_date": meta["approval_date"] if meta else None,
         "sale_series": _series(sale_series),
         "jeonse_series": _series(jeonse_series),
+        "valuation": _valuation(ppy_series, jr_series),
+        "ppy_series": ppy_series,          # 장기 평단가 스파크라인용(만원/평)
         "recent_sales": recent,
         "recent_rents": recent_rents,
         "gongsi": [{"year": g["year"], "area": g["exclu_area"],

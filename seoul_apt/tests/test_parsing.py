@@ -117,6 +117,21 @@ def test_sale_by_area_buckets():
     conn.close()
 
 
+def test_valuation_position():
+    """장기 평단가 위치(pos)·전세가율 백분위(jr_pct) 산출 검증."""
+    # 24개월 상승 후 하락: 최근가는 5년 범위 중하단
+    ppy = [{"m": f"2024-{i:02d}", "v": 3000 + i * 100} for i in range(1, 13)]
+    ppy += [{"m": f"2025-{i:02d}", "v": 4200 - i * 50} for i in range(1, 13)]
+    jr = [{"y": "2024", "v": 55.0}, {"y": "2025", "v": 70.0}]  # 최근이 역대 최고
+    v = aggregate._valuation(ppy, jr)
+    assert v["peak"] == 4200 and v["months"] == 24
+    assert 0 <= v["pos"] <= 100
+    assert v["vs_peak"] < 0                    # 최근가는 고점 아래
+    assert v["jr_cur"] == 70.0 and v["jr_pct"] == 100   # 현재가 역대 최고 전세가율
+    # 표본 부족 시 None
+    assert aggregate._valuation(ppy[:6], []) is None
+
+
 def test_by_area_jeonse_and_stale():
     """전세 평형별 대표가(deal_date 필요)와 1년+ 오래된 거래 stale 표시 검증."""
     from datetime import date, timedelta
