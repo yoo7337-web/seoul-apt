@@ -36,7 +36,7 @@
       const ok = await init();
       if (ok) setTimeout(() => { renderTrend(); renderPeakShare(); renderRebChart(); }, 60);
     },
-    refresh: () => { if (inited) renderRankTable(); },   // 관심구 별표 갱신
+    refresh: () => { if (inited) { renderRankTable(); renderMarketPhase(); } },  // 관심구 별표 갱신
   };
 
   const favDistricts = () => {
@@ -265,12 +265,14 @@
     const order = { boom: 0, slowdown: 1, neutral: 2, recovery: 3, recession: 4 };
     const rows = dash.market_phase.slice()
       .sort((a, b) => order[a.phase] - order[b.phase]);
+    const fav = favDistricts();
     grid.innerHTML = rows.map((r) => {
       const prc = r.price_chg != null
         ? `${r.price_chg > 0 ? "+" : ""}${r.price_chg}%` : "-";
+      const star = fav.has(r.lawd_cd) ? '<span class="fav-star">★</span> ' : "";
       return `<div class="phase-cell ${r.phase}" data-lawd="${r.lawd_cd}"
         title="거래량 최근3개월/직전12개월 ${r.vol_ratio ?? "-"}배 · 가격 6개월 ${prc}">
-        <div class="pc-gu">${r.name}</div>
+        <div class="pc-gu">${star}${r.name}</div>
         <div class="pc-label">${PHASE_LABEL[r.phase]}</div>
         <div class="pc-sub">${prc}</div></div>`;
     }).join("");
