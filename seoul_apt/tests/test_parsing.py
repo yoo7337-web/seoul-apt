@@ -117,6 +117,25 @@ def test_sale_by_area_buckets():
     conn.close()
 
 
+def test_recent_bargains():
+    """대시보드 급매: 최근 N일 창에서 동일평형 중앙값 -7%↓ 수집(저층 제외)."""
+    from datetime import date
+    conn = db.connect(":memory:")
+    cid = db.upsert_complex(conn, "11680", "대치동", "은마", 1979, "316")
+    today = date.today().isoformat()
+    for i in range(6):
+        db.insert_sale(conn, cid, today, 84.0, 5 + i, 120000)  # 기준 표본
+    db.insert_sale(conn, cid, today, 84.1, 10, 108000)         # 급매(-10%, 10층)
+    db.insert_sale(conn, cid, today, 84.2, 1, 100000)          # 1층 → 제외
+    conn.commit()
+    bargains = aggregate.recent_bargains(conn, days=45)
+    floors = [b["floor"] for b in bargains]
+    assert 10 in floors and 1 not in floors
+    b = next(x for x in bargains if x["floor"] == 10)
+    assert b["disc"] == -10.0 and b["id"] == cid and b["lawd_cd"] == "11680"
+    conn.close()
+
+
 def test_market_phase_classification():
     """4국면 판정: 거래량×가격 모멘텀 조합."""
     p = aggregate._phase

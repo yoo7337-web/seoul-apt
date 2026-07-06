@@ -496,6 +496,55 @@ def market_phase(conn) -> list[dict]:
     return out
 
 
+def recent_bargains(conn, days: int = 45, threshold: float = -7.0,
+                    min_sample: int = 5, area_tol: float = 0.12,
+                    low_floor: int = 2, min_disc: float = -40.0,
+                    limit: int = 60) -> list[dict]:
+    """최근 N일 매매 중 '급매' - 동일 단지·비슷한 전용면적(±area_tol) 최근 1년
+    중앙값 대비 threshold%(기본 -7%) 이하. 저층(≤low_floor)은 제외.
+    -40% 미만(min_disc)은 지분·증여성 등 비정상 거래일 가능성이 커 제외한다.
+    notify.bargain_deals 와 같은 판정을 '기간 기준'으로 모아 대시보드에 노출한다.
+    기준일은 DB 최신 계약일(수집 지연 무관)."""
+    anchor = conn.execute(
+        "SELECT MAX(deal_date) AS d FROM sale_txn WHERE canceled=0").fetchone()["d"]
+    if not anchor:
+        return []
+    y, m, d = (int(x) for x in anchor.split("-"))
+    win = (date(y, m, d) - timedelta(days=days)).isoformat()
+    since1y = (date(y, m, d) - timedelta(days=365)).isoformat()
+    rows = conn.execute(
+        """SELECT s.id, s.deal_date, s.exclu_area, s.floor, s.amount_manwon,
+                  s.complex_id, c.lawd_cd, c.umd_nm, c.apt_nm
+           FROM sale_txn s JOIN complex c ON s.complex_id=c.complex_id
+           WHERE s.canceled=0 AND s.deal_date>=? ORDER BY s.deal_date DESC""",
+        (win,)).fetchall()
+    out = []
+    for r in rows:
+        if r["floor"] and r["floor"] <= low_floor:
+            continue
+        area = r["exclu_area"]
+        lo, hi = area * (1 - area_tol), area * (1 + area_tol)
+        amts = [x["amount_manwon"] for x in conn.execute(
+            "SELECT amount_manwon FROM sale_txn WHERE complex_id=? AND canceled=0 "
+            "AND id!=? AND deal_date>=? AND exclu_area BETWEEN ? AND ?",
+            (r["complex_id"], r["id"], since1y, lo, hi))]
+        if len(amts) < min_sample:
+            continue
+        med = _median(amts)
+        if not med:
+            continue
+        disc = round((r["amount_manwon"] - med) / med * 100, 1)
+        if disc <= threshold and disc >= min_disc:   # 급매지만 비정상 극단은 제외
+            out.append({
+                "id": r["complex_id"], "apt": r["apt_nm"], "lawd_cd": r["lawd_cd"],
+                "umd": r["umd_nm"], "area": r["exclu_area"], "floor": r["floor"],
+                "amount": r["amount_manwon"], "med": round(med), "disc": disc,
+                "date": r["deal_date"],
+            })
+    out.sort(key=lambda x: x["disc"])   # 할인폭 큰 순
+    return out[:limit]
+
+
 def district_rankings(conn) -> list[dict]:
     """구별 평단가 중앙값과 최근 6개월 상승률 랭킹."""
     out = []

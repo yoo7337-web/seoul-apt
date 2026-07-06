@@ -26,6 +26,7 @@
     renderSubs();
     renderMarketPhase();
     renderScreeners();
+    renderBargains();
     return true;
   }
 
@@ -340,6 +341,37 @@
   function bindRows(wrap, onClick) {
     wrap.querySelectorAll("tr[data-id]").forEach((tr) =>
       tr.addEventListener("click", () => onClick(+tr.dataset.id)));
+  }
+
+  // ── 5d) 급매 포착 ───────────────────────────────────────────────────
+  function renderBargains() {
+    const wrap = $("bargain-wrap");
+    if (!wrap || !dash) return;
+    const list = dash.bargains || [];
+    if ($("bargain-days")) $("bargain-days").textContent =
+      `(최근 ${dash.bargains_days || 45}일 · ${list.length}건)`;
+    if (!list.length) {
+      wrap.innerHTML = '<div class="empty">최근 급매 없음</div>';
+      return;
+    }
+    const guName = (cd) => (meta.districts || [])
+      .find((d) => d.lawd_cd === cd)?.name || cd;
+    let html = `<table class="rank-table"><thead><tr>
+      <th>구</th><th>단지</th><th>면적</th><th>층</th><th>거래가</th>
+      <th>중앙값</th><th>할인</th><th>계약일</th></tr></thead><tbody>`;
+    list.forEach((b) => {
+      html += `<tr data-id="${b.id}">
+        <td>${guName(b.lawd_cd)}</td><td>${b.apt}</td>
+        <td>${b.area}㎡</td><td>${b.floor || "-"}</td>
+        <td>${SeoulCharts.fmt(b.amount)}</td><td>${SeoulCharts.fmt(b.med)}</td>
+        <td><span class="mgn neg">${b.disc}%</span></td>
+        <td>${b.date}</td></tr>`;
+    });
+    wrap.innerHTML = html + "</tbody></table>";
+    wrap.querySelectorAll("tr[data-id]").forEach((tr) =>
+      tr.addEventListener("click", () => {
+        if (window.SeoulMap) window.SeoulMap.focusComplex(+tr.dataset.id);
+      }));
   }
 
   // ── 6) 청약·분양 (서울) ─────────────────────────────────────────────

@@ -24,6 +24,7 @@ from .subscription import extract_gu
 BARGAIN_THRESHOLD = -7.0    # 동일평형 중앙값 대비 이만큼 낮으면 급매
 BARGAIN_MIN_SAMPLE = 5      # 비교 기준 최근 표본 최소치
 BARGAIN_LOW_FLOOR = 2       # 이 층 이하는 급매 판정 제외(저층 디스카운트)
+BARGAIN_MIN_DISC = -40.0    # 이보다 큰 하락은 지분·증여성 등 비정상 거래로 보고 제외
 
 TG_API = "https://api.telegram.org/bot{token}/sendMessage"
 TG_MAX_LEN = 3900          # 텔레그램 4096 한도 여유분
@@ -156,9 +157,11 @@ def bargain_deals(conn, rows, threshold: float = BARGAIN_THRESHOLD) -> list[dict
         if len(amts) < BARGAIN_MIN_SAMPLE:
             continue
         med = _median(amts)
-        if med and r["amount_manwon"] <= med * (1 + threshold / 100):
-            out.append({"row": r, "med": med,
-                        "disc": round((r["amount_manwon"] - med) / med * 100, 1)})
+        if not med:
+            continue
+        disc = round((r["amount_manwon"] - med) / med * 100, 1)
+        if disc <= threshold and disc >= BARGAIN_MIN_DISC:
+            out.append({"row": r, "med": med, "disc": disc})
     out.sort(key=lambda x: x["disc"])   # 할인폭 큰 순
     return out
 
