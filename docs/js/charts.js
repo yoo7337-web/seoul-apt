@@ -143,11 +143,58 @@
     });
   }
 
+  // 산점도 - datasets: [{label, color, data:[{x,y,meta}]}]. 점 클릭 시 opts.onClick(meta)
+  function scatter(canvasId, datasets, opts = {}) {
+    destroy(canvasId);
+    const ctx = document.getElementById(canvasId);
+    if (!ctx) return;
+    charts[canvasId] = new Chart(ctx, {
+      type: "scatter",
+      data: { datasets: datasets.map((d) => ({
+        label: d.label, data: d.data,
+        backgroundColor: d.color + "aa", borderColor: d.color,
+        pointRadius: 3.5, pointHoverRadius: 6,
+      })) },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        animation: false,
+        onClick: (e, els) => {
+          if (!els.length || !opts.onClick) return;
+          const el = els[0];
+          const meta = charts[canvasId].data.datasets[el.datasetIndex]
+            .data[el.index].meta;
+          if (meta) opts.onClick(meta);
+        },
+        plugins: {
+          legend: { labels: { color: themeColor(), font: { size: 11 }, boxWidth: 12 } },
+          tooltip: { callbacks: {
+            label: (c) => {
+              const m = c.raw.meta || {};
+              return `${m.apt || ""} (${c.parsed.x}${opts.xUnit || ""}, ${c.parsed.y}${opts.yUnit || ""})`;
+            },
+          } },
+        },
+        scales: {
+          x: { title: { display: !!opts.xLabel, text: opts.xLabel || "",
+                        color: themeColor(), font: { size: 11 } },
+               min: opts.xMin, max: opts.xMax,
+               ticks: { color: themeColor(), font: { size: 10 } },
+               grid: { color: themeColor() + "22" } },
+          y: { title: { display: !!opts.yLabel, text: opts.yLabel || "",
+                        color: themeColor(), font: { size: 11 } },
+               min: opts.yMin, max: opts.yMax,
+               ticks: { color: themeColor(), font: { size: 10 } },
+               grid: { color: themeColor() + "22" } },
+        },
+      },
+    });
+  }
+
   function fmt(v) {
     if (v == null) return "-";
     if (v >= 10000) return (v / 10000).toFixed(1).replace(/\.0$/, "") + "억";
     return Math.round(v).toLocaleString();
   }
 
-  global.SeoulCharts = { line, bar, destroy, palette, fmt };
+  global.SeoulCharts = { line, bar, scatter, destroy, palette, fmt };
 })(window);

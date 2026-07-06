@@ -27,6 +27,7 @@
     renderMarketPhase();
     renderScreeners();
     renderBargains();
+    renderValuation();
     return true;
   }
 
@@ -34,9 +35,15 @@
   window.SeoulDash = {
     open: async () => {
       const ok = await init();
-      if (ok) setTimeout(() => { renderTrend(); renderPeakShare(); renderRebChart(); }, 60);
+      if (ok) setTimeout(() => {
+        renderTrend(); renderPeakShare(); renderRebChart();
+        if (valData) renderValScatter();
+      }, 60);
     },
-    refresh: () => { if (inited) { renderRankTable(); renderMarketPhase(); } },  // 관심구 별표 갱신
+    refresh: () => { if (inited) {                       // 관심구 별표 갱신
+      renderRankTable(); renderMarketPhase();
+      if (valData) renderValGrid();
+    } },
   };
 
   const favDistricts = () => {
@@ -374,6 +381,124 @@
       tr.addEventListener("click", () => {
         if (window.SeoulMap) window.SeoulMap.focusComplex(+tr.dataset.id);
       }));
+  }
+
+  // ── 5e) 밸류에이션 종합(히트맵 + 판정별 리스트 + 산점도) ─────────────
+  const VAL_VERDICT = [
+    ["cheap", "저평가", (p) => p <= 30, "#059669"],
+    ["mid", "중단", (p) => p > 30 && p < 80, "#d97706"],
+    ["hot", "고점근접", (p) => p >= 80, "#ef4444"],
+  ];
+  let valData = null, valGu = "", valKind = "cheap";   // 필터 상태
+
+  async function renderValuation() {
+    if (!$("val-grid")) return;
+    (meta.districts || []).forEach((d) => { GU_NAME[d.lawd_cd] = d.name; });
+    if (!valData) {
+      try { valData = await fetchJSON(DATA + "valuation.json"); }
+      catch { $("val-grid").innerHTML = '<div class="empty">밸류에이션 데이터 없음</div>'; return; }
+    }
+    if ($("val-meta")) $("val-meta").textContent =
+      `(밴드 산출 ${valData.items.length.toLocaleString()}개 단지)`;
+    renderValGrid();
+    renderValList();
+    renderValScatter();
+  }
+
+  // 구 평균위치를 '구간 내 상대값'으로 5단계 색상화 - 시장 전체가 고점권이어도
+  // 상대적으로 싼/비싼 구가 구분되도록 min~max 정규화한다.
+  const VAL_COLORS = ["#059669", "#65a30d", "#d97706", "#ea580c", "#ef4444"];
+  function valColor(p, lo, hi) {
+    const t = hi > lo ? (p - lo) / (hi - lo) : 0.5;
+    return VAL_COLORS[Math.min(4, Math.floor(t * 5))];
+  }
+
+  function renderValGrid() {
+    const grid = $("val-grid");
+    const fav = favDistricts();
+    const poss = valData.gu.map((g) => g.avg_pos);
+    const lo = Math.min(...poss), hi = Math.max(...poss);
+    grid.innerHTML = valData.gu.map((g) => {
+      const star = fav.has(g.lawd_cd) ? '<span class="fav-star">★</span> ' : "";
+      const on = valGu === g.lawd_cd ? " on" : "";
+      return `<div class="phase-cell val-cell${on}" data-lawd="${g.lawd_cd}"
+        style="background:${valColor(g.avg_pos, lo, hi)}"
+        title="평균 5년위치 ${g.avg_pos}% · 저평가 ${g.cheap} / 중단 ${g.mid} / 고점근접 ${g.hot}">
+        <div class="pc-gu">${star}${g.name}</div>
+        <div class="pc-label">${g.avg_pos}%</div>
+        <div class="pc-sub">저평가 ${g.cheap}</div></div>`;
+    }).join("");
+    grid.querySelectorAll(".val-cell").forEach((c) =>
+      c.addEventListener("click", () => {
+        valGu = valGu === c.dataset.lawd ? "" : c.dataset.lawd;   // 재클릭=해제
+        renderValGrid(); renderValList(); renderValScatter();
+      }));
+  }
+
+  function valFiltered() {
+    const kind = VAL_VERDICT.find((v) => v[0] === valKind);
+    return valData.items.filter((it) =>
+      (!valGu || it.lawd === valGu) && (!kind || kind[2](it.pos)));
+  }
+
+  function renderValList() {
+    const chips = $("val-chips"), wrap = $("val-list-wrap");
+    const guName = valGu ? (valData.gu.find((g) => g.lawd_cd === valGu) || {}).name : "";
+    chips.innerHTML = VAL_VERDICT.map(([k, label]) =>
+      `<button class="d-chip${valKind === k ? " on" : ""}" data-kind="${k}">${label}</button>`).join("")
+      + `<button class="d-chip${valKind === "" ? " on" : ""}" data-kind="">전체</button>`
+      + (valGu ? ` <button class="d-chip on" data-clear-gu="1">${guName} ✕</button>` : "");
+    chips.querySelectorAll("[data-kind]").forEach((b) =>
+      b.addEventListener("click", () => {
+        valKind = b.dataset.kind; renderValList(); renderValScatter();
+      }));
+    const clear = chips.querySelector("[data-clear-gu]");
+    if (clear) clear.addEventListener("click", () => {
+      valGu = ""; renderValGrid(); renderValList(); renderValScatter();
+    });
+
+    const rows = valFiltered().sort((a, b) => a.pos - b.pos);
+    const CAP = 100;
+    const shown = rows.slice(0, CAP);
+    if (!rows.length) {
+      wrap.innerHTML = '<div class="empty">조건에 맞는 단지 없음</div>';
+      return;
+    }
+    let html = `<div class="sel-hint" style="margin:4px 0 6px">${rows.length.toLocaleString()}건${rows.length > CAP ? ` 중 상위 ${CAP}` : ""} · 5년위치 낮은 순 · 행 클릭=지도</div>
+      <table class="rank-table"><thead><tr>
+      <th>단지</th><th>구</th><th>평단가</th><th>5년위치</th><th>고점대비</th><th>전세가율</th><th>표본</th>
+      </tr></thead><tbody>`;
+    shown.forEach((it) => {
+      const shield = (it.pos <= 30 && it.jrp != null && it.jrp >= 65)
+        ? ' <span title="전세가율 역대 상위 - 하방 견고">🛡️</span>' : "";
+      html += `<tr data-id="${it.id}">
+        <td>${it.apt}${shield}</td><td>${GU_NAME[it.lawd] || "-"}</td>
+        <td>${it.ppy.toLocaleString()}</td><td><b>${it.pos}%</b></td>
+        <td>${it.vp != null ? it.vp + "%" : "-"}</td>
+        <td>${it.jr != null ? `${it.jr}%${it.jrp != null ? ` (${it.jrp})` : ""}` : "-"}</td>
+        <td>${it.m}개월</td></tr>`;
+    });
+    wrap.innerHTML = html + "</tbody></table>";
+    wrap.querySelectorAll("tr[data-id]").forEach((tr) =>
+      tr.addEventListener("click", () => {
+        if (window.SeoulMap) window.SeoulMap.focusComplex(+tr.dataset.id);
+      }));
+  }
+
+  function renderValScatter() {
+    if (!document.getElementById("val-scatter") || !window.SeoulCharts) return;
+    const base = valData.items.filter((it) =>
+      (!valGu || it.lawd === valGu) && it.jrp != null);
+    const datasets = VAL_VERDICT.map(([k, label, test, color]) => ({
+      label, color,
+      data: base.filter((it) => test(it.pos))
+        .map((it) => ({ x: it.pos, y: it.jrp, meta: it })),
+    }));
+    SeoulCharts.scatter("val-scatter", datasets, {
+      xLabel: "5년 평단가 위치(%)", yLabel: "전세가율 역대 백분위(%)",
+      xMin: 0, xMax: 100, yMin: 0, yMax: 100, xUnit: "%", yUnit: "%",
+      onClick: (meta) => { if (window.SeoulMap) window.SeoulMap.focusComplex(meta.id); },
+    });
   }
 
   // ── 6) 청약·분양 (서울) ─────────────────────────────────────────────

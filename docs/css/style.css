@@ -501,6 +501,8 @@ table.rank-table tbody tr[data-id]:hover { background: var(--accent-soft); }
 .phase-legend .ph {
   width: 11px; height: 11px; border-radius: 3px; display: inline-block;
 }
+/* 밸류에이션 히트맵 셀(색은 인라인) - 선택 시 테두리 강조 */
+.val-cell.on { outline: 2.5px solid var(--text); outline-offset: -1px; }
 
 .section-title { font-size: 14px; font-weight: 700; margin: 18px 0 8px; }
 .chart-wrap { position: relative; height: 200px; margin-bottom: 8px; }

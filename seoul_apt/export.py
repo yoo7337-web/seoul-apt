@@ -43,6 +43,7 @@ def export_all(conn, kakao_js_key: str | None = None) -> dict:
     markers = []
     district_list = []
     ppy_trend = {}   # 대시보드용: 구별 월별 평단가(경량)
+    val_items = []   # 밸류에이션 종합(대시보드 밸류에이션 섹션용)
     totals = {"sale": 0, "rent": 0, "complex": 0}
 
     for lawd_cd, name in config.SEOUL_DISTRICTS.items():
@@ -84,6 +85,14 @@ def export_all(conn, kakao_js_key: str | None = None) -> dict:
             detail["apt"] = c["apt"]
             detail["lawd_cd"] = lawd_cd
             _write_json(export_dir / "complex" / lawd_cd / f"{c['id']}.json", detail)
+            v = detail.get("valuation")
+            if v and c["lat"] and c["lon"]:
+                val_items.append({
+                    "id": c["id"], "apt": c["apt"], "lawd": lawd_cd,
+                    "pos": v["pos"], "vp": v["vs_peak"],
+                    "jr": v.get("jr_cur"), "jrp": v.get("jr_pct"),
+                    "ppy": v["cur_ppy"], "m": v["months"],
+                })
             if c["lat"] and c["lon"]:
                 markers.append({
                     "id": c["id"], "lawd_cd": lawd_cd, "apt": c["apt"],
@@ -114,6 +123,12 @@ def export_all(conn, kakao_js_key: str | None = None) -> dict:
         "generated": now.isoformat(timespec="seconds"),
         "items": subscription_items(conn, now.date().isoformat()),
     })
+    # 밸류에이션 종합(구별 히트맵·저평가 리스트·산점도용)
+    _write_json(export_dir / "valuation.json", {
+        "generated": now.isoformat(timespec="seconds"),
+        "items": val_items,
+        "gu": _valuation_gu_summary(val_items),
+    })
     # 대시보드 전용 데이터(구별 평단가 추이 + 신고가 비중)
     _write_json(export_dir / "dashboard.json", {
         "generated": now.isoformat(timespec="seconds"),
@@ -135,6 +150,31 @@ def export_all(conn, kakao_js_key: str | None = None) -> dict:
 
     _write_config_js(kakao_js_key)
     return {"markers": len(markers), **totals}
+
+
+def _valuation_gu_summary(items: list[dict]) -> list[dict]:
+    """구별 밸류에이션 요약 - 평균 5년위치와 판정별 개수.
+
+    판정 경계는 상세 패널 게이지와 동일: 저평가 pos≤30 / 고점근접 pos≥80.
+    저평가 비율 높은(=평균 위치 낮은) 구가 먼저 오도록 정렬한다.
+    """
+    by_gu: dict[str, list] = {}
+    for it in items:
+        by_gu.setdefault(it["lawd"], []).append(it)
+    out = []
+    for lawd_cd, rows in by_gu.items():
+        poss = [r["pos"] for r in rows]
+        out.append({
+            "lawd_cd": lawd_cd,
+            "name": config.SEOUL_DISTRICTS.get(lawd_cd, lawd_cd),
+            "n": len(rows),
+            "avg_pos": round(sum(poss) / len(poss)),
+            "cheap": sum(1 for p in poss if p <= 30),
+            "mid": sum(1 for p in poss if 30 < p < 80),
+            "hot": sum(1 for p in poss if p >= 80),
+        })
+    out.sort(key=lambda g: g["avg_pos"])
+    return out
 
 
 def subscription_items(conn, today: str) -> list[dict]:

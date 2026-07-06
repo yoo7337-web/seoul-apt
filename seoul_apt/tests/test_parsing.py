@@ -171,6 +171,25 @@ def test_bargain_deals():
     conn.close()
 
 
+def test_valuation_gu_summary():
+    """구별 밸류에이션 요약: 판정 경계(30/80)·평균위치·정렬 검증."""
+    from seoul_apt import export
+    items = [
+        {"lawd": "11680", "pos": 30},   # 경계: 저평가
+        {"lawd": "11680", "pos": 80},   # 경계: 고점근접
+        {"lawd": "11680", "pos": 55},   # 중단
+        {"lawd": "11350", "pos": 10},
+        {"lawd": "11350", "pos": 20},
+    ]
+    gu = export._valuation_gu_summary(items)
+    nowon = next(g for g in gu if g["lawd_cd"] == "11350")
+    gangnam = next(g for g in gu if g["lawd_cd"] == "11680")
+    assert nowon["cheap"] == 2 and nowon["avg_pos"] == 15
+    assert gangnam == {"lawd_cd": "11680", "name": "강남구", "n": 3,
+                       "avg_pos": 55, "cheap": 1, "mid": 1, "hot": 1}
+    assert gu[0]["lawd_cd"] == "11350"   # 평균위치 낮은 구 먼저
+
+
 def test_matched_jeonse_ratio():
     """전세가율은 같은 크기(대표 전용면적 ±12%) 전세/매매로 산출, 혼합 왜곡 방지."""
     # 매매: 84㎡ 12억(3건), 대형 178㎡ 40억(섞임). 전세: 84㎡ 8억, 178㎡ 20억.
