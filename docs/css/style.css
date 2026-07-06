@@ -346,6 +346,12 @@ table.rank-table tbody tr[data-id]:hover { background: var(--accent-soft); }
 .badge.sub-badge-done { background: #6b7280; color: #fff; }
 /* 청약 토글 버튼 활성 상태 */
 .chip-btn.active { color: #7c3aed; font-weight: 800; }
+/* 청약 안전마진 */
+.mgn { font-weight: 800; }
+.mgn.pos { color: #059669; }
+.mgn.neg { color: #ef4444; }
+.mgn-sub { display: block; font-size: 10px; color: var(--muted); }
+.mgn-na { font-size: 11px; color: var(--muted); }
 
 /* ── 지역(구) 버블 - 저줌 ─────────────────────────────────────────── */
 .region-bubble {

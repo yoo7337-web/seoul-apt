@@ -665,14 +665,16 @@
         ${sched.map(([k, v]) => `<tr><td style="color:var(--muted)">${k}</td><td>${v}</td></tr>`).join("")}
       </tbody></table>`;
     if (it.models && it.models.length) {
-      html += `<div class="section-title">주택형별 공급</div>
+      html += `<div class="section-title">주택형별 공급 · 안전마진</div>
+        <div class="desc">안전마진 = 반경 1.5km 같은 평형 최근 실거래 대비 분양가 할인율(+면 분양가가 시세보다 쌈)</div>
         <table class="rank-table"><thead><tr>
-          <th>주택형</th><th>공급면적</th><th>일반</th><th>특별</th><th>분양가(최고)</th>
+          <th>주택형</th><th>공급</th><th>일반</th><th>특별</th><th>분양가</th><th>안전마진</th>
         </tr></thead><tbody>` +
         it.models.map((m) => `<tr>
           <td>${escapeHtml(m.ty)}</td><td>${m.ar ? m.ar + "㎡" : "-"}</td>
           <td>${m.hh ?? "-"}</td><td>${m.shh ?? "-"}</td>
-          <td>${m.price ? fmt(m.price) : "-"}</td></tr>`).join("") +
+          <td>${m.price ? fmt(m.price) : "-"}</td>
+          <td>${marginCell(m)}</td></tr>`).join("") +
         `</tbody></table>`;
     }
     if (it.cmpet && it.cmpet.length) {
@@ -698,6 +700,20 @@
     if (!a && !b) return null;
     if (a && b && a !== b) return `${a} ~ ${b}`;
     return a || b;
+  }
+
+  // 안전마진 셀: 마진% + 주변시세(표본)
+  function marginCell(m) {
+    if (m.mgn == null) return '<span class="mgn-na">시세부족</span>';
+    const cls = m.mgn > 0 ? "pos" : "neg";
+    return `<span class="mgn ${cls}">${m.mgn > 0 ? "+" : ""}${m.mgn}%</span>`
+      + `<span class="mgn-sub">주변 ${fmt(m.mkt)}·${m.mkt_n}건</span>`;
+  }
+  // 공고의 대표 안전마진(주택형 중 최고) - 대시보드/요약용
+  function bestMargin(it) {
+    const ms = (it.models || []).filter((m) => m.mgn != null);
+    if (!ms.length) return null;
+    return ms.reduce((a, b) => (b.mgn > a.mgn ? b : a));
   }
 
   // ── 단지 상세 패널 ──────────────────────────────────────────────────

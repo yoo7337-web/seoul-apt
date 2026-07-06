@@ -88,6 +88,37 @@ def test_models_cmpet_and_export_items():
     conn.close()
 
 
+def test_safety_margin_in_export():
+    """분양가 vs 반경 내 같은 평형 실거래 → 안전마진(mgn) 산출."""
+    conn = db.connect(":memory:")
+    # 분양 공고(강남 좌표) 84형 분양가 10억
+    n = _parse_notice({**RAW_NOTICE, "HSSPLY_ADRES": "서울특별시 강남구 대치동 1"},
+                      "apt")
+    n["lat"], n["lon"] = 37.4990, 127.0620
+    n["fetched_at"] = "t"
+    conn.execute("INSERT INTO subscription (house_manage_no,kind,house_nm,adres,"
+                 "rcept_endde,lat,lon,fetched_at) VALUES (?,?,?,?,?,?,?,?)",
+                 (n["house_manage_no"], "apt", n["house_nm"], n["adres"],
+                  "2026-07-20", n["lat"], n["lon"], "t"))
+    db.upsert_subscription_model(conn, _parse_model(
+        {"HOUSE_MANAGE_NO": n["house_manage_no"], "HOUSE_TY": "084.9700A",
+         "SUPLY_AR": "112.4", "SUPLY_HSHLDCO": "100",
+         "LTTOT_TOP_AMOUNT": "100000"}, n["house_manage_no"]))
+    # 주변 단지(같은 좌표 인근) 84㎡ 최근 실거래 12억×3건 → 마진 +16.7%
+    from datetime import date
+    cid = db.upsert_complex(conn, "11680", "대치동", "인근아파트", 2015, "2")
+    db.set_coords(conn, cid, 37.4992, 127.0622, "t")
+    for i in range(3):
+        db.insert_sale(conn, cid, date.today().isoformat(), 84.5, 10 + i, 120000)
+    conn.commit()
+
+    items = export.subscription_items(conn, date.today().isoformat())
+    m = items[0]["models"][0]
+    assert m["mkt"] == 120000 and m["mkt_n"] == 3
+    assert m["mgn"] == round((120000 - 100000) / 120000 * 100, 1)   # +16.7%
+    conn.close()
+
+
 def test_subscription_news_known_and_today_start():
     conn = db.connect(":memory:")
     today = date.today().isoformat()

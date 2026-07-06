@@ -10,11 +10,23 @@ docs/js/config.js 에 KAKAO_JS_KEY 를 주입한다(없으면 빈 값).
 """
 
 import json
+import re
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
 from . import config, aggregate
 from .subscription import extract_gu
+
+_TY_AREA = re.compile(r"[\d.]+")
+
+
+def _ty_exclu_area(house_ty: str) -> float | None:
+    """주택형(예: '084.9700A')의 앞부분 전용면적(㎡) 추출."""
+    m = _TY_AREA.match((house_ty or "").strip())
+    try:
+        return float(m.group()) if m else None
+    except ValueError:
+        return None
 
 KST = timezone(timedelta(hours=9))
 
@@ -137,13 +149,25 @@ def subscription_items(conn, today: str) -> list[dict]:
     items = []
     for r in rows:
         hmn = r["house_manage_no"]
-        models = [{
-            "ty": m["house_ty"], "ar": m["suply_ar"],
-            "hh": m["suply_hshldco"], "shh": m["spsply_hshldco"],
-            "price": m["top_amount"],
-        } for m in conn.execute(
-            "SELECT * FROM subscription_model WHERE house_manage_no=? "
-            "ORDER BY suply_ar", (hmn,))]
+        models = []
+        for m in conn.execute(
+                "SELECT * FROM subscription_model WHERE house_manage_no=? "
+                "ORDER BY suply_ar", (hmn,)):
+            mo = {
+                "ty": m["house_ty"], "ar": m["suply_ar"],
+                "hh": m["suply_hshldco"], "shh": m["spsply_hshldco"],
+                "price": m["top_amount"],
+            }
+            # 안전마진: 분양가 vs 주변 반경 같은 평형 최근 실거래
+            exclu = _ty_exclu_area(m["house_ty"])
+            if m["top_amount"] and r["lat"] and exclu:
+                nb = aggregate.nearby_sale_median(conn, r["lat"], r["lon"], exclu)
+                if nb:
+                    mo["mkt"] = nb["median"]      # 주변 시세(만원)
+                    mo["mkt_n"] = nb["n"]
+                    mo["mgn"] = round(
+                        (nb["median"] - m["top_amount"]) / nb["median"] * 100, 1)
+            models.append(mo)
         cmpet = [{
             "ty": c["house_ty"], "resd": c["reside_secd"],
             "req": c["req_cnt"], "rate": c["cmpet_rate"],

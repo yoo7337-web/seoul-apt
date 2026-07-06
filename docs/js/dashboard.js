@@ -276,17 +276,21 @@
       wrap.innerHTML = '<div class="empty">진행중·예정 청약 없음</div>';
     } else {
       let html = `<table class="rank-table"><thead><tr>
-        <th>상태</th><th>주택명</th><th>구</th><th>세대</th><th>접수기간</th><th>최고분양가</th>
+        <th>상태</th><th>주택명</th><th>구</th><th>세대</th><th>접수기간</th><th>최고분양가</th><th>안전마진</th>
         </tr></thead><tbody>`;
       active.forEach((it) => {
         const st = subStatus(it);
         const top = Math.max(0, ...(it.models || []).map((m) => m.price || 0));
+        const mgns = (it.models || []).filter((m) => m.mgn != null).map((m) => m.mgn);
+        const bm = mgns.length ? Math.max(...mgns) : null;
+        const mgnTxt = bm == null ? "-"
+          : `<span class="mgn ${bm > 0 ? "pos" : "neg"}">${bm > 0 ? "+" : ""}${bm}%</span>`;
         html += `<tr data-lat="${it.lat || ""}" data-lon="${it.lon || ""}">
           <td><span class="badge sub-badge-${st.k}">${st.label}</span></td>
           <td>${it.name}${it.kind === "remndr" ? ' <span class="sel-hint">(무순위)</span>' : ""}</td>
           <td>${it.gu || "-"}</td><td>${it.tot ? it.tot.toLocaleString() : "-"}</td>
           <td>${it.rcept_bgn || "-"} ~ ${it.rcept_end || "-"}</td>
-          <td>${top ? SeoulCharts.fmt(top) : "-"}</td></tr>`;
+          <td>${top ? SeoulCharts.fmt(top) : "-"}</td><td>${mgnTxt}</td></tr>`;
       });
       wrap.innerHTML = html + "</tbody></table>";
       wrap.querySelectorAll("tr[data-lat]").forEach((tr) =>

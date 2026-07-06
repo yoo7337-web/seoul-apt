@@ -4,11 +4,54 @@ SQLite 에 median 함수가 없어 그룹 값을 파이썬으로 가져와 통�
 가격 단위는 만원. 평단가는 만원/평(전용면적 기준).
 """
 
+import math
 import statistics
 from collections import defaultdict
 from datetime import date, timedelta
 
 from . import config
+
+
+def _dist_km(lat1, lon1, lat2, lon2) -> float:
+    """두 좌표 간 거리(km, haversine)."""
+    r = 6371.0
+    p1, p2 = math.radians(lat1), math.radians(lat2)
+    dp = math.radians(lat2 - lat1)
+    dl = math.radians(lon2 - lon1)
+    a = (math.sin(dp / 2) ** 2
+         + math.cos(p1) * math.cos(p2) * math.sin(dl / 2) ** 2)
+    return r * 2 * math.asin(math.sqrt(a))
+
+
+def nearby_sale_median(conn, lat, lon, exclu_area, radius_km: float = 1.5,
+                       months: int = 15, area_tol: float = 0.12) -> dict | None:
+    """반경 내 '비슷한 전용면적'(±area_tol) 최근 매매 중앙값(만원). 청약 안전마진용.
+
+    분양가와 비교할 '주변 시세'. 버킷(~60㎡ 등)은 폭이 넓어 25㎡·59㎡가 섞이므로
+    분양 주택형의 전용면적에 ±12% 근접한 거래만 비교한다. 표본 3건 미만이면 None.
+    """
+    if lat is None or lon is None or not exclu_area:
+        return None
+    dlat = radius_km / 111.0
+    dlon = radius_km / (111.0 * math.cos(math.radians(lat)) or 1)
+    cxs = conn.execute(
+        "SELECT complex_id, lat, lon FROM complex "
+        "WHERE lat BETWEEN ? AND ? AND lon BETWEEN ? AND ?",
+        (lat - dlat, lat + dlat, lon - dlon, lon + dlon)).fetchall()
+    ids = [c["complex_id"] for c in cxs
+           if _dist_km(lat, lon, c["lat"], c["lon"]) <= radius_km]
+    if not ids:
+        return None
+    lo_ar, hi_ar = exclu_area * (1 - area_tol), exclu_area * (1 + area_tol)
+    since = (date.today() - timedelta(days=months * 30)).isoformat()
+    q = ("SELECT amount_manwon FROM sale_txn "
+         "WHERE canceled=0 AND deal_date>=? AND exclu_area BETWEEN ? AND ? "
+         "AND complex_id IN (%s)" % ",".join("?" * len(ids)))
+    amounts = [r["amount_manwon"] for r in
+               conn.execute(q, [since, lo_ar, hi_ar] + ids).fetchall()]
+    if len(amounts) < 3:
+        return None
+    return {"median": round(_median(amounts)), "n": len(amounts)}
 
 
 def _median(vals: list[float]) -> float | None:
