@@ -12,7 +12,7 @@
 import json
 import time
 from collections import defaultdict
-from datetime import date
+from datetime import date, timedelta
 
 import requests
 import yaml
@@ -20,6 +20,10 @@ import yaml
 from . import config
 from .aggregate import _median, _pyeong
 from .subscription import extract_gu
+
+BARGAIN_THRESHOLD = -7.0    # 동일평형 중앙값 대비 이만큼 낮으면 급매
+BARGAIN_MIN_SAMPLE = 5      # 비교 기준 최근 표본 최소치
+BARGAIN_LOW_FLOOR = 2       # 이 층 이하는 급매 판정 제외(저층 디스카운트)
 
 TG_API = "https://api.telegram.org/bot{token}/sendMessage"
 TG_MAX_LEN = 3900          # 텔레그램 4096 한도 여유분
@@ -130,6 +134,35 @@ def watch_swing(conn, watch: dict, threshold_pct: float,
             "pct": round(pct, 1)}
 
 
+BARGAIN_AREA_TOL = 0.12     # 비교 대상 전용면적 허용 오차(±12%)
+
+
+def bargain_deals(conn, rows, threshold: float = BARGAIN_THRESHOLD) -> list[dict]:
+    """신규 거래 중 '급매' - 동일 단지·비슷한 전용면적(±12%) 최근 1년 중앙값
+    대비 threshold%(기본 -7%) 이하로 낮은 거래. 저층(≤2층)은 제외해 오탐을 줄인다.
+    버킷(~60㎡ 등)은 폭이 넓어 소형이 대형과 섞이므로 면적 근접 비교를 쓴다.
+    매수자에게 실질적으로 가장 유용한 반대(하락) 신호."""
+    since = (date.today() - timedelta(days=365)).isoformat()
+    out = []
+    for r in rows:
+        if r["floor"] and r["floor"] <= BARGAIN_LOW_FLOOR:
+            continue
+        area = r["exclu_area"]
+        lo, hi = area * (1 - BARGAIN_AREA_TOL), area * (1 + BARGAIN_AREA_TOL)
+        amts = [x["amount_manwon"] for x in conn.execute(
+            "SELECT amount_manwon FROM sale_txn WHERE complex_id=? AND canceled=0 "
+            "AND id!=? AND deal_date>=? AND exclu_area BETWEEN ? AND ?",
+            (r["complex_id"], r["id"], since, lo, hi))]
+        if len(amts) < BARGAIN_MIN_SAMPLE:
+            continue
+        med = _median(amts)
+        if med and r["amount_manwon"] <= med * (1 + threshold / 100):
+            out.append({"row": r, "med": med,
+                        "disc": round((r["amount_manwon"] - med) / med * 100, 1)})
+    out.sort(key=lambda x: x["disc"])   # 할인폭 큰 순
+    return out
+
+
 # ── 메시지 조립 ──────────────────────────────────────────────────────────
 def _fmt_amount(manwon: int) -> str:
     if manwon >= 10000:
@@ -172,6 +205,24 @@ def build_message(conn, wl: dict, rows: list) -> str:
                 f"({r['deal_date']})")
         if len(peaks) > limit:
             lines.append(f"   … 외 {len(peaks) - limit}건")
+
+    # ── 급매 포착(동일평형 중앙값 대비 하락 거래)
+    watch_lawds = {w["lawd_cd"] for w in wl.get("watches", []) if w.get("lawd_cd")}
+    bargains = bargain_deals(conn, rows)
+    if bargains:
+        lines.append("")
+        lines.append(f"🔻 <b>급매 포착</b> (동일평형 중앙값 대비 "
+                     f"{int(BARGAIN_THRESHOLD)}%↓ · {len(bargains)}건)")
+        for b in bargains[:10]:
+            r = b["row"]
+            star = "⭐ " if r["lawd_cd"] in watch_lawds else ""
+            lines.append(
+                f" · {star}{_district_name(r['lawd_cd'])} {r['apt_nm']} "
+                f"{r['exclu_area']}㎡ {r['floor'] or '-'}층 "
+                f"{_fmt_amount(r['amount_manwon'])} "
+                f"(<b>{b['disc']}%</b> · 중앙값 {_fmt_amount(round(b['med']))})")
+        if len(bargains) > 10:
+            lines.append(f"   … 외 {len(bargains) - 10}건")
 
     # ── 워치리스트 섹션
     for watch in wl.get("watches", []):

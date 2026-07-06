@@ -117,6 +117,30 @@ def test_sale_by_area_buckets():
     conn.close()
 
 
+def test_bargain_deals():
+    """급매 감지: 동일평형 중앙값 대비 -7%↓, 저층 제외."""
+    from datetime import date
+    from seoul_apt import notify
+    conn = db.connect(":memory:")
+    cid = db.upsert_complex(conn, "11680", "대치동", "은마", 1979, "316")
+    today = date.today().isoformat()
+    # 기준 표본 6건(84㎡ 12억)
+    for i in range(6):
+        db.insert_sale(conn, cid, today, 84.0, 5 + i, 120000)
+    # 급매 후보: 84㎡ 10.8억(-10%), 10층 → 감지
+    db.insert_sale(conn, cid, today, 84.1, 10, 108000)
+    # 저층 급매(1층 10.8억) → 제외돼야 함
+    db.insert_sale(conn, cid, today, 84.2, 1, 108000)
+    conn.commit()
+    rows = notify.new_sales(conn, 0)
+    bargains = notify.bargain_deals(conn, rows)
+    floors = [b["row"]["floor"] for b in bargains]
+    assert 10 in floors and 1 not in floors        # 10층만 급매, 1층 제외
+    b10 = next(b for b in bargains if b["row"]["floor"] == 10)
+    assert b10["disc"] == -10.0
+    conn.close()
+
+
 def test_valuation_position():
     """장기 평단가 위치(pos)·전세가율 백분위(jr_pct) 산출 검증."""
     # 24개월 상승 후 하락: 최근가는 5년 범위 중하단
