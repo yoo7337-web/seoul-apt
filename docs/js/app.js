@@ -731,10 +731,11 @@
     renderPanel();
   }
 
-  // 상세 패널: 선택 평형(없으면 대표 평형) 기준 최근 매매/전세가
+  // 상세 패널: 매매·전세·전세가율을 '같은 평형'으로 맞춘다(선택 평형, 없으면 대표평형).
+  // 이래야 전세가율 = 화면의 전세/매매와 일치하고 전세·매매 주력 평형 차이로 왜곡 안 됨.
   function detailInfo(d, jeonse) {
     const byArea = jeonse ? d.jeonse_area : d.sale_area;
-    const bucket = state.detailArea || (jeonse ? d.jrep : d.rep);
+    const bucket = state.detailArea || d.rep;   // 전세도 매매 대표평형 기준
     const o = (byArea && bucket) ? byArea[bucket] : null;
     return o ? { price: o.p, py: o.py, stale: !!o.s } : null;
   }
@@ -775,6 +776,10 @@
   function renderPanel() {
     const d = state.currentDetail;
     const si = detailInfo(d, false), ji = detailInfo(d, true);
+    // 전세가율: 전체=백엔드 정밀값(대표 전용면적 ±12%), 특정 평형 선택 시 그 버킷 전세/매매
+    const jrPct = state.detailArea
+      ? ((si && ji && si.price) ? Math.round(ji.price / si.price * 1000) / 10 : null)
+      : d.jeonse_ratio;
     const isFav = state.favorites.some((f) => f.id === d.id);
     const gongsi = latestGongsi(d);
     const el = $("panel-content");
@@ -788,8 +793,8 @@
           <div class="value small">${d.ppy ? Math.round(d.ppy).toLocaleString() : "-"}</div></div>
         <div class="card"><div class="label">최근 전세${cardArea(ji)}</div>
           <div class="value small">${ji ? fmt(ji.price) : "-"}${staleTag(ji)}</div></div>
-        <div class="card"><div class="label">전세가율</div>
-          <div class="value small">${d.jeonse_ratio != null ? d.jeonse_ratio + "%" : "-"}</div></div>
+        <div class="card"><div class="label">전세가율${cardArea(si)}</div>
+          <div class="value small">${jrPct != null ? jrPct + "%" : "-"}</div></div>
         <div class="card"><div class="label">공시가격 ${gongsi ? "(" + gongsi.year + ")" : ""}</div>
           <div class="value small">${gongsi ? fmt(gongsi.price) : "미매칭"}</div></div>
         <div class="card"><div class="label">공시/실거래</div>

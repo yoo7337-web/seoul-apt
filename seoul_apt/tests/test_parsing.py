@@ -171,6 +171,21 @@ def test_bargain_deals():
     conn.close()
 
 
+def test_matched_jeonse_ratio():
+    """전세가율은 같은 크기(대표 전용면적 ±12%) 전세/매매로 산출, 혼합 왜곡 방지."""
+    # 매매: 84㎡ 12억(3건), 대형 178㎡ 40억(섞임). 전세: 84㎡ 8억, 178㎡ 20억.
+    sale = ([{"exclu_area": 84.0, "amount_manwon": 120000}] * 3
+            + [{"exclu_area": 178.0, "amount_manwon": 400000}] * 3)
+    jeonse = ([{"exclu_area": 84.0, "deposit_manwon": 80000}] * 3
+              + [{"exclu_area": 178.0, "deposit_manwon": 200000}] * 3)
+    # 대표 84㎡ ±12%: 전세 8억 / 매매 12억 = 66.7% (혼합이면 왜곡)
+    assert aggregate._matched_jeonse_ratio(sale, jeonse, 84.0) == 66.7
+    # 178㎡ 기준: 20억/40억 = 50%
+    assert aggregate._matched_jeonse_ratio(sale, jeonse, 178.0) == 50.0
+    # 표본 부족 시 None
+    assert aggregate._matched_jeonse_ratio(sale, jeonse[:1], 84.0) is None
+
+
 def test_valuation_position():
     """장기 평단가 위치(pos)·전세가율 백분위(jr_pct) 산출 검증."""
     # 24개월 상승 후 하락: 최근가는 5년 범위 중하단

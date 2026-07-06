@@ -197,11 +197,44 @@ def district_recent_txns(conn, lawd_cd: str, limit: int = 30) -> list[dict]:
 
 
 # ── 단지 단위 ────────────────────────────────────────────────────────────
+def _matched_jeonse_ratio(sale_rows, jeonse_rows, rep_area, since: str = None,
+                          tol: float = 0.12, n: int = 30,
+                          min_n: int = 3) -> float | None:
+    """전세가율(%) = 같은 크기(대표 전용면적 ±tol)·같은 시기(since 이후) 전세/매매
+    중앙값. 넓은 버킷은 대형·오피스텔에서 서로 다른 크기끼리 비교돼 왜곡되고
+    (한남더힐 26%, 오피스텔 200%), 최근 전세를 수년 전 매매와 비교하면 300%처럼
+    뻥튀기되므로 크기와 시기를 함께 맞춘다. rows 는 deal_date DESC 가정.
+    since=None 이면 시기 제한 없음(테스트용)."""
+    if not rep_area:
+        return None
+    lo, hi = rep_area * (1 - tol), rep_area * (1 + tol)
+
+    def _pick(rows, key):
+        out = []
+        for r in rows:
+            if not r["exclu_area"] or not (lo <= r["exclu_area"] <= hi):
+                continue
+            if since is not None and r["deal_date"] < since:
+                continue
+            out.append(r[key])
+            if len(out) >= n:
+                break
+        return out
+
+    s = _pick(sale_rows, "amount_manwon")
+    j = _pick(jeonse_rows, "deposit_manwon")
+    if len(s) < min_n or len(j) < min_n:
+        return None
+    sm, jm = _median(s), _median(j)
+    return round(jm / sm * 100, 1) if sm and jm else None
+
+
 def complex_list(conn, lawd_cd: str) -> list[dict]:
     """구의 단지 목록 - 좌표·대표가·평단가·전세가율·공시가격."""
     complexes = conn.execute(
         "SELECT * FROM complex WHERE lawd_cd=?", (lawd_cd,)).fetchall()
     year_ago = (date.today() - timedelta(days=365)).isoformat()
+    two_years_ago = (date.today() - timedelta(days=730)).isoformat()
     out = []
     for c in complexes:
         cid = c["complex_id"]
@@ -270,8 +303,10 @@ def complex_list(conn, lawd_cd: str) -> list[dict]:
             "jeonse_median": jeonse_med,
             "jeonse_by_area": jeonse_by_area,
             "jrep": jrep,
-            "jeonse_ratio": round(jeonse_med / sale_med * 100, 1)
-            if jeonse_med and sale_med else None,
+            # 전세가율 = 같은 크기(대표 전용면적 ±12%)·최근 2년 전세/매매.
+            # 넓은 버킷·시기 불일치로 인한 왜곡(한남더힐 26%, 오피스텔 300%) 방지.
+            "jeonse_ratio": _matched_jeonse_ratio(
+                recent_sales, jeonse_rows, _median(areas), since=two_years_ago),
             "gongsi_price": gongsi["price_manwon"] if gongsi else None,
             "gongsi_year": gongsi["year"] if gongsi else None,
             "gongsi_ratio": round(gongsi["price_manwon"] / sale_med * 100, 1)
