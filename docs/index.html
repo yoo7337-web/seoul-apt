@@ -52,6 +52,18 @@
       <div class="chart-tall"><canvas id="reb-chart"></canvas></div>
     </section>
     <section class="page-section">
+      <h2>시장 심리 지표 (서울)</h2>
+      <div class="desc">매수심리·외지인·미분양 — 한국부동산원 월간</div>
+      <div class="desc" style="margin-top:6px">📈 매매수급지수 <span style="color:var(--muted)">(100↑ 매수우위 · 100↓ 매도우위)</span></div>
+      <div class="chart-wrap"><canvas id="ms-supply"></canvas></div>
+      <div class="desc" style="margin-top:12px">🧭 외지인 매수비중 <span id="ms-out-latest" style="color:var(--muted)"></span></div>
+      <div class="chart-wrap"><canvas id="ms-outsider"></canvas></div>
+      <div class="desc" style="margin-top:6px">구별 최신 외지인 비중(투자수요 유입 구)</div>
+      <div class="chart-tall" style="height:320px"><canvas id="ms-out-bar"></canvas></div>
+      <div class="desc" style="margin-top:12px">🏚️ 미분양 <span id="ms-unsold-latest" style="color:var(--muted)"></span></div>
+      <div class="chart-wrap"><canvas id="ms-unsold"></canvas></div>
+    </section>
+    <section class="page-section">
       <h2>시장 국면 신호등</h2>
       <div class="desc">거래량 모멘텀 × 가격 6개월 변화 → 구별 사이클 국면</div>
       <div id="phase-grid" class="phase-grid"></div>
@@ -175,7 +187,7 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
   <script src="js/charts.js?v=7"></script>
-  <script src="js/dashboard.js?v=17"></script>
+  <script src="js/dashboard.js?v=18"></script>
   <script src="js/app.js?v=29"></script>
 </body>
 </html>

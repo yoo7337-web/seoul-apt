@@ -136,6 +136,31 @@ def test_recent_bargains():
     conn.close()
 
 
+def test_buyer_outsider_rows():
+    """매입자거주지별 pivot → 외지인 비중(%) 계산 검증."""
+    from seoul_apt import reb_api
+    mk = lambda grp, grpnm, cls, val: {
+        "GRP_FULLNM": grp, "GRP_NM": grpnm, "CLS_FULLNM": cls,
+        "DTA_VAL": val, "WRTTIME_IDTFR_ID": "202605"}
+    rows = [
+        mk("서울>강남구", "강남구", "합계", 100),
+        mk("서울>강남구", "강남구", "관할시군구내", 40),
+        mk("서울>강남구", "강남구", "관할시도내", 30),
+        mk("서울>강남구", "강남구", "관할시도외_기타", 30),
+        mk("서울>서초구", "서초구", "합계", 200),
+        mk("서울>서초구", "서초구", "관할시군구내", 100),
+        mk("서울>서초구", "서초구", "관할시도내", 60),
+        mk("충북>청주시>상당구", "상당구", "합계", 220),   # 서울 구 아님 → 제외
+        mk("서울>중구", "중구", "합계", 5),                # 구별 표본<10 제외, 서울 합산엔 포함
+    ]
+    out = dict(((r, p), v) for r, p, v in reb_api._buyer_outsider_rows(rows))
+    assert out[("강남구", "2026-05")] == 30.0     # (100-70)/100
+    assert out[("서초구", "2026-05")] == 20.0     # (200-160)/200
+    assert out[("서울", "2026-05")] == 24.6       # (305-230)/305, 25개구 합산
+    assert ("상당구", "2026-05") not in out
+    assert ("중구", "2026-05") not in out         # 구별로는 표본 부족
+
+
 def test_market_phase_classification():
     """4국면 판정: 거래량×가격 모멘텀 조합."""
     p = aggregate._phase

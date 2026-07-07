@@ -37,7 +37,7 @@
     open: async () => {
       const ok = await init();
       if (ok) setTimeout(() => {
-        renderTrend(); renderPeakShare(); renderRebChart();
+        renderTrend(); renderPeakShare(); renderRebChart();  // renderRebChart가 시장심리도 그림
         if (valData) renderValScatter();   // 분할패널 열릴 때 산점도 크기 재계산
         if (mkAll && cmpIds.length) renderCmpBody();   // 비교 차트 크기 재계산
       }, 60);
@@ -241,7 +241,9 @@
       try { rebData = await fetchJSON(DATA + "reb/seoul_index.json"); }
       catch { return; }
     }
-    const stats = Object.keys(rebData || {});
+    // 가격지수 2종만(수급·외지인·미분양은 스케일이 달라 별도 섹션)
+    const stats = ["아파트 매매가격지수", "아파트 전세가격지수"]
+      .filter((s) => rebData[s]);
     if (!stats.length || !window.SeoulCharts) return;
     const colors = ["#ff7e00", "#2563eb"];
     // period(월) 합집합을 라벨로 → 지표별 시작 시점이 달라도 정확히 정렬
@@ -262,6 +264,44 @@
         data: labels.map((m) => (m in map ? map[m] : null)) };
     });
     SeoulCharts.line("reb-chart", labels, datasets);
+    renderMarketStats();
+  }
+
+  // ── 5a) 시장 심리 지표(수급·외지인·미분양) ──────────────────────────
+  function _line(canvasId, series, label, color) {
+    if (!document.getElementById(canvasId) || !series || !series.length) return;
+    const labels = series.map((p) => p.period);
+    SeoulCharts.line(canvasId, labels,
+      [{ label, color, data: series.map((p) => p.value) }]);
+  }
+  function renderMarketStats() {
+    if (!rebData || !window.SeoulCharts) return;
+    const S = rebData["아파트 매매수급지수"], O = rebData["외지인 매수비중(%)"],
+          U = rebData["미분양(호)"];
+    if (S) _line("ms-supply", S["서울"], "매매수급지수", "#7c3aed");
+    if (O) {
+      _line("ms-outsider", O["서울"], "외지인 매수비중", "#ea580c");
+      const seoul = O["서울"] || [];
+      if (seoul.length && $("ms-out-latest"))
+        $("ms-out-latest").textContent =
+          `서울 ${seoul[seoul.length - 1].value}% (${seoul[seoul.length - 1].period})`;
+      // 구별 최신 바(구 이름 = SEOUL_DISTRICTS 값)
+      const guVals = (meta.districts || []).map((d) => {
+        const arr = O[d.name] || [];
+        return arr.length ? { name: d.name, v: arr[arr.length - 1].value } : null;
+      }).filter(Boolean).sort((a, b) => b.v - a.v);
+      if (guVals.length)
+        SeoulCharts.bar("ms-out-bar", guVals.map((g) => g.name),
+          guVals.map((g) => g.v),
+          { horizontal: true, label: "외지인 비중", unit: "%", color: "#ea580c" });
+    }
+    if (U) {
+      const s = U["서울>계"] || U["서울"] || [];
+      _line("ms-unsold", s, "미분양(호)", "#64748b");
+      if (s.length && $("ms-unsold-latest"))
+        $("ms-unsold-latest").textContent =
+          `서울 ${Math.round(s[s.length - 1].value).toLocaleString()}호 (${s[s.length - 1].period})`;
+    }
   }
 
   // ── 5b) 시장 국면 신호등 ────────────────────────────────────────────

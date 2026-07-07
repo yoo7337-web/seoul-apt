@@ -21,10 +21,18 @@ from . import config, db
 BASE = "https://www.reb.or.kr/r-one/openapi/SttsApiTblData.do"
 
 # (STATBL_ID, 지표명, 수집주기) - 필요 시 R-ONE 통계표 목록 기준으로 수정
+# CLS_FULLNM 이 지역('서울>...')인 표준형 통계들.
 REB_STATS = [
     ("A_2024_00178", "아파트 매매가격지수", "MM"),  # (월) 지역별 매매지수_아파트
     ("A_2024_00182", "아파트 전세가격지수", "MM"),  # (월) 지역별 전세지수_아파트
+    ("A_2024_00076", "아파트 매매수급지수", "MM"),  # (월) 매매수급동향_아파트(권역, 100↑=매수우위)
+    ("T237973129847263", "미분양(호)", "MM"),       # 미분양주택현황(서울>구, '서울>계'=합계)
 ]
+
+# 매입자거주지별 아파트매매(GRP_FULLNM=지역, CLS_FULLNM=거주지구분)
+# → 외지인 비중(%) = (합계 - 관할시군구내 - 관할시도내) / 합계
+BUYER_STATBL = "A_2024_00609"
+BUYER_STAT_NAME = "외지인 매수비중(%)"
 
 
 class RebAPIError(Exception):
@@ -105,20 +113,78 @@ def _region(row: dict) -> str:
     return "서울"
 
 
+def _stat_start(conn, stat_name: str, default_ym: str) -> str:
+    """증분 시작 시점 - 이미 적재된 최신 period 2개월 전(정정 반영), 없으면 default.
+
+    매입자거주지별처럼 전국 row 가 많은 통계를 매일 전 기간 재수집하지 않기 위함.
+    """
+    row = conn.execute(
+        "SELECT MAX(period) AS p FROM reb_index WHERE stat_name=?",
+        (stat_name,)).fetchone()
+    if not row or not row["p"]:
+        return default_ym
+    y, m = int(row["p"][:4]), int(row["p"][5:7])
+    m -= 2
+    if m < 1:
+        y, m = y - 1, m + 12
+    ym = f"{y:04d}{m:02d}"
+    return max(default_ym, ym) if default_ym else ym
+
+
+def _buyer_outsider_rows(rows: list[dict]) -> list[tuple[str, str, float]]:
+    """매입자거주지별 원시 row → (지역, period, 외지인비중%) 목록.
+
+    GRP_FULLNM='서울>강남구'(지역), CLS_FULLNM='합계|관할시군구내|관할시도내|
+    관할시도외_*'(매입자 거주지, 서로 배타적). 외지인 = 시도외 = 합계-시군구내-시도내.
+    서울 전체는 '서울>계' 같은 집계행이 '계'로 다른 시도와 충돌하므로 쓰지 않고
+    25개 구 합산으로 계산한다. 표본 10건 미만 월은 노이즈 커 제외.
+    """
+    gu_names = set(config.SEOUL_DISTRICTS.values())
+    piv: dict[tuple, dict] = {}
+    for r in rows:
+        grp = str(r.get("GRP_FULLNM") or "")
+        gu = str(r.get("GRP_NM") or "")
+        if not grp.startswith("서울") or gu not in gu_names:
+            continue
+        period = _period(r)
+        if not period:
+            continue
+        cls = str(r.get("CLS_FULLNM") or r.get("CLS_NM") or "")
+        try:
+            val = float(str(r.get("DTA_VAL")).replace(",", ""))
+        except (TypeError, ValueError):
+            continue
+        for key in ((gu, period), ("서울", period)):   # 구 + 서울(구 합산)
+            d = piv.setdefault(key, {"total": 0, "intra": 0})
+            if cls == "합계":
+                d["total"] += val
+            elif cls in ("관할시군구내", "관할시도내"):
+                d["intra"] += val
+    out = []
+    for (region, period), d in piv.items():
+        if d["total"] < 10:
+            continue
+        out.append((region, period,
+                    round((d["total"] - d["intra"]) / d["total"] * 100, 1)))
+    return out
+
+
 def collect_reb(conn, api_key: str, start_ym: str, end_ym: str) -> int:
     """설정된 통계표를 수집해 reb_index 에 적재. 적재 row 수 반환."""
     client = RebClient(api_key)
     n = 0
-    seoul_names = set(config.SEOUL_DISTRICTS.values()) | {"서울", "서울특별시"}
     for statbl_id, stat_name, cycle in REB_STATS:
         try:
-            rows = client.fetch_stat(statbl_id, cycle, start_ym, end_ym)
+            rows = client.fetch_stat(statbl_id, cycle,
+                                     _stat_start(conn, stat_name, start_ym),
+                                     end_ym)
         except RebAPIError:
             continue
         for r in rows:
             region = _region(r)
-            # 서울/자치구 관련 지역만 저장
-            if not any(s in region for s in seoul_names):
+            # 서울만 저장. CLS_FULLNM 은 '서울>...' 계층형이라 startswith 로 판별
+            # (부분일치는 '인천>중구'가 '중구'에 걸려 타시도가 섞이는 버그가 있었음)
+            if not region.startswith("서울"):
                 continue
             period = _period(r)
             val = r.get("DTA_VAL") or r.get("value")
@@ -131,4 +197,16 @@ def collect_reb(conn, api_key: str, start_ym: str, end_ym: str) -> int:
             db.insert_reb(conn, region, stat_name, period, value)
             n += 1
         conn.commit()
+
+    # 외지인 매수비중(파생 지표 - pivot 계산 후 적재)
+    try:
+        rows = client.fetch_stat(BUYER_STATBL, "MM",
+                                 _stat_start(conn, BUYER_STAT_NAME, start_ym),
+                                 end_ym)
+        for region, period, pct in _buyer_outsider_rows(rows):
+            db.insert_reb(conn, region, BUYER_STAT_NAME, period, pct)
+            n += 1
+        conn.commit()
+    except RebAPIError:
+        pass
     return n
