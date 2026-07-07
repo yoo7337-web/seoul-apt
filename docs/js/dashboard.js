@@ -28,6 +28,7 @@
     renderScreeners();
     renderBargains();
     renderValuation();
+    renderCompare();
     return true;
   }
 
@@ -38,6 +39,7 @@
       if (ok) setTimeout(() => {
         renderTrend(); renderPeakShare(); renderRebChart();
         if (valData) renderValScatter();   // 분할패널 열릴 때 산점도 크기 재계산
+        if (mkAll && cmpIds.length) renderCmpBody();   // 비교 차트 크기 재계산
       }, 60);
     },
     refresh: () => { if (inited) {                       // 관심구 별표 갱신
@@ -554,6 +556,139 @@
       xMin: 0, xMax: 100, yMin: 0, xUnit: "%", yUnit: "%",
       onClick: (meta) => { if (window.SeoulMap) window.SeoulMap.focusComplex(meta.id); },
     });
+  }
+
+  // ── 5f) 단지 비교(중첩 추이 + 스펙 비교표) ──────────────────────────
+  let cmpIds = [], mkAll = null;
+  const cmpDetails = {};   // id -> complex detail JSON 캐시
+  try { cmpIds = JSON.parse(localStorage.getItem("seoul_apt_compare") || "[]"); }
+  catch { cmpIds = []; }
+  const CMP_MAX = 5;
+
+  async function loadMk() {
+    if (!mkAll) mkAll = (await fetchJSON(DATA + "markers.json")).markers || [];
+    return mkAll;
+  }
+  function saveCmp() {
+    localStorage.setItem("seoul_apt_compare", JSON.stringify(cmpIds));
+  }
+
+  async function renderCompare() {
+    if (!$("cmp-search")) return;
+    (meta.districts || []).forEach((d) => { GU_NAME[d.lawd_cd] = d.name; });
+    await loadMk();
+    bindCmpBar();
+    await renderCmpBody();
+  }
+
+  function bindCmpBar() {
+    const inp = $("cmp-search");
+    if (inp._bound) return;
+    inp._bound = true;
+    inp.addEventListener("input", () => {
+      const q = inp.value.trim();
+      if (q.length < 2 || q.includes("#")) return;
+      const hits = mkAll.filter((m) => m.apt.includes(q)).slice(0, 20);
+      $("cmp-datalist").innerHTML = hits.map((m) =>
+        `<option value="${m.apt} · ${GU_NAME[m.lawd_cd] || m.lawd_cd} #${m.id}">`).join("");
+    });
+    inp.addEventListener("change", () => {
+      const mch = inp.value.match(/#(\d+)$/);
+      if (!mch) return;
+      addCmp(+mch[1]);
+      inp.value = "";
+    });
+    $("cmp-load-fav").addEventListener("click", () => {
+      let favs = [];
+      try { favs = JSON.parse(localStorage.getItem("seoul_apt_favs") || "[]"); }
+      catch { favs = []; }
+      favs.forEach((f) => { if (cmpIds.length < CMP_MAX && !cmpIds.includes(f.id)) cmpIds.push(f.id); });
+      saveCmp(); renderCmpBody();
+    });
+    $("cmp-clear").addEventListener("click", () => {
+      cmpIds = []; saveCmp(); renderCmpBody();
+    });
+  }
+
+  function addCmp(id) {
+    if (cmpIds.includes(id)) return;
+    if (cmpIds.length >= CMP_MAX) { cmpIds.shift(); }   // 가장 오래된 것 제거
+    cmpIds.push(id);
+    saveCmp(); renderCmpBody();
+  }
+
+  async function cmpDetail(mk) {
+    if (!cmpDetails[mk.id]) {
+      try {
+        cmpDetails[mk.id] = await fetchJSON(`${DATA}complex/${mk.lawd_cd}/${mk.id}.json`);
+      } catch { cmpDetails[mk.id] = {}; }
+    }
+    return cmpDetails[mk.id];
+  }
+
+  async function renderCmpBody() {
+    const chips = $("cmp-chips"), wrap = $("cmp-table-wrap");
+    const mks = cmpIds.map((id) => mkAll.find((m) => m.id === id)).filter(Boolean);
+    // 칩
+    chips.innerHTML = mks.map((m, i) =>
+      `<span class="cmp-chip" style="border-color:${COLORS[i % COLORS.length]}">
+        <i style="background:${COLORS[i % COLORS.length]}"></i>${m.apt}
+        <b data-del="${m.id}">✕</b></span>`).join("")
+      || '<span class="sel-hint">단지를 검색해 추가하세요 (지도에서 관심단지 ★ 등록 후 불러오기도 가능)</span>';
+    chips.querySelectorAll("[data-del]").forEach((b) =>
+      b.addEventListener("click", () => {
+        cmpIds = cmpIds.filter((x) => x !== +b.dataset.del);
+        saveCmp(); renderCmpBody();
+      }));
+    if (!mks.length) {
+      SeoulCharts.destroy("cmp-chart"); wrap.innerHTML = ""; return;
+    }
+    // 상세(추이·밸류) 로드
+    const details = await Promise.all(mks.map(cmpDetail));
+    // 중첩 차트: 월 라벨 union
+    const monthSet = new Set();
+    details.forEach((d) => (d.ppy_series || []).forEach((p) => monthSet.add(p.m)));
+    const labels = [...monthSet].sort();
+    const datasets = mks.map((m, i) => {
+      const map = {};
+      (details[i].ppy_series || []).forEach((p) => { map[p.m] = p.v; });
+      return { label: m.apt, color: COLORS[i % COLORS.length],
+               data: labels.map((x) => map[x] ?? null) };
+    });
+    SeoulCharts.line("cmp-chart", labels, datasets);
+    // 스펙 비교표(행=항목, 열=단지)
+    const nowY = new Date().getFullYear();
+    const repPrice = (m) => {
+      const o = m.rep && m.sale_area ? m.sale_area[m.rep] : null;
+      return o ? `${SeoulCharts.fmt(o.p)}·${o.py}평` : "-";
+    };
+    const rows = [
+      ["위치", (m, d) => `${GU_NAME[m.lawd_cd] || "-"} ${d.umd || ""}`],
+      ["준공", (m) => m.by ? `${m.by} (${nowY - m.by}년)` : "-"],
+      ["세대수", (m) => m.hh ? m.hh.toLocaleString() : "-"],
+      ["용적률", (m) => m.far != null ? m.far + "%" : "-"],
+      ["대표평형 최근매매", repPrice],
+      ["평단가(만/평)", (m) => m.ppy ? Math.round(m.ppy).toLocaleString() : "-"],
+      ["전세가율", (m) => m.jeonse_ratio != null ? m.jeonse_ratio + "%" : "-"],
+      ["1년 거래(회전율)", (m) => m.n1y != null
+        ? `${m.n1y}건${m.hh ? ` (${(m.n1y / m.hh * 100).toFixed(1)}%)` : ""}` : "-"],
+      ["5년위치", (m, d) => d.valuation ? `<b>${d.valuation.pos}%</b>` : "-"],
+      ["고점대비", (m, d) => d.valuation && d.valuation.vs_peak != null
+        ? d.valuation.vs_peak + "%" : "-"],
+    ];
+    let html = `<table class="rank-table cmp-table"><thead><tr><th></th>`
+      + mks.map((m, i) => `<th class="cmp-head" data-id="${m.id}">
+          <i style="background:${COLORS[i % COLORS.length]}"></i>${m.apt}</th>`).join("")
+      + "</tr></thead><tbody>";
+    rows.forEach(([label, fn]) => {
+      html += `<tr><td class="cmp-label">${label}</td>`
+        + mks.map((m, i) => `<td>${fn(m, details[i])}</td>`).join("") + "</tr>";
+    });
+    wrap.innerHTML = html + "</tbody></table>";
+    wrap.querySelectorAll(".cmp-head").forEach((th) =>
+      th.addEventListener("click", () => {
+        if (window.SeoulMap) window.SeoulMap.focusComplex(+th.dataset.id);
+      }));
   }
 
   // ── 6) 청약·분양 (서울) ─────────────────────────────────────────────
