@@ -439,22 +439,35 @@
 
   // 선택 평형대에 해당하는 버킷 밸류에이션(전체 범위면 all). 없으면 null.
   function valView(it) {
-    let v;
+    let v, b = "all";
     if (valArea.lo <= 0 && valArea.hi >= 80) {
       v = it.all;
     } else {
       const lo = valArea.lo * VAL_M2, hi = valArea.hi * VAL_M2;
-      let best = null, bestOv = 0;
-      for (const [b, blo, bhi] of VAL_BUCKETS) {
-        const x = it.areas[b];
+      let best = null, bestOv = 0, bestB = null;
+      for (const [bl, blo, bhi] of VAL_BUCKETS) {
+        const x = it.areas[bl];
         if (!x) continue;
         const ov = Math.min(hi, bhi) - Math.max(lo, blo);
-        if (ov > bestOv) { bestOv = ov; best = x; }
+        if (ov > bestOv) { bestOv = ov; best = x; bestB = bl; }
       }
-      v = bestOv > 0 ? best : null;
+      v = bestOv > 0 ? best : null; b = bestB;
     }
-    return v ? { id: it.id, apt: it.apt, lawd: it.lawd,
+    return v ? { id: it.id, apt: it.apt, lawd: it.lawd, b,
                  pos: v.pos, vp: v.vp, jr: v.jr, ppy: v.ppy, m: v.m } : null;
+  }
+  // 마커에서 평(대표/선택 버킷)·세대수 조회
+  let valMkById = null;
+  function valPy(view) {
+    const mk = valMkById && valMkById[view.id];
+    if (!mk || !mk.sale_area) return null;
+    const bucket = view.b === "all" ? mk.rep : view.b;
+    const o = bucket ? mk.sale_area[bucket] : null;
+    return o ? o.py : null;
+  }
+  function valHh(view) {
+    const mk = valMkById && valMkById[view.id];
+    return mk ? mk.hh : null;
   }
   function valViews() { return valData.items.map(valView).filter(Boolean); }
 
@@ -477,6 +490,8 @@
       try { valData = await fetchJSON(DATA + "valuation.json"); }
       catch { $("val-grid").innerHTML = '<div class="empty">밸류에이션 데이터 없음</div>'; return; }
     }
+    await loadMk();                       // 평·세대수 표기용
+    if (!valMkById) { valMkById = {}; mkAll.forEach((m) => { valMkById[m.id] = m; }); }
     bindValArea();
     renderValAll();
   }
@@ -564,13 +579,16 @@
     const CAP = 100, shown = rows.slice(0, CAP);
     let html = `<div class="sel-hint" style="margin:4px 0 6px">${rows.length.toLocaleString()}건${rows.length > CAP ? ` 중 상위 ${CAP}` : ""} · 5년위치 낮은 순 · 행 클릭=지도</div>
       <table class="rank-table"><thead><tr>
-      <th>단지</th><th>구</th><th>평단가</th><th>5년위치</th><th>고점대비</th><th>전세가율</th><th>표본</th>
+      <th>단지</th><th>구</th><th>평</th><th>세대</th><th>평단가</th><th>5년위치</th><th>고점대비</th><th>전세가율</th><th>표본</th>
       </tr></thead><tbody>`;
     shown.forEach((it) => {
       const shield = (it.pos <= 30 && it.jr != null && it.jr >= 60)
         ? ' <span title="전세가율 높음 - 하방 견고">🛡️</span>' : "";
+      const py = valPy(it), hh = valHh(it);
       html += `<tr data-id="${it.id}">
         <td>${it.apt}${shield}</td><td>${GU_NAME[it.lawd] || "-"}</td>
+        <td>${py != null ? py + "평" : "-"}</td>
+        <td>${hh != null ? hh.toLocaleString() : "-"}</td>
         <td>${it.ppy.toLocaleString()}</td><td><b>${it.pos}%</b></td>
         <td>${it.vp != null ? it.vp + "%" : "-"}</td>
         <td>${it.jr != null ? it.jr + "%" : "-"}</td>
@@ -585,8 +603,13 @@
 
   function renderValScatter(views) {
     if (!document.getElementById("val-scatter") || !window.SeoulCharts) return;
-    const base = (views || valViews())
-      .filter((v) => (!valGu || v.lawd === valGu) && v.jr != null);
+    const inView = (views || valViews()).filter((v) => !valGu || v.lawd === valGu);
+    const base = inView.filter((v) => v.jr != null);
+    // 전세가율 없는 단지는 Y축(전세가율)에 올릴 수 없어 산점도에서 제외됨을 명시
+    const excluded = inView.length - base.length;
+    if ($("val-scatter-note")) $("val-scatter-note").textContent =
+      `· 전세가율 있는 ${base.length.toLocaleString()}개 표시`
+      + (excluded ? ` (전세가율 미집계 ${excluded.toLocaleString()}개 제외)` : "");
     const datasets = VAL_VERDICT.map(([k, label, test, color]) => ({
       label, color,
       data: base.filter((v) => test(v.pos)).map((v) => ({ x: v.pos, y: v.jr, meta: v })),
