@@ -437,29 +437,19 @@
     ["mid", "중단", (p) => p > 30 && p < 80, "#d97706"],
     ["hot", "고점근접", (p) => p >= 80, "#ef4444"],
   ];
-  const VAL_M2 = 3.305785;   // 1평 = 3.305785㎡
-  const VAL_BUCKETS = [["~60㎡", 0, 60], ["60~85㎡", 60, 85],
-                       ["85~135㎡", 85, 135], ["135㎡~", 135, 99999]];
-  let valData = null, valGu = "", valKind = "cheap";
-  let valArea = { lo: 0, hi: 80 };   // 평형대(평), 0~80 전체
+  // 평형대 = 전용면적 버킷 '정확 선택'(전체 or 특정 버킷). 연속 슬라이더는
+  // ~60㎡·135㎡~ 같은 넓은/무한 버킷과 겹침 계산이 어긋나(4평이 18~26평에,
+  // 41평이 60~80평에 걸림) 버킷 단위로 정확히 고르게 한다.
+  const VAL_AREA_OPTS = [
+    ["all", "전체"], ["~60㎡", "~18평"], ["60~85㎡", "18~26평"],
+    ["85~135㎡", "26~41평"], ["135㎡~", "41평↑"],
+  ];
+  let valData = null, valGu = "", valKind = "cheap", valBucket = "all";
 
-  // 선택 평형대에 해당하는 버킷 밸류에이션(전체 범위면 all). 없으면 null.
+  // 선택 버킷의 밸류에이션(전체면 all). 그 버킷 데이터가 없으면 null(제외).
   function valView(it) {
-    let v, b = "all";
-    if (valArea.lo <= 0 && valArea.hi >= 80) {
-      v = it.all;
-    } else {
-      const lo = valArea.lo * VAL_M2, hi = valArea.hi * VAL_M2;
-      let best = null, bestOv = 0, bestB = null;
-      for (const [bl, blo, bhi] of VAL_BUCKETS) {
-        const x = it.areas[bl];
-        if (!x) continue;
-        const ov = Math.min(hi, bhi) - Math.max(lo, blo);
-        if (ov > bestOv) { bestOv = ov; best = x; bestB = bl; }
-      }
-      v = bestOv > 0 ? best : null; b = bestB;
-    }
-    return v ? { id: it.id, apt: it.apt, lawd: it.lawd, b,
+    const v = valBucket === "all" ? it.all : it.areas[valBucket];
+    return v ? { id: it.id, apt: it.apt, lawd: it.lawd, b: valBucket,
                  pos: v.pos, vp: v.vp, jr: v.jr, ppy: v.ppy, m: v.m } : null;
   }
   // 마커에서 평(대표/선택 버킷)·세대수 조회
@@ -498,10 +488,11 @@
     }
     await loadMk();                       // 평·세대수 표기용
     if (!valMkById) { valMkById = {}; mkAll.forEach((m) => { valMkById[m.id] = m; }); }
-    bindValArea();
+    renderValAreaChips();
     renderValAll();
   }
   function renderValAll() {
+    renderValAreaChips();                 // 선택 버킷 활성 상태 반영
     const views = valViews();
     if ($("val-meta")) $("val-meta").textContent =
       `(선택 평형대 ${views.length.toLocaleString()}개 단지)`;
@@ -510,33 +501,14 @@
     renderValScatter(views);
   }
 
-  // 평형대 듀얼레인지 슬라이더
-  function paintValArea() {
-    const { lo, hi } = valArea, pc = (v) => v / 80 * 100;
-    const fill = $("va-fill");
-    if (fill) { fill.style.left = pc(lo) + "%"; fill.style.width = (pc(hi) - pc(lo)) + "%"; }
-    const val = $("va-val");
-    if (val) val.textContent = (lo <= 0 && hi >= 80) ? "전체"
-      : `${lo}평 ~ ${hi}평${hi >= 80 ? "↑" : ""}`;
-  }
-  function bindValArea() {
-    const lo = $("va-lo"), hi = $("va-hi");
-    if (!lo || lo._bound) { paintValArea(); return; }
-    lo._bound = true;
-    $("va-ticks").innerHTML = [[0, "0"], [20, "20"], [40, "40"], [60, "60"], [80, "80+"]]
-      .map(([v, t]) => { const p = v / 80 * 100, tx = p <= 0 ? "0" : p >= 100 ? "-100%" : "-50%";
-        return `<span style="left:${p}%;transform:translateX(${tx})">${t}</span>`; }).join("");
-    const upd = (commit) => {
-      let a = +lo.value, b = +hi.value;
-      if (a > b) { if (document.activeElement === lo) { b = a; hi.value = b; } else { a = b; lo.value = a; } }
-      valArea = { lo: a, hi: b }; paintValArea();
-      if (commit) renderValAll();
-    };
-    lo.addEventListener("input", () => upd(false));
-    hi.addEventListener("input", () => upd(false));
-    lo.addEventListener("change", () => upd(true));
-    hi.addEventListener("change", () => upd(true));
-    paintValArea();
+  // 평형대(전용면적 버킷) 선택 칩
+  function renderValAreaChips() {
+    const wrap = $("val-area-chips");
+    if (!wrap) return;
+    wrap.innerHTML = VAL_AREA_OPTS.map(([k, label]) =>
+      `<button class="d-chip${valBucket === k ? " on" : ""}" data-bucket="${k}">${label}</button>`).join("");
+    wrap.querySelectorAll("[data-bucket]").forEach((b) =>
+      b.addEventListener("click", () => { valBucket = b.dataset.bucket; renderValAll(); }));
   }
 
   const VAL_COLORS = ["#059669", "#65a30d", "#d97706", "#ea580c", "#ef4444"];
