@@ -525,6 +525,13 @@ table.rank-table tbody tr[data-id]:hover { background: var(--accent-soft); }
 .cmp-table .cmp-head:hover { color: var(--accent); }
 .cmp-table .cmp-head i { width: 8px; height: 8px; border-radius: 50%;
   display: inline-block; margin-right: 5px; }
+/* 지도 푯말 드래그 → 단지 비교 드롭 */
+.page-section.cmp-drop {
+  outline: 2px dashed var(--accent); outline-offset: -5px;
+  background: var(--accent-soft);
+}
+.price-bubble[draggable] { cursor: grab; }
+.price-bubble.dragging { opacity: .4; }
 
 /* 밸류에이션 평형대 슬라이더(필터 슬라이더 스타일 재사용) */
 .val-area { margin-bottom: 14px; }

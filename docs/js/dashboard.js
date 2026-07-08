@@ -649,6 +649,25 @@
     $("cmp-clear").addEventListener("click", () => {
       cmpIds = []; saveCmp(); renderCmpBody();
     });
+    // 지도 가격 푯말 드래그 → 이 섹션에 드롭하면 비교 추가
+    const dz = inp.closest("section");
+    if (dz) {
+      dz.addEventListener("dragover", (e) => {
+        if ((e.dataTransfer.types || []).indexOf("text/plain") >= 0) {
+          e.preventDefault();
+          e.dataTransfer.dropEffect = "copy";
+          dz.classList.add("cmp-drop");
+        }
+      });
+      dz.addEventListener("dragleave", (e) => {
+        if (!dz.contains(e.relatedTarget)) dz.classList.remove("cmp-drop");
+      });
+      dz.addEventListener("drop", (e) => {
+        const d = e.dataTransfer.getData("text/plain");
+        dz.classList.remove("cmp-drop");
+        if (d && d.indexOf("cmp:") === 0) { e.preventDefault(); addCmp(+d.slice(4)); }
+      });
+    }
   }
 
   function addCmp(id) {

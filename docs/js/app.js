@@ -245,6 +245,14 @@
       openComplex(mk);
       renderMarkers();
     });
+    // 가격 푯말을 '매수 후보 찾기' 단지 비교로 드래그해 추가
+    el.draggable = true;
+    el.addEventListener("dragstart", (e) => {
+      e.dataTransfer.setData("text/plain", "cmp:" + mk.id);
+      e.dataTransfer.effectAllowed = "copy";
+      el.classList.add("dragging");
+    });
+    el.addEventListener("dragend", () => el.classList.remove("dragging"));
     const ov = new kakao.maps.CustomOverlay({
       position: new kakao.maps.LatLng(mk.lat, mk.lon),
       content: el, yAnchor: 1, clickable: true,
