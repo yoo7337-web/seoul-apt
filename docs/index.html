@@ -16,6 +16,7 @@
   <header class="float-bar">
     <div class="brand-chip"><span class="logo">🏙️</span><b>서울아파트</b></div>
     <button id="btn-dashboard" class="chip-btn nav-link">📊 대시보드</button>
+    <button id="btn-buy" class="chip-btn nav-link">🎯 매수후보</button>
     <div class="search-box">
       <span class="s-icon">🔍</span>
       <input id="search-input" type="search" placeholder="단지명 검색" autocomplete="off">
@@ -75,36 +76,6 @@
       </div>
     </section>
     <section class="page-section">
-      <h2>밸류에이션 종합 <span id="val-meta" style="font-weight:400;font-size:12px;color:var(--muted)"></span></h2>
-      <div class="desc">단지별 5년 평단가 위치(0%=5년저점, 100%=5년고점) — 평형대·구 선택 시 아래 전체 갱신</div>
-      <div class="val-area" id="val-area">
-        <div class="fs-head"><span class="fs-label">평형대</span><span class="fs-val" id="va-val">전체</span></div>
-        <div class="range"><div class="rtrack"></div><div class="rfill" id="va-fill"></div>
-          <input type="range" id="va-lo" min="0" max="80" step="1" value="0">
-          <input type="range" id="va-hi" min="0" max="80" step="1" value="80">
-        </div>
-        <div class="range-ticks" id="va-ticks"></div>
-      </div>
-      <div id="val-grid" class="phase-grid"></div>
-      <div class="chip-row" id="val-chips" style="margin-top:14px"></div>
-      <div class="table-scroll" id="val-list-wrap"></div>
-      <div class="desc" style="margin-top:14px">산점도: 좌상=저평가+전세가율 높음(기회) · 우하=고점근접+전세 낮음(주의) · 점 클릭=지도 이동 <span id="val-scatter-note" style="color:var(--muted)"></span></div>
-      <div class="chart-tall"><canvas id="val-scatter"></canvas></div>
-    </section>
-    <section class="page-section">
-      <h2>단지 비교 <span id="cmp-meta" style="font-weight:400;font-size:12px;color:var(--muted)">(최대 5개)</span></h2>
-      <div class="desc">단지명 검색으로 추가 — 평단가 추이 중첩 + 스펙 비교 · 열 헤더 클릭=지도</div>
-      <div class="cmp-bar">
-        <input id="cmp-search" type="search" list="cmp-datalist" placeholder="단지명 입력 후 선택" autocomplete="off">
-        <datalist id="cmp-datalist"></datalist>
-        <button id="cmp-load-fav" class="d-chip">★ 관심단지 불러오기</button>
-        <button id="cmp-clear" class="d-chip">비우기</button>
-      </div>
-      <div class="chip-row" id="cmp-chips"></div>
-      <div class="chart-tall"><canvas id="cmp-chart"></canvas></div>
-      <div class="table-scroll" id="cmp-table-wrap"></div>
-    </section>
-    <section class="page-section">
       <h2>구별 평단가 랭킹</h2>
       <div class="desc" id="rank-desc">만원/평</div>
       <div class="table-scroll" id="rank-table-wrap"></div>
@@ -149,6 +120,44 @@
       <div class="table-scroll" id="subs-cmpet-wrap"></div>
     </section>
   </aside>
+
+  <!-- 매수 후보 찾기 패널(밸류에이션 + 단지 비교) - 대시보드와 같은 슬롯 공유 -->
+  <aside id="buy-panel" class="dash-panel hidden">
+    <div class="dash-head">
+      <h1>🎯 매수 후보 찾기</h1>
+      <button id="buy-close" class="dash-close" title="닫기">✕</button>
+    </div>
+    <section class="page-section">
+      <h2>밸류에이션 종합 <span id="val-meta" style="font-weight:400;font-size:12px;color:var(--muted)"></span></h2>
+      <div class="desc">단지별 5년 평단가 위치(0%=5년저점, 100%=5년고점) — 평형대·구 선택 시 아래 전체 갱신</div>
+      <div class="val-area" id="val-area">
+        <div class="fs-head"><span class="fs-label">평형대</span><span class="fs-val" id="va-val">전체</span></div>
+        <div class="range"><div class="rtrack"></div><div class="rfill" id="va-fill"></div>
+          <input type="range" id="va-lo" min="0" max="80" step="1" value="0">
+          <input type="range" id="va-hi" min="0" max="80" step="1" value="80">
+        </div>
+        <div class="range-ticks" id="va-ticks"></div>
+      </div>
+      <div id="val-grid" class="phase-grid"></div>
+      <div class="chip-row" id="val-chips" style="margin-top:14px"></div>
+      <div class="table-scroll" id="val-list-wrap"></div>
+      <div class="desc" style="margin-top:14px">산점도: 좌상=저평가+전세가율 높음(기회) · 우하=고점근접+전세 낮음(주의) · 점 클릭=지도 이동 <span id="val-scatter-note" style="color:var(--muted)"></span></div>
+      <div class="chart-tall"><canvas id="val-scatter"></canvas></div>
+    </section>
+    <section class="page-section">
+      <h2>단지 비교 <span id="cmp-meta" style="font-weight:400;font-size:12px;color:var(--muted)">(최대 5개)</span></h2>
+      <div class="desc">단지명 검색으로 추가 — 평단가 추이 중첩 + 스펙 비교 · 열 헤더 클릭=지도</div>
+      <div class="cmp-bar">
+        <input id="cmp-search" type="search" list="cmp-datalist" placeholder="단지명 입력 후 선택" autocomplete="off">
+        <datalist id="cmp-datalist"></datalist>
+        <button id="cmp-load-fav" class="d-chip">★ 관심단지 불러오기</button>
+        <button id="cmp-clear" class="d-chip">비우기</button>
+      </div>
+      <div class="chip-row" id="cmp-chips"></div>
+      <div class="chart-tall"><canvas id="cmp-chart"></canvas></div>
+      <div class="table-scroll" id="cmp-table-wrap"></div>
+    </section>
+  </aside>
   <div id="dash-resizer" class="dash-resizer hidden" title="드래그해서 너비 조절"></div>
 
   <!-- 필터 패널(오른쪽 분할, 슬라이더는 JS 생성) -->
@@ -188,7 +197,7 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
   <script src="js/charts.js?v=7"></script>
-  <script src="js/dashboard.js?v=19"></script>
-  <script src="js/app.js?v=29"></script>
+  <script src="js/dashboard.js?v=20"></script>
+  <script src="js/app.js?v=30"></script>
 </body>
 </html>

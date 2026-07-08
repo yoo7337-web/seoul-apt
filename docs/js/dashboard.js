@@ -38,8 +38,14 @@
       const ok = await init();
       if (ok) setTimeout(() => {
         renderTrend(); renderPeakShare(); renderRebChart();  // renderRebChart가 시장심리도 그림
-        if (valData) renderValScatter();   // 분할패널 열릴 때 산점도 크기 재계산
-        if (mkAll && cmpIds.length) renderCmpBody();   // 비교 차트 크기 재계산
+      }, 60);
+    },
+    // 매수 후보 패널(밸류에이션 + 단지 비교) 열릴 때 차트 크기 재계산
+    openBuy: async () => {
+      const ok = await init();
+      if (ok) setTimeout(() => {
+        if (valData) renderValScatter();
+        if (mkAll && cmpIds.length) renderCmpBody();
       }, 60);
     },
     refresh: () => { if (inited) {                       // 관심구 별표 갱신

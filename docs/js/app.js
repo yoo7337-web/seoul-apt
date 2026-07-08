@@ -119,6 +119,8 @@
     $("btn-subs").addEventListener("click", toggleSubs);
     $("btn-dashboard").addEventListener("click", toggleDashboard);
     $("dash-close").addEventListener("click", () => toggleDashboard(false));
+    $("btn-buy").addEventListener("click", toggleBuy);
+    $("buy-close").addEventListener("click", () => toggleBuy(false));
     bindDashResizer();
     bindFilterUI();
     $("panel-close").addEventListener("click", () => $("panel").classList.add("hidden"));
@@ -471,16 +473,25 @@
   }
 
   // 대시보드 분할 패널 토글 (지도는 오른쪽으로 밀려 함께 표시)
-  function toggleDashboard(force) {
-    const open = typeof force === "boolean"
-      ? force : !document.body.classList.contains("dash-open");
-    document.body.classList.toggle("dash-open", open);
-    $("dash-panel").classList.toggle("hidden", !open);
-    $("dash-resizer").classList.toggle("hidden", !open);
-    if (open && window.SeoulDash) SeoulDash.open();
-    // 지도 컨테이너 크기가 바뀌었으니 카카오 지도 재계산
+  // 대시보드·매수후보 패널은 같은 왼쪽 슬롯을 공유(하나만 열림)
+  function togglePanel(which, force) {
+    const panel = $(which + "-panel");
+    const willOpen = typeof force === "boolean" ? force
+      : panel.classList.contains("hidden");
+    const other = which === "dash" ? "buy" : "dash";
+    $(other + "-panel").classList.add("hidden");   // 반대편 닫기
+    panel.classList.toggle("hidden", !willOpen);
+    const anyOpen = !$("dash-panel").classList.contains("hidden")
+      || !$("buy-panel").classList.contains("hidden");
+    document.body.classList.toggle("dash-open", anyOpen);   // 맵 shift 공유
+    $("dash-resizer").classList.toggle("hidden", !anyOpen);
+    if (willOpen && window.SeoulDash) {
+      which === "dash" ? SeoulDash.open() : SeoulDash.openBuy();
+    }
     setTimeout(() => { if (state.map) state.map.relayout(); }, 80);
   }
+  function toggleDashboard(force) { togglePanel("dash", force); }
+  function toggleBuy(force) { togglePanel("buy", force); }
 
   // 대시보드 패널 너비를 드래그로 조절
   const DASH_MIN = 320;
