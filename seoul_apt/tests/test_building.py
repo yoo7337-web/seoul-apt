@@ -34,6 +34,51 @@ def test_migrate_and_set_building():
     conn.close()
 
 
+def test_resolve_raises_on_persistent_network_error(monkeypatch):
+    """주소검색이 끝내 실패하면(네트워크 등) None 이 아니라 예외를 던져야
+    한다 - '진짜 매칭 안 됨'과 구분해 호출부가 재시도할 수 있게(사고 이력)."""
+    import requests
+    monkeypatch.setattr(building.time, "sleep", lambda *_: None)   # 재시도 대기 생략
+    client = building.BuildingClient("dk", "kk")
+
+    class _FakeSession:
+        def get(self, *a, **kw):
+            raise requests.ConnectionError("boom")
+    client.session = _FakeSession()
+    try:
+        client.resolve("강남구", "대치동", "316")
+        assert False, "BuildingAPIError 를 던졌어야 함"
+    except building.BuildingAPIError:
+        pass
+
+
+def test_collect_buildings_does_not_permalock_on_transient_failure(monkeypatch):
+    """일시적 오류(BuildingAPIError)가 난 단지는 bldg_fetched_at 을 채우면
+    안 된다 - 채우면 다음 실행에서도 영원히 재조회 대상에서 빠진다(사고 이력
+    회귀 테스트). 정상 실패(매칭 없음, None)는 계속 기록해 재조회를 막는다."""
+    conn = db.connect(":memory:")
+    ok_cid = db.upsert_complex(conn, "11680", "대치동", "정상단지", 2000, "1")
+    fail_cid = db.upsert_complex(conn, "11680", "대치동", "실패단지", 2000, "2")
+    conn.commit()
+
+    client = building.BuildingClient("dk", "kk")
+
+    def fake_fetch(gu, umd, jibun):
+        if jibun == "2":
+            raise building.BuildingAPIError("네트워크 오류")
+        return None   # 정상적으로 "매칭 안 됨"
+    monkeypatch.setattr(client, "fetch", fake_fetch)
+    monkeypatch.setattr(building, "BuildingClient", lambda dk, kk: client)
+
+    stats = building.collect_buildings(conn, "dk", "kk", "11680")
+    assert stats["failed"] == 1 and stats["tried"] == 1
+
+    remaining = {r["complex_id"] for r in db.complexes_without_building(conn, "11680")}
+    assert fail_cid in remaining        # 재시도 대상으로 남아있어야 함
+    assert ok_cid not in remaining      # 정상 처리는 대상에서 빠짐
+    conn.close()
+
+
 def test_fetch_combines_recap_and_title(monkeypatch):
     """총괄표제부에 없는 값을 표제부(동별)로 폴백."""
     client = building.BuildingClient("dk", "kk")

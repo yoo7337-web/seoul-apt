@@ -30,6 +30,9 @@ def cmd_collect(conn, args):
     stats = collect.run_daily(conn, key, lookback=args.months)
     print(f"[collect] 매매 {stats['sale']} / 전월세 {stats['rent']} "
           f"(월: {', '.join(stats['months'])})")
+    if stats["failed"]:
+        print(f"[collect] 실패(다음 실행에 자동 재시도) {len(stats['failed'])}건: "
+              f"{', '.join(stats['failed'])}")
 
 
 def cmd_backfill(conn, args):
@@ -37,6 +40,10 @@ def cmd_backfill(conn, args):
     stats = collect.run_backfill(conn, key, args.from_ym, args.to_ym, args.force)
     print(f"[backfill] 매매 {stats['sale']} / 전월세 {stats['rent']} "
           f"/ 건너뜀 {stats['skipped']} ({stats['start']}~{stats['end']})")
+    if stats["failed"]:
+        print(f"[backfill] 실패(다음 실행에 자동 재시도) {len(stats['failed'])}건: "
+              f"{', '.join(stats['failed'][:10])}"
+              f"{' ...' if len(stats['failed']) > 10 else ''}")
 
 
 def cmd_geocode(conn, args):
@@ -61,7 +68,8 @@ def cmd_building(conn, args):
         return
     stats = building.collect_buildings(conn, data_key, kakao_key,
                                        args.district, args.limit)
-    print(f"[building] 조회 {stats['tried']} / 정보확보 {stats['filled']}")
+    print(f"[building] 조회 {stats['tried']} / 정보확보 {stats['filled']} "
+          f"/ 실패(재시도예정) {stats['failed']}")
 
 
 def cmd_subscription(conn, args):

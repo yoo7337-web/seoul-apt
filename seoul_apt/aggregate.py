@@ -229,6 +229,21 @@ def _matched_jeonse_ratio(sale_rows, jeonse_rows, rep_area, since: str = None,
     return round(jm / sm * 100, 1) if sm and jm else None
 
 
+def _matched_peak(rows, area, tol: float = 0.12) -> float | None:
+    """비슷한 크기(±tol) 거래 중 최고가(신고가 판정용). None이면 매칭 표본 없음.
+
+    전 평형 혼합 최고가를 쓰면 대형 평형의 역대가가 소형 평형의 진짜 신고가를
+    가려 is_peak·drop_pct·신고가 비중이 왜곡된다(사고 이력) — 거래와 비슷한
+    크기끼리만 비교한다.
+    """
+    if not area:
+        return None
+    lo, hi = area * (1 - tol), area * (1 + tol)
+    amounts = [r["amount_manwon"] for r in rows
+               if r["exclu_area"] and lo <= r["exclu_area"] <= hi]
+    return max(amounts) if amounts else None
+
+
 def complex_list(conn, lawd_cd: str) -> list[dict]:
     """구의 단지 목록 - 좌표·대표가·평단가·전세가율·공시가격."""
     complexes = conn.execute(
@@ -258,9 +273,13 @@ def complex_list(conn, lawd_cd: str) -> list[dict]:
         areas = [r["exclu_area"] for r in recent_sales if r["exclu_area"]]
         area_min = round(min(areas), 1) if areas else None
         area_max = round(max(areas), 1) if areas else None
-        # 역대 최고가(신고가 하이라이트용)
-        peak = max((r["amount_manwon"] for r in recent_sales), default=None)
+        # 역대 최고가(신고가 하이라이트용) - 최근 거래와 비슷한 크기(±12%)로 비교,
+        # 매칭 표본이 없으면(면적정보 없음 등) 전 평형 혼합 최고가로 폴백
         last_amount = recent_sales[0]["amount_manwon"] if recent_sales else None
+        last_area = recent_sales[0]["exclu_area"] if recent_sales else None
+        peak = _matched_peak(recent_sales, last_area) if last_area else None
+        if peak is None:
+            peak = max((r["amount_manwon"] for r in recent_sales), default=None)
         # 최근 1년 거래 건수(활발도 필터) + 고점대비 하락률(%)
         # 고점대비는 '최근 1건 거래' 기준 → 신고가(is_peak)면 0%가 되어 하락 필터에서 제외
         n1y = sum(1 for r in recent_sales if r["deal_date"] >= year_ago)
@@ -470,11 +489,13 @@ def complex_detail(conn, complex_id: int) -> dict:
 
 
 def district_peak_share(conn, days: int = 90) -> list[dict]:
-    """구별 최근 N일 매매 중 신고가(단지 역대 최고가) 거래 비중(%).
+    """구별 최근 N일 매매 중 신고가(비슷한 크기 ±12% 단지 역대 최고가) 거래 비중(%).
 
-    어느 지역이 최근에 고점을 갱신하며 오르는지 보는 모멘텀 지표.
-    기준일은 DB 최신 계약일(수집 지연 무관). 표본 노이즈를 줄이기 위해
-    누적 거래 3건 미만 단지의 거래는 신고가로 치지 않는다.
+    어느 지역이 최근에 고점을 갱신하며 오르는지 보는 모멘텀 지표. 신고가를
+    단지 내 전 평형 혼합 최고가로 판정하면 대형 평형의 역대가가 소형 평형의
+    진짜 신고가를 가려 과소산정된다(사고 이력) — 거래와 비슷한 크기(±12%)의
+    거래끼리만 비교한다. 기준일은 DB 최신 계약일(수집 지연 무관). 표본 노이즈를
+    줄이기 위해 같은 크기 누적 거래 3건 미만이면 신고가로 치지 않는다.
     """
     anchor = conn.execute(
         "SELECT MAX(deal_date) AS d FROM sale_txn WHERE canceled=0").fetchone()["d"]
@@ -483,28 +504,42 @@ def district_peak_share(conn, days: int = 90) -> list[dict]:
     y, m, d = (int(x) for x in anchor.split("-"))
     cutoff = (date(y, m, d) - timedelta(days=days)).isoformat()
 
-    rows = conn.execute(
-        """SELECT c.lawd_cd,
-                  COUNT(*) AS total,
-                  SUM(CASE WHEN s.amount_manwon >= cm.mx AND cm.n >= 3
-                      THEN 1 ELSE 0 END) AS peaks
-           FROM sale_txn s
-           JOIN complex c ON s.complex_id = c.complex_id
-           JOIN (SELECT complex_id, MAX(amount_manwon) AS mx, COUNT(*) AS n
-                 FROM sale_txn WHERE canceled=0 GROUP BY complex_id) cm
-             ON cm.complex_id = s.complex_id
-           WHERE s.canceled=0 AND s.deal_date >= ?
-           GROUP BY c.lawd_cd""", (cutoff,)).fetchall()
+    recent = conn.execute(
+        """SELECT s.complex_id, s.exclu_area, s.amount_manwon, c.lawd_cd
+           FROM sale_txn s JOIN complex c ON s.complex_id = c.complex_id
+           WHERE s.canceled=0 AND s.deal_date >= ?""", (cutoff,)).fetchall()
+    if not recent:
+        return []
+
+    # 해당 단지들의 전체(역대) 매매를 한 번에 가져와 크기 매칭은 파이썬에서 수행
+    cids = sorted({r["complex_id"] for r in recent})
+    all_by_cid = defaultdict(list)
+    q = ("SELECT complex_id, exclu_area, amount_manwon FROM sale_txn "
+         "WHERE canceled=0 AND complex_id IN (%s)" % ",".join("?" * len(cids)))
+    for r in conn.execute(q, cids):
+        all_by_cid[r["complex_id"]].append(r)
+
+    totals, peaks = defaultdict(int), defaultdict(int)
+    for r in recent:
+        totals[r["lawd_cd"]] += 1
+        area = r["exclu_area"]
+        if not area:
+            continue
+        lo, hi = area * 0.88, area * 1.12
+        same_size = [x["amount_manwon"] for x in all_by_cid[r["complex_id"]]
+                     if x["exclu_area"] and lo <= x["exclu_area"] <= hi]
+        if len(same_size) >= 3 and r["amount_manwon"] >= max(same_size):
+            peaks[r["lawd_cd"]] += 1
 
     out = []
-    for r in rows:
-        total, peaks = r["total"], r["peaks"] or 0
+    for lawd_cd, total in totals.items():
+        p = peaks.get(lawd_cd, 0)
         out.append({
-            "lawd_cd": r["lawd_cd"],
-            "name": config.SEOUL_DISTRICTS.get(r["lawd_cd"], r["lawd_cd"]),
+            "lawd_cd": lawd_cd,
+            "name": config.SEOUL_DISTRICTS.get(lawd_cd, lawd_cd),
             "total": total,
-            "peaks": peaks,
-            "share": round(peaks / total * 100, 1) if total else 0.0,
+            "peaks": p,
+            "share": round(p / total * 100, 1) if total else 0.0,
         })
     out.sort(key=lambda x: -x["share"])
     return out

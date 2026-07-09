@@ -7,7 +7,7 @@
 from datetime import datetime, timezone, timedelta
 
 from . import config, db
-from .molit_api import MolitClient
+from .molit_api import MolitClient, MolitAPIError
 
 KST = timezone(timedelta(hours=9))
 
@@ -75,14 +75,26 @@ def collect_month(conn, client: MolitClient, lawd_cd: str, ymd: str) -> tuple[in
 
 
 def run_daily(conn, service_key: str, lookback: int | None = None) -> dict:
-    """일일 증분 수집 - 최근 N개월 재수집."""
+    """일일 증분 수집 - 최근 N개월 재수집.
+
+    한 구·월의 일시적 API 오류(MolitAPIError, 재시도 소진)가 전체 배치를
+    중단시키면 안 된다(사고 이력: 이 예외는 RuntimeError 가 아니라 cli.py 의
+    except 에 안 걸려 그대로 크래시 → 나머지 구가 그날 통째로 미수집됨).
+    실패한 (구,월)은 건너뛰고 계속 진행하며, 다음 실행 시 fetch_log 기준으로
+    자동 재시도된다(백필과 같은 원리).
+    """
     client = MolitClient(service_key)
     lookback = lookback or config.DAILY_LOOKBACK_MONTHS
     yms = _recent_yms(lookback)
-    stats = {"months": yms, "sale": 0, "rent": 0}
+    stats = {"months": yms, "sale": 0, "rent": 0, "failed": []}
     for lawd_cd, name in config.SEOUL_DISTRICTS.items():
         for ymd in yms:
-            s, r = collect_month(conn, client, lawd_cd, ymd)
+            try:
+                s, r = collect_month(conn, client, lawd_cd, ymd)
+            except MolitAPIError as e:
+                print(f"[daily] {name}({lawd_cd}) {ymd} 실패(건너뜀): {e}")
+                stats["failed"].append(f"{lawd_cd}:{ymd}")
+                continue
             stats["sale"] += s
             stats["rent"] += r
             print(f"[daily] {name}({lawd_cd}) {ymd}: 매매 {s}, 전월세 {r}")
@@ -91,18 +103,29 @@ def run_daily(conn, service_key: str, lookback: int | None = None) -> dict:
 
 def run_backfill(conn, service_key: str, start_ym: str | None = None,
                  end_ym: str | None = None, force: bool = False) -> dict:
-    """백필 - 시작월~끝월 순회, fetch_log 로 재개."""
+    """백필 - 시작월~끝월 순회, fetch_log 로 재개.
+
+    일시적 API 오류로 한 (구,월)이 실패해도 나머지 순회를 계속한다(위 run_daily
+    와 동일한 이유) - 실패분은 fetch_log 에 기록되지 않으므로 다음 실행 시
+    자동 재시도된다.
+    """
     client = MolitClient(service_key)
     start_ym = start_ym or config.BACKFILL_START_YM
     end_ym = end_ym or _now_kst().strftime("%Y%m")
-    stats = {"start": start_ym, "end": end_ym, "sale": 0, "rent": 0, "skipped": 0}
+    stats = {"start": start_ym, "end": end_ym, "sale": 0, "rent": 0,
+             "skipped": 0, "failed": []}
     for lawd_cd, name in config.SEOUL_DISTRICTS.items():
         for ymd in _ym_iter(start_ym, end_ym):
             if not force and db.already_fetched(conn, lawd_cd, ymd, "sale") \
                     and db.already_fetched(conn, lawd_cd, ymd, "rent"):
                 stats["skipped"] += 1
                 continue
-            s, r = collect_month(conn, client, lawd_cd, ymd)
+            try:
+                s, r = collect_month(conn, client, lawd_cd, ymd)
+            except MolitAPIError as e:
+                print(f"[backfill] {name}({lawd_cd}) {ymd} 실패(건너뜀): {e}")
+                stats["failed"].append(f"{lawd_cd}:{ymd}")
+                continue
             stats["sale"] += s
             stats["rent"] += r
             print(f"[backfill] {name}({lawd_cd}) {ymd}: 매매 {s}, 전월세 {r}")

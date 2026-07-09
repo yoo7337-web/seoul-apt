@@ -86,12 +86,25 @@ def match_watch(row, watch: dict) -> bool:
     return True
 
 
+PEAK_AREA_TOL = 0.12   # 신고가 판정 시 비교할 크기 허용오차(±12%)
+
+
 def is_new_peak(conn, row) -> bool:
-    """해당 거래가 그 단지의 역대 최고가(신고가)인지. 과거 거래가 없으면 False."""
+    """해당 거래가 '비슷한 크기(±12%)' 내 역대 최고가(신고가)인지.
+
+    전 평형 혼합 최고가로 비교하면 대형 평형의 역대가가 소형 평형의 진짜
+    신고가를 가려 알림이 누락된다(사고 이력) - 거래와 비슷한 크기끼리만 비교.
+    과거 거래가 없으면 False.
+    """
+    area = row["exclu_area"]
+    if not area:
+        return False
+    lo, hi = area * (1 - PEAK_AREA_TOL), area * (1 + PEAK_AREA_TOL)
     prev = conn.execute(
         """SELECT MAX(amount_manwon) AS m, COUNT(*) AS n FROM sale_txn
-           WHERE complex_id=? AND canceled=0 AND id != ?""",
-        (row["complex_id"], row["id"])).fetchone()
+           WHERE complex_id=? AND canceled=0 AND id != ?
+             AND exclu_area BETWEEN ? AND ?""",
+        (row["complex_id"], row["id"], lo, hi)).fetchone()
     if not prev["n"]:
         return False
     return row["amount_manwon"] > prev["m"]

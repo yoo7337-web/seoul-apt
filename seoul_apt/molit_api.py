@@ -102,7 +102,14 @@ class MolitClient:
             raise MolitAPIError(f"[{reason}] {auth_msg}")
 
     def _paged_items(self, endpoint: str, lawd_cd: str, deal_ymd: str):
-        """페이지네이션하며 <item> 엘리먼트를 순회 yield."""
+        """페이지네이션하며 <item> 엘리먼트를 순회 yield.
+
+        totalCount 파싱 실패를 0으로 대체하면(과거 버그) 첫 페이지가 꽉 찬
+        경우에도 'seen(1000) >= total(0)'이 참이 되어 즉시 중단, 1000건
+        초과분이 조용히 유실된다(사고 이력). 페이지 크기(len(items) <
+        NUM_OF_ROWS)만으로 종료를 판단하고, total 은 파싱됐을 때만 보조적
+        조기종료에 쓴다.
+        """
         page = 1
         total = None
         seen = 0
@@ -114,14 +121,16 @@ class MolitClient:
                 "numOfRows": config.NUM_OF_ROWS,
             })
             if total is None:
-                total = _to_int(root.findtext(".//totalCount")) or 0
+                total = _to_int(root.findtext(".//totalCount"))
             items = root.findall(".//item")
             if not items:
                 break
             for item in items:
                 yield item
                 seen += 1
-            if seen >= total or len(items) < config.NUM_OF_ROWS:
+            if len(items) < config.NUM_OF_ROWS:
+                break
+            if total is not None and seen >= total:
                 break
             page += 1
             time.sleep(config.REQUEST_SLEEP)

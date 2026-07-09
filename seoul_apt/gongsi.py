@@ -92,7 +92,7 @@ def _ingest_frame(conn, df: pd.DataFrame, default_year: int | None) -> int:
     inserted = 0
     for _, r in df.iterrows():
         sigungu = str(r.get(c_sigungu, "")).strip()
-        gu = next((g for g in NAME_TO_LAWD if g in sigungu), None)
+        gu = _match_gu(sigungu)
         if not gu:
             continue
         lawd_cd = NAME_TO_LAWD[gu]
@@ -114,6 +114,23 @@ def _ingest_frame(conn, df: pd.DataFrame, default_year: int | None) -> int:
         db.insert_gongsi(conn, complex_id, year, area, price, conf)
         inserted += 1
     return inserted
+
+
+def _match_gu(sigungu: str) -> str | None:
+    """시군구 문자열에서 서울 자치구명을 추출.
+
+    R-ONE 지역필터와 같은 부분일치(in) 버그를 방지한다: '중구' 등이 substring
+    으로 '인천광역시 중구'·'대구광역시 중구'에도 매칭돼 타시도 공시가격이 서울
+    단지에 잘못 배정되는 사고 이력. '서울'이 포함된 행만 대상으로 하고,
+    자치구명은 공백/쉼표 토큰 단위로 정확히 일치할 때만 인정한다.
+    """
+    if "서울" not in sigungu:
+        return None
+    tokens = sigungu.replace(",", " ").split()
+    for g in NAME_TO_LAWD:
+        if g in tokens:
+            return g
+    return None
 
 
 def _match_complex(conn, lawd_cd, apt_nm, umd):

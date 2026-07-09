@@ -40,6 +40,32 @@ def test_parse_canceled_deal():
     assert {r["deal_gbn"] for r in normal} == {None, "중개거래"}
 
 
+def test_paged_items_no_early_break_on_unparsable_total_count():
+    """totalCount 파싱 실패(0으로 대체되던 과거 버그) 시 첫 페이지가 꽉 차도
+    즉시 중단돼 초과분이 유실되면 안 된다(사고 이력 회귀 테스트) - 페이지가
+    NUM_OF_ROWS 미만으로 돌아올 때까지 계속 조회해야 한다."""
+    def make_root(n_items, bad_total=False):
+        items = "".join("<item><x>1</x></item>" for _ in range(n_items))
+        total = "<totalCount>abc</totalCount>" if bad_total else ""
+        return ET.fromstring(f"<response><body>{total}{items}</body></response>")
+
+    client = MolitClient("dummy")
+    pages = {
+        1: make_root(config.NUM_OF_ROWS, bad_total=True),  # 꽉 찬 페이지 + 파싱불가 총계
+        2: make_root(5),                                    # 마지막 페이지(미달)
+    }
+    calls = []
+
+    def fake_get_xml(ep, params):
+        calls.append(params["pageNo"])
+        return pages[params["pageNo"]]
+    client._get_xml = fake_get_xml
+
+    items = list(client._paged_items("http://x", "11680", "202601"))
+    assert calls == [1, 2]                          # 2페이지 모두 조회돼야 함
+    assert len(items) == config.NUM_OF_ROWS + 5      # 유실 없이 전부 수집
+
+
 def test_cancel_date_formats():
     from seoul_apt.molit_api import _cancel_date
     assert _cancel_date("25.01.03") == "2025-01-03"
@@ -295,6 +321,46 @@ def test_complex_list_filter_fields_and_peak_share():
     assert gang["total"] == 3                     # 최근 90일 거래 3건
     assert gang["peaks"] == 1                     # 그중 신고가 1건
     assert gang["share"] == round(1 / 3 * 100, 1)
+    conn.close()
+
+
+def test_peak_matched_by_size():
+    """신고가 판정은 비슷한 크기(±12%)끼리 비교 - 대형 평형 역대가가
+    소형 평형의 진짜 신고가를 가리면 안 된다(사고 이력 회귀 테스트)."""
+    from datetime import date
+    conn = db.connect(":memory:")
+    cid = db.upsert_complex(conn, "11680", "대치동", "은마", 1979, "316")
+    today = date.today().isoformat()
+    # 대형(135㎡) 역대 최고 20억(오래전) - 전 평형 혼합이면 이게 "역대 최고가"로 잡힘
+    db.insert_sale(conn, cid, "2020-01-10", 135.0, 10, 200000)
+    # 소형(59㎡) 과거 8억 → 최근 9억(59㎡ 안에서는 신고가, 20억보다는 훨씬 낮음)
+    db.insert_sale(conn, cid, "2021-01-10", 59.0, 3, 80000)
+    db.insert_sale(conn, cid, today, 59.0, 5, 90000)
+    conn.commit()
+
+    cx = aggregate.complex_list(conn, "11680")[0]
+    assert cx["is_peak"] is True        # 59㎡ 기준으로는 신고가여야 함
+    assert cx["peak_amount"] == 90000    # 135㎡ 20억에 가려지면 안 됨
+    conn.close()
+
+
+def test_district_peak_share_matched_by_size():
+    """구별 신고가 비중도 크기 매칭 - 표본 부족한 크기(대형 1건)는 신고가 판정 제외."""
+    from datetime import date, timedelta
+    conn = db.connect(":memory:")
+    cid = db.upsert_complex(conn, "11680", "대치동", "은마", 1979, "316")
+    anchor = date.today()
+    for i, amt in enumerate([80000, 82000, 85000, 90000]):
+        d = (anchor - timedelta(days=10 * (4 - i))).isoformat()
+        db.insert_sale(conn, cid, d, 59.0, 3 + i, amt)
+    # 대형(135㎡) 1건은 같은 크기 표본<3이라 신고가 판정에서 제외돼야 함
+    db.insert_sale(conn, cid, anchor.isoformat(), 135.0, 20, 500000)
+    conn.commit()
+
+    ps = aggregate.district_peak_share(conn, days=90)
+    gang = next(p for p in ps if p["lawd_cd"] == "11680")
+    assert gang["total"] == 5
+    assert gang["peaks"] == 1   # 59㎡ 마지막 거래(90000)만 그 크기 내 신고가
     conn.close()
 
 

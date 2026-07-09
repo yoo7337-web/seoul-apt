@@ -43,6 +43,21 @@ def test_new_sales_and_peak_detection():
     conn.close()
 
 
+def test_is_new_peak_matched_by_size():
+    """신고가 알림 판정도 비슷한 크기(±12%)끼리 비교 - 대형 평형 역대가에
+    소형 평형 신고가 알림이 가려지면 안 된다(사고 이력 회귀 테스트)."""
+    conn = db.connect(":memory:")
+    cid = db.upsert_complex(conn, "11680", "대치동", "은마", 1979, "316")
+    db.insert_sale(conn, cid, "2020-01-10", 135.0, 10, 200000)  # 대형 역대 20억
+    db.insert_sale(conn, cid, "2021-01-10", 59.0, 3, 80000)     # 소형 과거 8억
+    db.insert_sale(conn, cid, "2026-06-01", 59.0, 5, 90000)     # 소형 신고가 9억
+    conn.commit()
+    rows = notify.new_sales(conn, 0)
+    new_row = next(r for r in rows if r["amount_manwon"] == 90000)
+    assert notify.is_new_peak(conn, new_row) is True   # 20억에 가려지면 안 됨
+    conn.close()
+
+
 def test_watch_swing_detects_jump():
     conn = db.connect(":memory:")
     _seed(conn)
@@ -97,6 +112,34 @@ def test_first_run_baseline(tmp_path, monkeypatch):
     conn.commit()
     rows = notify.new_sales(conn, notify.load_state(state_p)["last_sale_id"])
     assert len(rows) == 1 and rows[0]["amount_manwon"] == 260000
+    conn.close()
+
+
+def test_reco_matched_by_size(tmp_path):
+    """추천 후보의 평단가·전세가율은 비슷한 크기(±12%)로 계산 - 대형 평형이
+    섞여 소형 평형 저평가 판정이 왜곡되면 안 된다(사고 이력 회귀 테스트)."""
+    conn = db.connect(":memory:")
+    cid = db.upsert_complex(conn, "11680", "대치동", "은마", 1979, "316")
+    from datetime import date, timedelta
+    anchor = date.today()
+    # 대형(135㎡) 평단가 매우 높음(㎡당 비쌈) - 5건, 표본 요건 충족용
+    for i in range(5):
+        d = (anchor - timedelta(days=200 + i)).isoformat()
+        db.insert_sale(conn, cid, d, 135.0, 10 + i, 600000)
+    # 소형(59㎡) 최근 거래 1건 - 소형끼리 비교하면 실제로는 비싼(고평가) 거래
+    recent_d = (anchor - timedelta(days=1)).isoformat()
+    db.insert_sale(conn, cid, recent_d, 59.0, 3, 95000)
+    for i in range(4):
+        d = (anchor - timedelta(days=100 + i)).isoformat()
+        db.insert_sale(conn, cid, d, 59.0, 4 + i, 80000)   # 59㎡ 기준시세 8억
+    conn.commit()
+    out = tmp_path / "reco.json"
+    reco.build_candidates(conn, path=out, lawd_cds=["11680"])
+    payload = json.loads(out.read_text(encoding="utf-8"))
+    deal = next((c for c in payload["candidates"] if c["amount_manwon"] == 95000), None)
+    # 전 평형 혼합이면 대형(600000) 때문에 discount가 크게 음수(저평가로 오판)가
+    # 되지만, 59㎡끼리 비교하면 8억 대비 9.5억은 고평가 → 후보(discount<=-5%)가 아니어야 함
+    assert deal is None or deal["discount_pct"] > reco.MIN_DISCOUNT_PCT
     conn.close()
 
 

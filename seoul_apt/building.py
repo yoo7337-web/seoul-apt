@@ -46,6 +46,17 @@ def _apr_date(v) -> str | None:
     return None
 
 
+class BuildingAPIError(Exception):
+    """일시적 오류(네트워크·API 장애 등)로 조회를 완료하지 못함 - 재시도 대상.
+
+    '요청 자체가 실패함'과 '요청은 성공했으나 매칭되는 주소/데이터가 없음'을
+    구분해야 한다(사고 이력): 구분 없이 둘 다 None 으로 뭉치면
+    collect_buildings 가 bldg_fetched_at 을 영구히 채워버려, 일시적 5xx가
+    걸린 시간대에 처리된 단지는 실제로는 정보가 있는데도 다시는 재조회되지
+    않는다.
+    """
+
+
 class BuildingClient:
     def __init__(self, data_key: str, kakao_key: str):
         self.data_key = data_key
@@ -54,12 +65,17 @@ class BuildingClient:
 
     # ── 주소 → 법정동코드/지번 ──────────────────────────────────────────
     def resolve(self, gu: str, umd: str | None, jibun: str | None) -> dict | None:
-        """카카오 주소검색으로 (sigunguCd, bjdongCd, bun, ji, platGb) 반환."""
+        """카카오 주소검색으로 (sigunguCd, bjdongCd, bun, ji, platGb) 반환.
+
+        요청 자체가 끝내 실패하면 BuildingAPIError(재시도 대상). 요청은
+        성공했는데 매칭 주소가 없으면 None(진짜 없음, 재조회 불필요).
+        """
         parts = ["서울", gu]
         if umd:
             parts.append(umd)
         if jibun:
             parts.append(jibun)
+        last_err = None
         for attempt in range(config.MAX_RETRY):
             try:
                 r = self.session.get(
@@ -68,6 +84,7 @@ class BuildingClient:
                 if r.status_code == 429:
                     time.sleep(2 ** attempt)
                     continue
+                r.raise_for_status()
                 docs = r.json().get("documents") or []
                 if not docs:
                     return None
@@ -81,17 +98,21 @@ class BuildingClient:
                     "ji": str(a.get("sub_address_no") or "0").zfill(4),
                     "platGb": "1" if a.get("mountain_yn") == "Y" else "0",
                 }
-            except (requests.RequestException, ValueError):
+            except (requests.RequestException, ValueError) as e:
+                last_err = e
                 time.sleep(2 ** attempt)
-        return None
+        raise BuildingAPIError(f"카카오 주소검색 실패: {last_err}")
 
     def _get_items(self, endpoint: str, addr: dict) -> list[dict]:
+        """요청 자체가 끝내 실패하면 BuildingAPIError(재시도 대상). 요청은
+        성공했는데 이 엔드포인트에 데이터가 없으면 []( 폴백 경로로 계속 진행)."""
         params = {
             "serviceKey": self.data_key,
             "sigunguCd": addr["sigunguCd"], "bjdongCd": addr["bjdongCd"],
             "platGbCd": addr["platGb"], "bun": addr["bun"], "ji": addr["ji"],
             "_type": "json", "numOfRows": "50",
         }
+        last_err = None
         for attempt in range(config.MAX_RETRY):
             try:
                 r = self.session.get(endpoint, params=params,
@@ -103,12 +124,15 @@ class BuildingClient:
                 if rows is None:
                     return []
                 return [rows] if isinstance(rows, dict) else list(rows)
-            except (requests.RequestException, ValueError):
+            except (requests.RequestException, ValueError) as e:
+                last_err = e
                 time.sleep(2 ** attempt)
-        return []
+        raise BuildingAPIError(
+            f"건축물대장 조회 실패({endpoint.rsplit('/', 1)[-1]}): {last_err}")
 
     def fetch(self, gu: str, umd: str | None, jibun: str | None) -> dict | None:
-        """단지 부가정보 dict 또는 None. 실패해도 예외 없이 None."""
+        """단지 부가정보 dict, 또는 None(주소가 진짜 매칭 안 됨).
+        일시적 오류는 BuildingAPIError 로 전파한다(재시도 대상, 예외 삼키지 않음)."""
         addr = self.resolve(gu, umd, jibun)
         if not addr:
             return None
@@ -146,17 +170,24 @@ def collect_buildings(conn, data_key: str, kakao_key: str,
     """건축물대장 정보 없는 단지를 조회해 저장. 통계 dict 반환."""
     client = BuildingClient(data_key, kakao_key)
     targets = db.complexes_without_building(conn, lawd_cd, limit)
-    stats = {"tried": 0, "filled": 0}
+    stats = {"tried": 0, "filled": 0, "failed": 0}
     for i, row in enumerate(targets, 1):
         gu = config.SEOUL_DISTRICTS.get(row["lawd_cd"], "")
-        info = client.fetch(gu, row["umd_nm"], row["jibun"])
+        try:
+            info = client.fetch(gu, row["umd_nm"], row["jibun"])
+        except BuildingAPIError as e:
+            # 일시적 오류 - bldg_fetched_at 을 채우지 않아 다음 실행에 재시도됨
+            print(f"[building] {row['apt_nm']} 실패(재시도 예정): {e}")
+            stats["failed"] += 1
+            time.sleep(config.REQUEST_SLEEP)
+            continue
         now = datetime.now(KST).isoformat(timespec="seconds")
         if info:
             db.set_building(conn, row["complex_id"], info["households"],
                             info["far"], info["bcr"], info["approval_date"], now)
             stats["filled"] += 1
         else:
-            # 조회했으나 결과 없음 - 재조회 방지 위해 시각만 기록
+            # 조회는 성공했으나 매칭되는 주소/데이터가 없음 - 재조회 방지 위해 시각만 기록
             db.set_building(conn, row["complex_id"], None, None, None, None, now)
         # 느린 API 대기 중 쓰기 락을 쥐지 않도록 매 행 즉시 커밋(동시 수집 안전)
         conn.commit()

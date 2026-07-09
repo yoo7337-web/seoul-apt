@@ -22,6 +22,17 @@ MIN_DISCOUNT_PCT = -5.0   # 1년 중앙값 대비 이만큼 싸면 후보
 MIN_JEONSE_RATIO = 70.0   # 전세가율 이 이상이면 후보(갭투자 관점)
 MIN_CX_SAMPLES = 5        # 단지 1년 매매 표본 최소치(중앙값 신뢰용)
 MAX_CANDIDATES = 40
+AREA_TOL = 0.12           # 같은 크기로 볼 전용면적 허용오차(±12%)
+MIN_MATCHED_SAMPLES = 3   # 크기 매칭 표본 최소치(부족하면 전 평형 혼합으로 폴백)
+
+
+def _area_matched(rows, area, tol: float = AREA_TOL) -> list:
+    """비슷한 크기(±tol)의 행만 필터. 전 평형 혼합 왜곡 방지(한남더힐 26%
+    전세가율 등 사고 이력) - 표본이 부족하면 호출부에서 원본으로 폴백한다."""
+    if not area:
+        return []
+    lo, hi = area * (1 - tol), area * (1 + tol)
+    return [r for r in rows if r["exclu_area"] and lo <= r["exclu_area"] <= hi]
 
 
 def _iso_minus_days(iso_day: str, days: int) -> str:
@@ -61,32 +72,50 @@ def build_candidates(conn, path=None, lawd_cds=None) -> int:
 
         for d in deals:
             cid = d["complex_id"]
+            area = d["exclu_area"]
             year_rows = conn.execute(
                 """SELECT exclu_area, amount_manwon FROM sale_txn
                    WHERE complex_id=? AND canceled=0 AND deal_date >= ?""",
                 (cid, year_ago)).fetchall()
             if len(year_rows) < MIN_CX_SAMPLES:
                 continue
+            # 평단가·전세가율 기준은 비슷한 크기(±12%)로 좁히고, 표본이 부족한
+            # (신규/희소거래) 단지는 전 평형 혼합으로 폴백한다(사고 이력: 한남더힐
+            # 전세가율 26%, 오피스텔 300% 등 - 전 평형 혼합 중앙값 왜곡).
+            matched = _area_matched(year_rows, area)
+            ppy_source = matched if len(matched) >= MIN_MATCHED_SAMPLES else year_rows
             ppys = [r["amount_manwon"] / _pyeong(r["exclu_area"])
-                    for r in year_rows if r["exclu_area"]]
+                    for r in ppy_source if r["exclu_area"]]
             cx_ppy_med = _median(ppys)
-            py = _pyeong(d["exclu_area"])
+            py = _pyeong(area)
             if not (cx_ppy_med and py > 0):
                 continue
             deal_ppy = d["amount_manwon"] / py
             discount = (deal_ppy - cx_ppy_med) / cx_ppy_med * 100
 
-            peak = conn.execute(
-                "SELECT MAX(amount_manwon) AS m FROM sale_txn "
-                "WHERE complex_id=? AND canceled=0", (cid,)).fetchone()["m"]
+            # 역대 고점도 비슷한 크기로 우선 조회, 매칭 표본 없으면 전 평형 혼합 폴백
+            # (대형 평형 역대가가 소형 평형 신고가를 가리는 사고 이력 방지)
+            peak = None
+            if area:
+                lo, hi = area * (1 - AREA_TOL), area * (1 + AREA_TOL)
+                peak = conn.execute(
+                    "SELECT MAX(amount_manwon) AS m FROM sale_txn WHERE complex_id=? "
+                    "AND canceled=0 AND exclu_area BETWEEN ? AND ?",
+                    (cid, lo, hi)).fetchone()["m"]
+            if peak is None:
+                peak = conn.execute(
+                    "SELECT MAX(amount_manwon) AS m FROM sale_txn "
+                    "WHERE complex_id=? AND canceled=0", (cid,)).fetchone()["m"]
             drop_from_peak = ((d["amount_manwon"] - peak) / peak * 100) if peak else 0.0
 
             jeonse_rows = conn.execute(
-                """SELECT deposit_manwon FROM rent_txn
+                """SELECT exclu_area, deposit_manwon FROM rent_txn
                    WHERE complex_id=? AND rent_type='jeonse'
-                   ORDER BY deal_date DESC LIMIT 30""", (cid,)).fetchall()
-            jeonse_med = _median([r["deposit_manwon"] for r in jeonse_rows])
-            sale_med = _median([r["amount_manwon"] for r in year_rows])
+                   ORDER BY deal_date DESC LIMIT 60""", (cid,)).fetchall()
+            matched_j = _area_matched(jeonse_rows, area)
+            j_source = matched_j if len(matched_j) >= MIN_MATCHED_SAMPLES else jeonse_rows
+            jeonse_med = _median([r["deposit_manwon"] for r in j_source[:30]])
+            sale_med = _median([r["amount_manwon"] for r in ppy_source])
             jeonse_ratio = (round(jeonse_med / sale_med * 100, 1)
                             if jeonse_med and sale_med else None)
 
