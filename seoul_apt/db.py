@@ -123,6 +123,16 @@ CREATE TABLE IF NOT EXISTS subscription_cmpet (
     PRIMARY KEY (house_manage_no, house_ty, reside_secd)
 );
 
+CREATE TABLE IF NOT EXISTS poi (
+    id     INTEGER PRIMARY KEY AUTOINCREMENT,
+    kind   TEXT NOT NULL,             -- 'subway' | 'elem'
+    name   TEXT NOT NULL,             -- 역명 / 학교명
+    line   TEXT,                      -- 노선명(지하철), 학교는 NULL
+    lat    REAL NOT NULL,
+    lon    REAL NOT NULL,
+    UNIQUE(kind, name, lat, lon)
+);
+
 CREATE INDEX IF NOT EXISTS idx_sale_complex_date ON sale_txn(complex_id, deal_date);
 CREATE INDEX IF NOT EXISTS idx_rent_complex_date ON rent_txn(complex_id, deal_date);
 CREATE INDEX IF NOT EXISTS idx_complex_lawd ON complex(lawd_cd);
@@ -170,6 +180,11 @@ def _migrate(conn: sqlite3.Connection) -> None:
         ("bcr", "REAL"),                 # 건폐율(%)
         ("approval_date", "TEXT"),       # 사용승인일 'YYYY-MM-DD'
         ("bldg_fetched_at", "TEXT"),     # 건축물대장 조회 시각(재조회 skip용)
+        # 입지 레이어(역세권·초품아) — 최근접 POI 거리(m)와 이름
+        ("subway_m", "INTEGER"),         # 최근접 지하철역 직선거리(m)
+        ("subway_nm", "TEXT"),           # 최근접 역명(+노선)
+        ("school_m", "INTEGER"),         # 최근접 초등학교 직선거리(m)
+        ("poi_fetched_at", "TEXT"),      # POI 최근접 계산 시각(증분 skip용)
     ]:
         if name not in ccols:
             conn.execute(f"ALTER TABLE complex ADD COLUMN {name} {decl}")

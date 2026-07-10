@@ -29,6 +29,10 @@
       ticks: [[0, "0"], [10, "10건"], [30, "30건"], [50, "50건+"]] },
     { key: "drop", label: "고점대비 하락", min: 0, max: 50, step: 5, u: "%",
       ticks: [[0, "0"], [10, "10%"], [20, "20%"], [30, "30%"], [50, "50%+"]] },
+    { key: "sw", label: "역까지 거리", min: 0, max: 1500, step: 100, u: "m",
+      ticks: [[0, "0"], [500, "500m"], [1000, "1km"], [1500, "1.5km+"]] },
+    { key: "el", label: "초등학교 거리", min: 0, max: 1000, step: 100, u: "m",
+      ticks: [[0, "0"], [300, "300m"], [600, "600m"], [1000, "1km+"]] },
   ];
   const F_CFG = Object.fromEntries(F_SLIDERS.map((s) => [s.key, s]));
 
@@ -366,6 +370,9 @@
       if (state.peak && !m.is_peak) return false;
       // 고점대비 하락(%): drop은 음수(하락)/0(신고가) → 하락폭 -drop 으로 비교
       if (active("drop") && !inR("drop", m.drop == null ? null : -m.drop)) return false;
+      // 입지: 역까지·초등학교까지 거리(m). 상한(역 2km/초등 1.5km) 밖은 null → 제외
+      if (active("sw") && !inR("sw", m.sw)) return false;
+      if (active("el") && !inR("el", m.el)) return false;
       return true;
     });
   }
@@ -891,6 +898,21 @@
              etc, costs, loan, cash: price - loan + costs };
   }
 
+  // 입지(역세권·초품아) 한 줄 — 도보 약 67m/분 환산
+  function locationInfo(d) {
+    if (d.subway_m == null && d.school_m == null) return "";
+    const walk = (m) => Math.max(1, Math.round(m / 67));
+    const parts = [];
+    if (d.subway_m != null) {
+      const nm = d.subway_nm || "역";
+      parts.push(`🚇 ${nm} ${d.subway_m}m<span class="loc-walk">도보 ${walk(d.subway_m)}분</span>`);
+    }
+    if (d.school_m != null) {
+      parts.push(`🏫 초등 ${d.school_m}m<span class="loc-walk">도보 ${walk(d.school_m)}분</span>`);
+    }
+    return `<div class="loc-info">${parts.join('<span class="loc-sep">·</span>')}</div>`;
+  }
+
   function costCalcHtml(si) {
     if (!si || !si.price) return "";
     return `<details class="cost-calc">
@@ -953,6 +975,7 @@
     el.innerHTML = `
       <h2>${d.apt} ${d.is_peak ? '<span class="badge peak">신고가</span>' : ""}</h2>
       <div class="sub">${districtName(d.lawd_cd)}${d.umd ? " " + d.umd : ""} · ${buildYearText(d)}</div>
+      ${locationInfo(d)}
       <div class="price-cards">
         <div class="card"><div class="label">최근 매매${cardArea(si)}</div>
           <div class="value">${si ? fmt(si.price) : "-"}${staleTag(si)}</div></div>

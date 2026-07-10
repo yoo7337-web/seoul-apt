@@ -132,6 +132,19 @@ def cmd_aireco(conn, args):
         print(text)
 
 
+def cmd_poi(conn, args):
+    from . import poi
+    out = poi.run(conn, refresh=args.refresh)
+    ld = out["loaded"]
+    nr = out["nearest"]
+    print(f"[poi] 적재 지하철 {ld['subway']} / 초등 {ld['elem']}")
+    if nr.get("no_poi"):
+        print("[poi] poi 테이블 비어있음 — data/poi/*.csv 확인")
+    else:
+        print(f"[poi] 최근접 계산 단지 {nr['updated']}건 "
+              f"(역 {nr.get('subways', 0)} · 학교 {nr.get('elems', 0)})")
+
+
 def cmd_all(conn, args):
     cmd_collect(conn, args)
     cmd_geocode(conn, args)
@@ -199,6 +212,11 @@ def build_parser() -> argparse.ArgumentParser:
     ar.add_argument("--dry-run", action="store_true",
                     help="발송 없이 추천 텍스트 미리보기")
     ar.set_defaults(func=cmd_aireco)
+
+    po = sub.add_parser("poi", help="입지 레이어(역세권·초품아) POI 적재+최근접 계산")
+    po.add_argument("--refresh", action="store_true",
+                    help="이미 계산된 단지도 다시 계산(기본은 미계산분만)")
+    po.set_defaults(func=cmd_poi)
 
     a = sub.add_parser("all", help="collect+geocode+gongsi+reb+export")
     a.add_argument("--months", type=int, default=None)

@@ -113,6 +113,9 @@ def export_all(conn, kakao_js_key: str | None = None) -> dict:
                     "drop": c["drop_pct"],       # 고점대비 %(음수=하락)
                     "am": c["area_min"],         # 전용면적 최소(㎡)
                     "ax": c["area_max"],         # 전용면적 최대(㎡)
+                    "sw": c["subway_m"],         # 최근접 지하철역 거리(m)
+                    "swn": c["subway_nm"],       # 최근접 역명(+노선)
+                    "el": c["school_m"],         # 최근접 초등학교 거리(m)
                 })
 
     _write_json(export_dir / "markers.json", {"markers": markers})

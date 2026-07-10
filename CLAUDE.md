@@ -14,6 +14,23 @@
   `config/watchlist.yml`의 `complexes:`에 붙여넣기(정적 사이트라 이 1회 수동
   연결 필요). 등록된 단지 거래는 다이제스트 최상단 ⭐섹션에 표시.
 
+## 입지 레이어(역세권·초품아, `poi` 명령)
+
+- 데이터는 준불변이라 1회 적재 후 재계산만 하면 된다(daily Action 불필요).
+  `data/poi/subway_stations.csv`(전국도시철도역사정보표준데이터·KRIC, 수도권 필터),
+  `data/poi/schools_seoul.csv`(카카오 키워드검색으로 서울 25구 초등학교, 좌표 포함).
+  두 CSV는 커밋되어 있으므로 `poi` 명령만 실행하면 재현된다.
+- `.venv\Scripts\python.exe -m seoul_apt.cli poi` — CSV를 `poi` 테이블에 적재하고
+  좌표 보유 단지의 최근접 지하철역·초등학교 직선거리(m)를 계산해
+  `complex.subway_m/subway_nm/school_m`에 저장(미계산 단지만 증분, `--refresh`로 전체).
+- 최근접 상한: 지하철 2km·초등 1.5km. 그 밖이면 NULL(역세권/초품아 아님)로
+  지도 필터·패널에서 제외. 도보 환산은 약 67m/분.
+- CSV 재생성 소스: KRIC 도시철도 XLSX는
+  `https://data.kric.go.kr/rips/dataset/download.file?type=filedata&id=32&operation=1`
+  (세션 쿠키 필요), 초등학교는 Kakao Local 키워드검색 `{구}+초등학교`(category SC4,
+  place_name·category가 '초등학교'로 끝나고 주소가 '서울'로 시작하는 것만).
+  ⚠ NEIS 학교API는 인증키 없이 5건만 반환하므로 사용 금지(사고 이력).
+
 ## ⭐ 트리거: "아파트 추천해줘" / "관심구 물건 추천" / "물건 추천"
 
 사용자가 위와 같이 말하면 = **내가(Claude) 직접 후보를 분석해 추천**하라는 뜻.
