@@ -540,6 +540,32 @@ table.rank-table tbody tr[data-id]:hover { background: var(--accent-soft); }
 .val-area .fs-label { font-size: 13px; font-weight: 700; }
 .val-area .fs-val { font-size: 13px; font-weight: 800; color: var(--accent); }
 
+/* ── 실구매 비용 계산기 ────────────────────────────────────────────── */
+.cost-calc {
+  margin: 12px 0 4px; border-radius: 12px; background: var(--bg);
+  padding: 4px 14px 10px;
+}
+.cost-calc summary {
+  cursor: pointer; font-size: 13px; font-weight: 800; padding: 8px 0;
+  user-select: none;
+}
+.cost-calc summary .sel-hint { font-weight: 500; margin-left: 4px; }
+.cc-row {
+  display: flex; align-items: center; gap: 10px; margin: 8px 0;
+  font-size: 12.5px;
+}
+.cc-row label { min-width: 110px; color: var(--muted); font-weight: 600; }
+.cc-row label b { color: var(--accent-dark); margin-left: 2px; }
+.cc-row input[type=number], .cc-row select {
+  flex: 1; padding: 6px 10px; border-radius: 8px; font-size: 13px;
+  border: 1px solid var(--border); background: var(--card); color: var(--text);
+}
+.cc-row input[type=range] { flex: 1; accent-color: var(--accent); }
+.cc-table { margin-top: 6px; }
+.cc-table td:last-child { text-align: right; font-variant-numeric: tabular-nums; }
+.cc-cash td { border-top: 2px solid var(--accent); color: var(--accent-dark); }
+.cc-note { margin-top: 8px; font-size: 10.5px; color: var(--muted); }
+
 .section-title { font-size: 14px; font-weight: 700; margin: 18px 0 8px; }
 .chart-wrap { position: relative; height: 200px; margin-bottom: 8px; }
 

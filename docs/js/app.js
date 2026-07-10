@@ -796,6 +796,88 @@
     </div>`;
   }
 
+  // ── 실구매 비용 계산기 (2026년 기준 단순 참고) ──────────────────────
+  // 취득세: 1주택 6억↓1% / 6~9억 선형(가액억×2/3−3)% / 9억↑3%; 2주택(조정)8%; 3주택+12%
+  function calcCost(price, homes, ltvPct, excluM2) {
+    const eok = price / 10000;
+    let acqRate;
+    if (homes >= 3) acqRate = 12;
+    else if (homes === 2) acqRate = 8;
+    else acqRate = eok <= 6 ? 1 : eok >= 9 ? 3
+      : Math.min(3, Math.max(1, eok * 2 / 3 - 3));
+    const acq = price * acqRate / 100;
+    const eduRate = homes >= 2 ? 0.4 : acqRate / 10;      // 지방교육세
+    const edu = price * eduRate / 100;
+    const bigArea = excluM2 != null && excluM2 > 85;       // 농특세: 전용85㎡ 초과만
+    const farmRate = !bigArea ? 0 : homes >= 3 ? 1.0 : homes === 2 ? 0.6 : 0.2;
+    const farm = price * farmRate / 100;
+    // 중개보수 상한요율(매매) + VAT 10%
+    let brokRate, brokCap = Infinity;
+    if (eok < 0.5) { brokRate = 0.6; brokCap = 25; }
+    else if (eok < 2) { brokRate = 0.5; brokCap = 80; }
+    else if (eok < 9) brokRate = 0.4;
+    else if (eok < 12) brokRate = 0.5;
+    else if (eok < 15) brokRate = 0.6;
+    else brokRate = 0.7;
+    const brok = Math.min(price * brokRate / 100, brokCap) * 1.1;   // VAT 포함
+    // 기타: 인지세(10억↓ 15만 / 10억↑ 35만, 1억↓ 7만) + 법무 대략 50만
+    const stamp = eok <= 1 ? 7 : eok <= 10 ? 15 : 35;
+    const etc = stamp + 50;
+    const costs = acq + edu + farm + brok + etc;
+    const loan = price * ltvPct / 100;
+    return { acqRate, acq, eduRate, edu, farmRate, farm, brokRate, brok,
+             etc, costs, loan, cash: price - loan + costs };
+  }
+
+  function costCalcHtml(si) {
+    if (!si || !si.price) return "";
+    return `<details class="cost-calc">
+      <summary>💰 실구매 비용 계산 <span class="sel-hint">취득세·중개보수·대출 가정</span></summary>
+      <div class="cc-row"><label>매수가(만원)</label>
+        <input type="number" id="cc-price" value="${si.price}" step="1000" min="0"></div>
+      <div class="cc-row"><label>보유 주택</label>
+        <select id="cc-homes">
+          <option value="1">1주택(무주택 포함)</option>
+          <option value="2">2주택(조정, 중과 8%)</option>
+          <option value="3">3주택 이상(중과 12%)</option>
+        </select></div>
+      <div class="cc-row"><label>대출 LTV <b id="cc-ltv-val">40%</b></label>
+        <input type="range" id="cc-ltv" min="0" max="70" step="5" value="40"></div>
+      <div id="cc-result"></div>
+      <div class="cc-note">2026년 기준 단순 참고 — 국민주택채권·대출이자·보유세 미포함,
+        실제 세액·요율은 상이할 수 있음</div>
+    </details>`;
+  }
+
+  function bindCostCalc(si) {
+    const priceEl = $("cc-price");
+    if (!priceEl) return;
+    const excluM2 = si && si.py ? si.py * M2_PER_PY : null;
+    const render = () => {
+      const price = +priceEl.value || 0;
+      const homes = +$("cc-homes").value;
+      const ltv = +$("cc-ltv").value;
+      $("cc-ltv-val").textContent = ltv + "%";
+      if (!price) { $("cc-result").innerHTML = ""; return; }
+      const c = calcCost(price, homes, ltv, excluM2);
+      const won = (v) => v >= 10000 ? fmt(Math.round(v))
+        : Math.round(v).toLocaleString() + "만";
+      $("cc-result").innerHTML = `<table class="rank-table cc-table"><tbody>
+        <tr><td>취득세 (${c.acqRate.toFixed(1)}%)</td><td>${won(c.acq)}</td></tr>
+        <tr><td>지방교육세 (${c.eduRate.toFixed(1)}%)</td><td>${won(c.edu)}</td></tr>
+        ${c.farm ? `<tr><td>농어촌특별세 (${c.farmRate}%, 전용85㎡초과)</td><td>${won(c.farm)}</td></tr>` : ""}
+        <tr><td>중개보수 상한 (${c.brokRate}%+VAT)</td><td>${won(c.brok)}</td></tr>
+        <tr><td>기타 (인지세·법무 대략)</td><td>${won(c.etc)}</td></tr>
+        <tr><td><b>부대비용 합계</b></td><td><b>${won(c.costs)}</b></td></tr>
+        <tr><td>대출금 (LTV ${ltv}%)</td><td>−${won(c.loan)}</td></tr>
+        <tr class="cc-cash"><td><b>필요 현금</b></td><td><b>${won(c.cash)}</b></td></tr>
+      </tbody></table>`;
+    };
+    ["cc-price", "cc-homes", "cc-ltv"].forEach((id) =>
+      $(id).addEventListener("input", render));
+    render();
+  }
+
   function renderPanel() {
     const d = state.currentDetail;
     const si = detailInfo(d, false), ji = detailInfo(d, true);
@@ -828,6 +910,8 @@
 
       ${buildingInfo(d)}
 
+      ${costCalcHtml(si)}
+
       <div class="btn-row">
         <button id="fav-toggle" class="${isFav ? "active" : ""}">
           ${isFav ? "★ 관심단지" : "☆ 관심단지"}</button>
@@ -851,6 +935,7 @@
     $("panel").classList.remove("hidden");
     $("fav-toggle").addEventListener("click", () => toggleFavorite(d));
     $("csv-btn").addEventListener("click", () => downloadCSV(d));
+    bindCostCalc(si);
     el.querySelectorAll(".chart-tabs button").forEach((b) =>
       b.addEventListener("click", () => { state.chartMode = b.dataset.mode; renderPanel(); }));
     el.querySelectorAll("[data-area]").forEach((b) =>
