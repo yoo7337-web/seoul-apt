@@ -41,6 +41,7 @@ def load_watchlist(path=None) -> dict:
     with open(path, encoding="utf-8") as f:
         data = yaml.safe_load(f) or {}
     data.setdefault("watches", [])
+    data.setdefault("complexes", [])   # 관심단지 [{id, apt, lawd_cd}] - 단지단위 알림
     data.setdefault("swing_threshold_pct", 5)
     data.setdefault("swing_min_sample", 5)
     data.setdefault("digest_peak_limit", 5)
@@ -191,11 +192,47 @@ def _district_name(lawd_cd: str) -> str:
     return config.SEOUL_DISTRICTS.get(lawd_cd, lawd_cd)
 
 
+def watched_complex_lines(conn, wl: dict, rows: list) -> list[str]:
+    """⭐ 관심단지(watchlist.yml complexes) 단지단위 알림 라인.
+
+    지도에서 ★ 등록한 단지의 신규거래를 최상단에 별도 표시 - 신고가/급매
+    여부를 함께 마크한다. 관심단지 미등록이거나 해당 거래 없으면 빈 리스트.
+    """
+    ids = {c["id"] for c in wl.get("complexes", []) if c.get("id")}
+    if not ids:
+        return []
+    hits = [r for r in rows if r["complex_id"] in ids]
+    if not hits:
+        return []
+    bargain_ids = {b["row"]["id"] for b in bargain_deals(conn, hits)}
+    lines = [f"⭐ <b>관심단지 거래</b> ({len(hits)}건)"]
+    for r in sorted(hits, key=lambda x: x["deal_date"], reverse=True)[:10]:
+        marks = []
+        if is_new_peak(conn, r):
+            marks.append("🚩신고가")
+        if r["id"] in bargain_ids:
+            marks.append("🔻급매")
+        mark = (" " + "·".join(marks)) if marks else ""
+        lines.append(
+            f" · {_district_name(r['lawd_cd'])} <b>{r['apt_nm']}</b> "
+            f"{r['exclu_area']}㎡ {r['floor'] or '-'}층 "
+            f"{_fmt_amount(r['amount_manwon'])} ({r['deal_date']}){mark}")
+    if len(hits) > 10:
+        lines.append(f"   … 외 {len(hits) - 10}건")
+    return lines
+
+
 def build_message(conn, wl: dict, rows: list) -> str:
     """다이제스트 + 워치 알림 전체 메시지(HTML)."""
     lines: list[str] = []
     lines.append("🏙️ <b>서울 아파트 일일 다이제스트</b>")
     lines.append("")
+
+    # ── ⭐ 관심단지(최상단 - 사용자가 가장 궁금한 것)
+    watched = watched_complex_lines(conn, wl, rows)
+    if watched:
+        lines.extend(watched)
+        lines.append("")
 
     # ── 서울 전체 요약
     by_gu = defaultdict(int)

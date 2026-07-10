@@ -1146,22 +1146,63 @@
         .then((d) => ({ f, d })).catch(() => null)
     )).then((results) => {
       const valid = results.filter(Boolean);
+      const cutoff = new Date(Date.now() - 30 * 86400000)
+        .toISOString().slice(0, 10);
       let c = `<table class="rank-table"><thead><tr>
-        <th>단지</th><th>자치구</th><th>최근매매</th><th>평단가</th><th></th>
+        <th>단지</th><th>자치구</th><th>최근매매</th><th>30일</th><th>직전대비</th><th></th>
         </tr></thead><tbody>`;
       valid.forEach(({ f, d }) => {
-        const lastSale = d.recent_sales && d.recent_sales[0];
+        // 30일 변동 요약: 거래수·직전 거래 대비 변동%(같은 크기 ±12% 매칭)·신고가
+        const sales = (d.recent_sales || []).filter((r) => !r.canceled);
+        const m30 = sales.filter((r) => r.date >= cutoff);
+        const last = sales[0];
+        let chgTxt = "-";
+        if (last && last.area) {
+          const prev = sales.slice(1).find((r) =>
+            r.area >= last.area * 0.88 && r.area <= last.area * 1.12);
+          if (prev) {
+            const chg = (last.amount - prev.amount) / prev.amount * 100;
+            const cls = chg > 0 ? "chg-up" : chg < 0 ? "chg-down" : "";
+            chgTxt = `<span class="${cls}">${chg > 0 ? "+" : ""}${chg.toFixed(1)}%</span>`;
+          }
+        }
+        const peakMark = (d.valuation && last && d.valuation.peak
+          && last.amount >= d.valuation.peak) ? " 🚩" : "";
         c += `<tr class="fav-c-row" data-id="${f.id}" data-lawd="${f.lawd_cd}">
-          <td>${f.apt}</td><td>${districtName(f.lawd_cd)}</td>
-          <td>${lastSale ? fmt(lastSale.amount) : "-"}</td>
-          <td>${ppyOf(d)}</td>
+          <td>${f.apt}${peakMark}</td><td>${districtName(f.lawd_cd)}</td>
+          <td>${last ? `${fmt(last.amount)} <span class="sel-hint">${last.date.slice(5)}</span>` : "-"}</td>
+          <td>${m30.length}건</td>
+          <td>${chgTxt}</td>
           <td class="fav-del" data-kind="c" data-id="${f.id}">✕</td></tr>`;
       });
-      finish(c + "</tbody></table>");
+      c += "</tbody></table>";
+      // 텔레그램 단지단위 알림 연동: watchlist.yml complexes 스니펫 복사
+      c += `<div class="btn-row" style="margin-top:10px">
+        <button id="fav-copy-yml" title="config/watchlist.yml 의 complexes: 에 붙여넣으면 텔레그램 단지 알림이 켜집니다">📋 알림설정 복사</button>
+      </div>
+      <div class="sel-hint">복사한 내용을 GitHub의 config/watchlist.yml 에 붙여넣으면
+        관심단지 거래가 텔레그램 다이제스트 최상단에 표시됩니다</div>`;
+      finish(c);
     });
   }
 
+  // ★ 관심단지 목록 → watchlist.yml complexes 스니펫 클립보드 복사
+  function copyFavYml() {
+    const lines = ["complexes:"];
+    state.favorites.forEach((f) => {
+      const apt = String(f.apt || "").replace(/"/g, "");
+      lines.push(`  - {id: ${f.id}, apt: "${apt}", lawd_cd: "${f.lawd_cd}"}`);
+    });
+    const text = lines.join("\n");
+    (navigator.clipboard ? navigator.clipboard.writeText(text)
+      : Promise.reject()).then(
+      () => toast("📋 복사됨 - config/watchlist.yml 에 붙여넣기"),
+      () => { window.prompt("아래 내용을 복사하세요", text); });
+  }
+
   function bindFavModal() {
+    const copyBtn = $("fav-copy-yml");
+    if (copyBtn) copyBtn.addEventListener("click", copyFavYml);
     // 관심구 행 클릭 → 지도에서 그 구 선택 + 모달 닫기
     document.querySelectorAll("#modal-content tr.fav-d-row").forEach((tr) =>
       tr.addEventListener("click", () => {

@@ -10,6 +10,9 @@
 - `data/seoul_apt.sqlite` 누적 DB(커밋됨), `data/notify_state.json` 알림 상태
 - GitHub Actions: daily(09:00 KST 수집+알림), weekly(일 10:30 KST AI 추천)
 - 로컬 미리보기: launch.json `seoul-apt-docs` → http://localhost:8511
+- 관심단지 텔레그램 알림: 지도에서 ★ 등록 → [★ 관심 → 📋 알림설정 복사] →
+  `config/watchlist.yml`의 `complexes:`에 붙여넣기(정적 사이트라 이 1회 수동
+  연결 필요). 등록된 단지 거래는 다이제스트 최상단 ⭐섹션에 표시.
 
 ## ⭐ 트리거: "아파트 추천해줘" / "관심구 물건 추천" / "물건 추천"
 

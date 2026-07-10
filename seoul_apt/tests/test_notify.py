@@ -43,6 +43,28 @@ def test_new_sales_and_peak_detection():
     conn.close()
 
 
+def test_watched_complex_section():
+    """⭐ 관심단지(complexes) 거래가 다이제스트 최상단 섹션으로 표시된다."""
+    conn = db.connect(":memory:")
+    eunma, mapo = _seed(conn)
+    wl = {
+        "watches": [], "complexes": [{"id": eunma, "apt": "은마", "lawd_cd": "11680"}],
+        "swing_threshold_pct": 5, "swing_min_sample": 5, "digest_peak_limit": 5,
+    }
+    rows = notify.new_sales(conn, 0)
+    msg = notify.build_message(conn, wl, rows)
+    assert "⭐" in msg and "관심단지 거래" in msg
+    assert msg.index("관심단지 거래") < msg.index("신규 수집 거래")   # 최상단
+    assert "은마" in msg
+    # 마포는 관심단지가 아니므로 ⭐ 섹션 안에 없어야 함(섹션 텍스트만 검사)
+    star_sec = msg.split("신규 수집 거래")[0]
+    assert "마포래미안푸르지오" not in star_sec
+    # 관심단지 미등록이면 섹션 없음
+    wl2 = dict(wl, complexes=[])
+    assert "관심단지 거래" not in notify.build_message(conn, wl2, rows)
+    conn.close()
+
+
 def test_is_new_peak_matched_by_size():
     """신고가 알림 판정도 비슷한 크기(±12%)끼리 비교 - 대형 평형 역대가에
     소형 평형 신고가 알림이 가려지면 안 된다(사고 이력 회귀 테스트)."""
