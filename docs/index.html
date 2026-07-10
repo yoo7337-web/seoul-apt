@@ -36,6 +36,7 @@
       <option value="135㎡~">135㎡~</option>
     </select>
     <button id="btn-filter" class="chip-btn">필터 <span id="filter-count" class="count hidden">0</span></button>
+    <button id="btn-profile" class="chip-btn hidden" title="저장된 매수 프로필 적용/해제">💼 프로필</button>
     <button id="btn-subs" class="chip-btn" title="청약·분양 마커 표시">🏷️ 청약 <span id="subs-count" class="count hidden">0</span></button>
     <button id="btn-favorites" class="chip-btn">★ 관심 <span id="fav-count" class="count">0</span></button>
     <a class="chip-btn nav-link nav-right" href="devlog.html">📝 개발일지</a>
@@ -164,6 +165,7 @@
     </div>
     <div id="filter-body"></div>
     <div class="fp-actions">
+      <button id="f-save-profile" class="ghost" title="현재 필터+구 선택을 내 매수 프로필로 저장">💼 프로필로 저장</button>
       <button id="f-reset" class="ghost">초기화</button>
       <button id="f-close" class="filled">닫기</button>
     </div>
@@ -193,7 +195,7 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
   <script src="js/charts.js?v=7"></script>
-  <script src="js/dashboard.js?v=23"></script>
-  <script src="js/app.js?v=34"></script>
+  <script src="js/dashboard.js?v=27"></script>
+  <script src="js/app.js?v=38"></script>
 </body>
 </html>

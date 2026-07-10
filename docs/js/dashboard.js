@@ -445,12 +445,35 @@
     ["85~135㎡", "26~41평"], ["135㎡~", "41평↑"],
   ];
   let valData = null, valGu = "", valKind = "cheap", valBucket = "all";
+  let valProfileOn = false;   // 💼 '내 프로필만' 필터 상태
 
   // 선택 버킷의 밸류에이션(전체면 all). 그 버킷 데이터가 없으면 null(제외).
   function valView(it) {
     const v = valBucket === "all" ? it.all : it.areas[valBucket];
     return v ? { id: it.id, apt: it.apt, lawd: it.lawd, b: valBucket,
                  pos: v.pos, vp: v.vp, jr: v.jr, ppy: v.ppy, m: v.m } : null;
+  }
+
+  // 💼 매수 프로필(지도에서 저장한 필터 스냅샷) 조건에 맞는 단지만
+  function valMatchProfile(view) {
+    const p = window.SeoulMap && SeoulMap.getProfile && SeoulMap.getProfile();
+    if (!p) return true;
+    // 관심 구
+    if (p.districts && p.districts.length && !p.districts.includes(view.lawd))
+      return false;
+    const mk = valMkById && valMkById[view.id];
+    if (!mk) return false;
+    // 예산(억): 프로필 가격범위가 설정돼 있으면 대표/선택 평형 최근매매가로 판정
+    const pr = p.range && p.range.price;
+    if (pr && (pr.lo > 0 || pr.hi < 40)) {
+      const bucket = view.b === "all" ? mk.rep : view.b;
+      const o = bucket && mk.sale_area ? mk.sale_area[bucket] : null;
+      if (!o || !o.p) return false;
+      const eok = o.p / 10000;
+      if (pr.lo > 0 && eok < pr.lo) return false;
+      if (pr.hi < 40 && eok > pr.hi) return false;
+    }
+    return true;   // 평형은 칩 토글 시 valBucket 자동 전환으로 반영(아래)
   }
   // 마커에서 평(대표/선택 버킷)·세대수 조회
   let valMkById = null;
@@ -465,7 +488,11 @@
     const mk = valMkById && valMkById[view.id];
     return mk ? mk.hh : null;
   }
-  function valViews() { return valData.items.map(valView).filter(Boolean); }
+  function valViews() {
+    let views = valData.items.map(valView).filter(Boolean);
+    if (valProfileOn) views = views.filter(valMatchProfile);
+    return views;
+  }
 
   function valGuSummary(views) {
     const by = {};
@@ -542,12 +569,24 @@
   function renderValList(views) {
     const chips = $("val-chips"), wrap = $("val-list-wrap");
     const kind = VAL_VERDICT.find((v) => v[0] === valKind);
+    const hasProfile = !!(window.SeoulMap && SeoulMap.getProfile && SeoulMap.getProfile());
     chips.innerHTML = VAL_VERDICT.map(([k, label]) =>
       `<button class="d-chip${valKind === k ? " on" : ""}" data-kind="${k}">${label}</button>`).join("")
       + `<button class="d-chip${valKind === "" ? " on" : ""}" data-kind="">전체</button>`
+      + (hasProfile ? ` <button class="d-chip${valProfileOn ? " on" : ""}" data-profile="1"
+          title="지도에서 저장한 매수 프로필(예산·구·평형)로 압축">💼 내 프로필만</button>` : "")
       + (valGu ? ` <button class="d-chip on" data-clear-gu="1">${GU_NAME[valGu] || valGu} ✕</button>` : "");
     chips.querySelectorAll("[data-kind]").forEach((b) =>
       b.addEventListener("click", () => { valKind = b.dataset.kind; renderValAll(); }));
+    const profBtn = chips.querySelector("[data-profile]");
+    if (profBtn) profBtn.addEventListener("click", () => {
+      valProfileOn = !valProfileOn;
+      if (valProfileOn) {
+        const p = SeoulMap.getProfile();
+        if (p && p.area) valBucket = p.area;   // 프로필 평형으로 자동 전환
+      }
+      renderValAll();
+    });
     const clear = chips.querySelector("[data-clear-gu]");
     if (clear) clear.addEventListener("click", () => { valGu = ""; renderValAll(); });
 

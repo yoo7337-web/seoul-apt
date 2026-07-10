@@ -62,6 +62,7 @@
     subs: [],          // 청약·분양 공고(subscription.json)
     subOverlays: [],   // 청약 마커(실거래 오버레이와 별도 관리)
     showSubs: localStorage.getItem("seoul_apt_show_subs") !== "0",
+    profileOn: false,  // 💼 매수 프로필 적용 상태
   };
 
   const BUCKET_ORDER = ["~60㎡", "60~85㎡", "85~135㎡", "135㎡~"];
@@ -467,6 +468,66 @@
     $("filter-close").addEventListener("click", () => toggleFilter(false));
     $("f-close").addEventListener("click", () => toggleFilter(false));
     $("f-reset").addEventListener("click", resetFilters);
+    $("f-save-profile").addEventListener("click", saveProfile);
+    $("btn-profile").addEventListener("click", toggleProfile);
+    updateProfileBtn();
+  }
+
+  // ── 나의 매수 프로필: 현재 필터+구+평형+거래유형 스냅샷 저장 → 원클릭 적용 ──
+  function loadProfile() {
+    try { return JSON.parse(localStorage.getItem("seoul_apt_profile") || "null"); }
+    catch { return null; }
+  }
+  function saveProfile() {
+    const p = {
+      v: 1, savedAt: new Date().toISOString().slice(0, 10),
+      range: state.range, area: state.area,
+      districts: [...state.districts], dealType: state.dealType,
+      minusGap: state.minusGap, peak: state.peak,
+    };
+    localStorage.setItem("seoul_apt_profile", JSON.stringify(p));
+    state.profileOn = false;   // 저장만. 적용 상태는 [💼] 토글로만 관리
+    updateProfileBtn();
+    toast("💼 매수 프로필 저장됨 - 헤더 [💼 프로필]로 언제든 적용");
+  }
+  function applyProfile(p) {
+    F_SLIDERS.forEach((s) => {
+      const r = (p.range && p.range[s.key]) || { lo: s.min, hi: s.max };
+      state.range[s.key] = { lo: r.lo, hi: r.hi };
+      const lo = $("rlo-" + s.key), hi = $("rhi-" + s.key);
+      if (lo) { lo.value = r.lo; hi.value = r.hi; paintRange(s); }
+    });
+    state.minusGap = !!p.minusGap; state.peak = !!p.peak;
+    if ($("f-minusgap")) $("f-minusgap").checked = state.minusGap;
+    if ($("f-peak")) $("f-peak").checked = state.peak;
+    state.area = p.area || "";
+    if ($("area-filter")) $("area-filter").value = state.area;
+    state.dealType = p.dealType || "sale";
+    if ($("deal-type")) $("deal-type").value = state.dealType;
+    setSelectedDistricts(new Set(p.districts || []));
+    onFilterChange();
+  }
+  function toggleProfile() {
+    const p = loadProfile();
+    if (!p) return;
+    state.profileOn = !state.profileOn;
+    if (state.profileOn) {
+      applyProfile(p);
+      toast("💼 프로필 적용됨");
+    } else {
+      resetFilters();
+      state.area = ""; if ($("area-filter")) $("area-filter").value = "";
+      setSelectedDistricts(new Set());
+      toast("프로필 해제");
+    }
+    updateProfileBtn();
+  }
+  function updateProfileBtn() {
+    const btn = $("btn-profile");
+    if (!btn) return;
+    const p = loadProfile();
+    btn.classList.toggle("hidden", !p);       // 저장된 프로필 있을 때만 노출
+    btn.classList.toggle("active", !!state.profileOn);
   }
 
   function updateFilterBadge() {
@@ -593,6 +654,7 @@
       state.map.setCenter(new kakao.maps.LatLng(lat, lon));
       return true;
     },
+    getProfile: loadProfile,   // 매수후보 패널의 '내 프로필만' 필터용
     onChange: null,   // dashboard.js 가 등록: (Set) => void
   };
 
