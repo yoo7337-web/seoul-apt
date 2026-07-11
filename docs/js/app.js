@@ -304,7 +304,12 @@
   function markerInfo(mk) {
     const jeonse = state.dealType === "jeonse";
     const byArea = jeonse ? mk.jeonse_area : mk.sale_area;
-    const bucket = state.area || (jeonse ? mk.jrep : mk.rep);
+    // 현재 선택(포커스)된 단지는 상세 패널과 같은 평형(detailArea)으로 맞춘다.
+    // 그래야 "18~26평 저평가"로 매수후보에서 열었을 때 지도 버블도 26평 가격을
+    // 보여준다(그냥 헤더 평형필터/대표평형만 쓰면 불일치 - 사고 이력).
+    const bucket = (mk.id === state.selectedId && state.detailArea)
+      ? state.detailArea
+      : state.area || (jeonse ? mk.jrep : mk.rep);
     const o = (byArea && bucket) ? byArea[bucket] : null;
     return o ? { price: o.p, py: o.py, stale: !!o.s, bucket } : null;
   }
@@ -631,14 +636,49 @@
     if (window.SeoulMap.onChange) window.SeoulMap.onChange(new Set(state.districts));
   }
 
-  function focusComplex(id) {
+  // 방금 포커스한 좌표가 좌측 상세 패널에 가려지지 않도록 보정.
+  // setCenter만 하면 지도 컨테이너의 '진짜 중앙'에 놓이는데, 창 너비 1280px
+  // 안팎(매수후보 리스트+상세 패널이 함께 열린 흔한 폭)에서는 그 자리가 하필
+  // 열려 있는 상세 패널 밑이라 마커가 안 보인다(사고 이력). 패널이 지도 왼쪽에
+  // 붙은 세로 스트립일 때만 화면에 남는 폭 쪽으로 밀어서 센터링한다.
+  function centerAvoidingPanel(lat, lon) {
+    const map = state.map;
+    map.setCenter(new kakao.maps.LatLng(lat, lon));
+    const panelEl = $("panel"), mapEl = $("map");
+    if (!panelEl || !mapEl || panelEl.classList.contains("hidden")) return;
+    const mapRect = mapEl.getBoundingClientRect();
+    const panelRect = panelEl.getBoundingClientRect();
+    const deadLeft = Math.max(0, panelRect.left - mapRect.left);
+    const deadRight = Math.min(mapRect.width, panelRect.right - mapRect.left);
+    const coversHeight = (Math.min(mapRect.height, panelRect.bottom - mapRect.top)
+      - Math.max(0, panelRect.top - mapRect.top)) >= mapRect.height * 0.5;
+    // 모바일 하단시트(가로 전체 폭)나 애매한 겹침은 보정하지 않는다
+    if (!coversHeight || deadLeft > 20 || deadRight <= 0 || deadRight >= mapRect.width) return;
+    const visibleWidth = mapRect.width - deadRight;
+    if (visibleWidth < 80) return;   // 남는 폭이 너무 좁으면 보정 포기
+    const desiredX = deadRight + visibleWidth / 2;
+    const shiftX = desiredX - mapRect.width / 2;
+    if (Math.abs(shiftX) < 1) return;
+    try {
+      const proj = map.getProjection();
+      const centerPt = proj.containerPointFromCoords(map.getCenter());
+      const newPt = new kakao.maps.Point(centerPt.x - shiftX, centerPt.y);
+      map.setCenter(proj.coordsFromContainerPoint(newPt));
+    } catch { /* 프로젝션 실패 시 중앙 센터링 그대로 둠 */ }
+  }
+
+  function focusComplex(id, areaHint) {
     const mk = state.markers.find((m) => m.id === id);
     if (!mk || !state.map) return false;
     state.map.setLevel(4);
     state.map.setCenter(new kakao.maps.LatLng(mk.lat, mk.lon));
     state.selectedId = id;
-    openComplex(mk);
     renderMarkers();
+    // openComplex는 비동기(fetch)라 패널이 실제로 열리기(.hidden 해제) 전에는
+    // 패널 가림 여부를 판단할 수 없다 - 패널이 열린 뒤에 보정 재센터링한다
+    // (먼저 센터링→openComplex 전에 보정하면 항상 hidden 상태로 보여 보정이
+    // 스킵되는 버그가 났었다).
+    openComplex(mk, areaHint).then(() => centerAvoidingPanel(mk.lat, mk.lon));
     return true;
   }
 
@@ -658,7 +698,7 @@
     focusLatLng: (lat, lon) => {          // 대시보드 청약 행 클릭 → 지도 이동
       if (!state.map || !lat || !lon) return false;
       state.map.setLevel(4);
-      state.map.setCenter(new kakao.maps.LatLng(lat, lon));
+      centerAvoidingPanel(lat, lon);
       return true;
     },
     getProfile: loadProfile,   // 매수후보 패널의 '내 프로필만' 필터용
@@ -810,7 +850,13 @@
   }
 
   // ── 단지 상세 패널 ──────────────────────────────────────────────────
-  async function openComplex(mk) {
+  // areaHint: 특정 평형 맥락에서 열었을 때(예: 매수후보 리스트의 "18~26평" 저평가
+  // 행, 급매 리스트의 실거래 면적) 그 평형으로 상세를 맞추기 위한 힌트.
+  // 버킷 키 문자열("60~85㎡") 또는 원시 전용면적(㎡ 숫자) 둘 다 받는다.
+  // 힌트 없이 열면(지도에서 직접 클릭 등) 기존처럼 헤더 평형필터→대표평형 순.
+  // 힌트를 무시하면 매수후보 리스트에서 "18~26평 저평가"로 열었는데 상세/버블은
+  // 단지의 대표평형(다른 평형)을 보여주는 불일치가 난다(사고 이력).
+  async function openComplex(mk, areaHint) {
     let detail;
     try {
       detail = await fetchJSON(`${DATA}complex/${mk.lawd_cd}/${mk.id}.json`);
@@ -818,9 +864,10 @@
       return;
     }
     state.currentDetail = Object.assign({}, mk, detail);
-    // 상세 면적 선택: 전역 평형 필터를 상속(해당 단지에 있으면), 없으면 전체
     const bks = detailBuckets(state.currentDetail);
-    state.detailArea = (state.area && bks.includes(state.area)) ? state.area : "";
+    const hintBucket = typeof areaHint === "number" ? areaBucket(areaHint) : areaHint;
+    state.detailArea = (hintBucket && bks.includes(hintBucket)) ? hintBucket
+      : (state.area && bks.includes(state.area)) ? state.area : "";
     renderPanel();
   }
 

@@ -427,7 +427,10 @@
     wrap.innerHTML = html + "</tbody></table>";
     wrap.querySelectorAll("tr[data-id]").forEach((tr) =>
       tr.addEventListener("click", () => {
-        if (window.SeoulMap) window.SeoulMap.focusComplex(+tr.dataset.id);
+        // 급매 실거래의 실제 전용면적(㎡)으로 지도 상세/버블을 맞춘다(대표평형이
+        // 다른 크기면 "이 급매"와 다른 가격이 보이는 불일치 방지)
+        const b = list.find((x) => x.id === +tr.dataset.id);
+        if (window.SeoulMap) window.SeoulMap.focusComplex(+tr.dataset.id, b ? b.area : undefined);
       }));
   }
 
@@ -614,7 +617,11 @@
     wrap.innerHTML = html + "</tbody></table>";
     wrap.querySelectorAll("tr[data-id]").forEach((tr) =>
       tr.addEventListener("click", () => {
-        if (window.SeoulMap) window.SeoulMap.focusComplex(+tr.dataset.id);
+        // 특정 평형 버킷(전체가 아니면) 그대로 지도 상세/버블에도 반영 -
+        // 리스트가 "18~26평" 기준으로 보여준 값과 지도가 다른 평형(대표평형)을
+        // 보여주는 불일치 방지(사고 이력)
+        if (window.SeoulMap) window.SeoulMap.focusComplex(
+          +tr.dataset.id, valBucket !== "all" ? valBucket : undefined);
       }));
   }
 
