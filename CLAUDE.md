@@ -31,6 +31,17 @@
   가능, ② `docs/data/*.json`도 URL을 알면 로그인 없이 직접 fetch 가능(백엔드 없는 정적 사이트라 원천
   차단 불가). 실거래가 데이터 자체는 국토부 공개정보라 민감하지 않음 — 진짜 비공개가 필요해지면
   별도 백엔드 필요.
+- **Pages가 라이브인 이상 `docs/js·css·html` 수정은 커밋만으로 안 끝난다 — 반드시 `git push`까지
+  완료해야 실사이트에 반영된다**(main/docs를 그대로 서빙하므로 push=배포). 코드 수정 작업의 마지막
+  단계로 항상 `git push`를 실행하고, 그냥 성공했다고 넘기지 말고:
+  1. push가 non-fast-forward로 거부되면(Actions daily/weekly 자동커밋과 겹칠 수 있음) `git fetch` →
+     `git rebase origin/main`(merge 말고 rebase로 히스토리 유지) → 재push.
+  2. 배포 확인이 필요한 변경(사용자가 직접 확인 요청했거나 중요한 수정)은 push 후
+     `gh api repos/yoo7337-web/seoul-apt/pages/builds/latest`로 `status:"built"`와
+     `commit`이 방금 push한 SHA(`git rev-parse HEAD`)와 일치하는지 확인 — 지금 세션에서 이미
+     확인된 패턴. 로그인 게이트 때문에 실사이트 브라우저 확인은 제한적이니(구글 로그인은 직접
+     수행 불가) 빌드 상태 확인으로 대체.
+  3. 로컬 프리뷰(8511, 게이트 스킵)에서 먼저 검증 후 push하는 기존 절차는 그대로 유지.
 
 ## 입지 레이어(역세권·초품아, `poi` 명령)
 
