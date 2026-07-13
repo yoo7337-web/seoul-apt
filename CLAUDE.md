@@ -14,6 +14,24 @@
   `config/watchlist.yml`의 `complexes:`에 붙여넣기(정적 사이트라 이 1회 수동
   연결 필요). 등록된 단지 거래는 다이제스트 최상단 ⭐섹션에 표시.
 
+### 외부 배포 (GitHub Pages + 구글 로그인, 2026-07-14 구축)
+- URL: **https://yoo7337-web.github.io/seoul-apt/** (repo `yoo7337-web/seoul-apt`, main/`docs`)
+- **전제조건: repo가 Public이어야 함** — 무료 플랜은 Private repo에서 GitHub Pages 미지원
+  (`422 Your current plan does not support GitHub Pages for this repository`). Private→Public
+  전환은 접근권한 변경이라 사용자가 직접 GitHub 웹(Settings > Danger Zone)에서 수행.
+- Pages 활성화는 repo가 Public이 된 뒤 `gh api -X POST repos/yoo7337-web/seoul-apt/pages
+  -f "source[branch]=main" -f "source[path]=/docs"` (또는 Settings > Pages 웹에서).
+- 로그인: Firebase Auth(To-Do의 `career-board-fc111` 프로젝트 재사용, `docs/js/firebase-config.js`) —
+  구글 signInWithPopup + **허용 이메일 화이트리스트**(`window.ALLOWED_EMAILS`, 현재 yoo7337@gmail.com만).
+  게이트 로직은 `docs/js/auth.js`, index.html·dashboard.html·devlog.html 3곳 모두 head에 로드.
+  **localhost는 게이트 자동 스킵**(로컬 개발·프리뷰 영향 없음). authDomain이 `yoo7337-web.github.io`라
+  같은 계정의 다른 github.io 배포(career-board, chart-principles)와 승인 도메인을 공유 — 추가 설정 불필요.
+- ⚠ 한계(chart-principles와 동일): **공개 repo + 정적 사이트라 로그인 게이트는 UI 차원**일 뿐,
+  ① repo 자체(코드·`config/watchlist.yml`의 관심지역 등)는 github.com에서 로그인 없이 그대로 열람·clone
+  가능, ② `docs/data/*.json`도 URL을 알면 로그인 없이 직접 fetch 가능(백엔드 없는 정적 사이트라 원천
+  차단 불가). 실거래가 데이터 자체는 국토부 공개정보라 민감하지 않음 — 진짜 비공개가 필요해지면
+  별도 백엔드 필요.
+
 ## 입지 레이어(역세권·초품아, `poi` 명령)
 
 - 데이터는 준불변이라 1회 적재 후 재계산만 하면 된다(daily Action 불필요).
