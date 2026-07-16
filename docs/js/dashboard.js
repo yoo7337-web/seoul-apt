@@ -491,6 +491,11 @@
     const mk = valMkById && valMkById[view.id];
     return mk ? mk.hh : null;
   }
+  // 현재 매물(매매) 건수 — export가 마커에 얹은 요약(ls). 미수집 단지는 null
+  function valLs(view) {
+    const mk = valMkById && valMkById[view.id];
+    return mk && mk.ls != null ? mk.ls : null;
+  }
   function valViews() {
     let views = valData.items.map(valView).filter(Boolean);
     if (valProfileOn) views = views.filter(valMatchProfile);
@@ -599,12 +604,12 @@
     const CAP = 100, shown = rows.slice(0, CAP);
     let html = `<div class="sel-hint" style="margin:4px 0 6px">${rows.length.toLocaleString()}건${rows.length > CAP ? ` 중 상위 ${CAP}` : ""} · 5년위치 낮은 순 · 행 클릭=지도</div>
       <table class="rank-table"><thead><tr>
-      <th>단지</th><th>구</th><th>평</th><th>세대</th><th>5년위치</th><th>고점대비</th><th>전세가율</th><th>표본</th>
+      <th>단지</th><th>구</th><th>평</th><th>세대</th><th>5년위치</th><th>고점대비</th><th>전세가율</th><th>매물</th><th>표본</th>
       </tr></thead><tbody>`;
     shown.forEach((it) => {
       const shield = (it.pos <= 30 && it.jr != null && it.jr >= 60)
         ? ' <span title="전세가율 높음 - 하방 견고">🛡️</span>' : "";
-      const py = valPy(it), hh = valHh(it);
+      const py = valPy(it), hh = valHh(it), ls = valLs(it);
       html += `<tr data-id="${it.id}">
         <td>${it.apt}${shield}</td><td>${GU_NAME[it.lawd] || "-"}</td>
         <td>${py != null ? py + "평" : "-"}</td>
@@ -612,6 +617,8 @@
         <td><b>${it.pos}%</b></td>
         <td>${it.vp != null ? it.vp + "%" : "-"}</td>
         <td>${it.jr != null ? it.jr + "%" : "-"}</td>
+        <td>${ls != null ? `<b>${ls}</b>건`
+          : '<span title="매물 미수집 단지" style="color:var(--muted)">-</span>'}</td>
         <td>${it.m}개월</td></tr>`;
     });
     wrap.innerHTML = html + "</tbody></table>";

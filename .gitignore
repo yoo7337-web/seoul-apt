@@ -13,3 +13,6 @@ data/gongsi/
 data/seoul_apt.sqlite
 data/seoul_apt.sqlite-*
 
+# 매물 수집 진행상태(로컬 실행 전용 - 중단 시 이어하기용)
+data/listings_state.json
+

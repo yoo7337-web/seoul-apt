@@ -43,6 +43,36 @@
      수행 불가) 빌드 상태 확인으로 대체.
   3. 로컬 프리뷰(8511, 게이트 스킵)에서 먼저 검증 후 push하는 기존 절차는 그대로 유지.
 
+## 현재 매물(호가) 수집 (`listings` 명령, 2026-07-17 구축)
+
+⭐ 트리거: **"매물 수집해줘"** → `.venv\Scripts\python.exe -m seoul_apt.cli listings`
+(옵션: `--scope watch|seoul`, `--source auto|naver|zigbang`, `--limit N`, `--restart`)
+수집 후 반드시 `export` 재실행해야 사이트에 반영된다.
+
+- **네이버부동산이 주 소스**(커버리지·품질 압도적. 은마 매매 329건 vs 직방 1건).
+  일반 requests 는 TLS 핑거프린팅으로 **무조건 429** → `curl_cffi`(Chrome
+  impersonate)로 우회. 이건 우회가 아니라 **정상 브라우저 흉내**라 잘 동작하지만,
+  네이버가 정책을 바꾸면 깨질 수 있다(그때는 직방 폴백 + 링크아웃이 안전망).
+- **확인된 무인증 경로**(2026-07 검증):
+  `new.land/api/search?keyword=단지명` → complexNo·좌표·cortarNo (단지 매칭용) /
+  fin.land `front-api/v1/complex/buildingList`·`pyeongList`·
+  `building/article/list`(complexNumber×buildingNumber×pyeongTypeNumber 순회).
+  **new.land 의 complexNo 와 fin.land 의 complexNumber 는 같은 체계**(검증됨).
+  `POST /complex/article/list` 는 스키마가 까다로워 400 — GET 3종 조합을 쓸 것.
+  `articles` 는 층별 dict, 값은 리스트, **대표매물 기준으로 세야 실제 물건 수**
+  (totalCount 는 중복 중개사 등록 포함이라 더 큼).
+- **단지 매칭은 좌표가 주 신호**(±120m), 이름은 보조. 국토부↔네이버 표기차가 잦다
+  ('인왕산아이파크'↔'인왕산현대아이파크', '효성쥬얼리시티'↔'효성주얼리시티').
+  괄호 든 이름은 검색 0건이라 괄호 제거 후 재검색. **좌표 ≤50m 면 이름 달라도 채택**.
+  '현대'·'롯데캐슬' 같은 일반명은 오매칭 위험이 커 매칭 실패로 두는 게 맞다
+  (실패 단지는 프런트에서 네이버 **검색 링크아웃**으로 폴백).
+- **차단 안전장치**: 요청 간격 1.2s+jitter / 429 시 지수 백오프(60→300s, 초과 시
+  세션 중단) / 세션 요청 상한 / `data/listings_state.json` 진행상태 → 중단분 재개.
+  **GitHub Actions(해외 IP)에는 넣지 말 것** — 차단 위험. 로컬 실행 전제.
+- **호가 괴리(prem)** 는 대원칙대로 같은 크기(±12%)·최근 1년 실거래 중앙값 대비.
+  표본<3이면 미표시. 매매만 계산(전세 실거래는 rent_txn 이라 비교 불가).
+- 내려간 매물은 삭제하지 않고 `status='gone'`(이력 보존), 다시 올라오면 open 복구.
+
 ## 입지 레이어(역세권·초품아, `poi` 명령)
 
 - 데이터는 준불변이라 1회 적재 후 재계산만 하면 된다(daily Action 불필요).

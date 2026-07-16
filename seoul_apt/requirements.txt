@@ -4,3 +4,6 @@ pandas>=2.0.0
 python-dotenv>=1.0.0
 openpyxl>=3.1.0   # 공시가격 XLSX 파싱
 PyYAML>=6.0       # 관심지역 워치리스트(config/watchlist.yml)
+# 매물 수집(listings) 전용 - 네이버부동산 TLS 핑거프린팅 우회(Chrome impersonate).
+# 미설치여도 다른 명령은 정상 동작(listings.py 가 지연 import + 직방 폴백).
+curl_cffi>=0.7.0

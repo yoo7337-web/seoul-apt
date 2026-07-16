@@ -132,6 +132,15 @@ def cmd_aireco(conn, args):
         print(text)
 
 
+def cmd_listings(conn, args):
+    from . import listings
+    stats = listings.collect(conn, scope=args.scope, source=args.source,
+                             limit=args.limit, resume=not args.restart)
+    print(f"[listings] 단지 {stats['complexes']} / 매물 {stats['listings']} "
+          f"(네이버 {stats['naver']} · 직방 {stats['zigbang']})"
+          + (" · ⚠차단으로 중단(다음 실행 재개)" if stats.get("blocked") else ""))
+
+
 def cmd_poi(conn, args):
     from . import poi
     out = poi.run(conn, refresh=args.refresh)
@@ -217,6 +226,16 @@ def build_parser() -> argparse.ArgumentParser:
     po.add_argument("--refresh", action="store_true",
                     help="이미 계산된 단지도 다시 계산(기본은 미계산분만)")
     po.set_defaults(func=cmd_poi)
+
+    ls = sub.add_parser("listings", help="현재 매물(호가) 수집 - 네이버부동산+직방")
+    ls.add_argument("--scope", choices=["watch", "seoul"], default="watch",
+                    help="watch=거래활발 단지(기본), seoul=전역 스윕")
+    ls.add_argument("--source", choices=["auto", "naver", "zigbang"], default="auto",
+                    help="auto=네이버 우선+직방폴백(기본)")
+    ls.add_argument("--limit", type=int, default=None, help="처리 단지 수 제한")
+    ls.add_argument("--restart", action="store_true",
+                    help="진행상태 무시하고 처음부터(기본은 중단분 이어하기)")
+    ls.set_defaults(func=cmd_listings)
 
     a = sub.add_parser("all", help="collect+geocode+gongsi+reb+export")
     a.add_argument("--months", type=int, default=None)

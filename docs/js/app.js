@@ -65,6 +65,8 @@
     favDistricts: loadFavDistricts(),   // 관심구(lawd_cd Set)
     subs: [],          // 청약·분양 공고(subscription.json)
     subOverlays: [],   // 청약 마커(실거래 오버레이와 별도 관리)
+    listings: null,    // 현재 매물(listings.json) - 최초 패널 열 때 지연 로드
+    listingTrade: "sale",   // 매물 섹션 탭: 'sale' | 'jeonse'
     showSubs: localStorage.getItem("seoul_apt_show_subs") !== "0",
     profileOn: false,  // 💼 매수 프로필 적용 상태
   };
@@ -868,6 +870,7 @@
     const hintBucket = typeof areaHint === "number" ? areaBucket(areaHint) : areaHint;
     state.detailArea = (hintBucket && bks.includes(hintBucket)) ? hintBucket
       : (state.area && bks.includes(state.area)) ? state.area : "";
+    await ensureListings();   // 매물 섹션·네이버 링크에 필요(최초 1회만 네트워크)
     renderPanel();
   }
 
@@ -943,6 +946,80 @@
     const loan = price * ltvPct / 100;
     return { acqRate, acq, eduRate, edu, farmRate, farm, brokRate, brok,
              etc, costs, loan, cash: price - loan + costs };
+  }
+
+  // ── 현재 매물(호가) ─────────────────────────────────────────────────
+  // listings.json 은 수집한 단지만 들어있는 별도 파일 → 패널 최초 오픈 때 1회 로드.
+  async function ensureListings() {
+    if (state.listings !== null) return state.listings;
+    try {
+      const j = await fetchJSON(DATA + "listings.json");
+      state.listings = j.complexes || {};
+    } catch {
+      state.listings = {};   // 미수집/파일없음 → 빈 객체(재시도 안 함)
+    }
+    return state.listings;
+  }
+
+  // 네이버부동산 링크(매핑된 단지번호 있으면 단지 직링크, 없으면 검색)
+  function naverUrl(d) {
+    const g = state.listings && state.listings[String(d.id)];
+    if (g && g.no) return `https://fin.land.naver.com/complexes/${g.no}`;
+    const q = encodeURIComponent(`${d.umd || ""} ${d.apt}`.trim());
+    return `https://m.land.naver.com/search/result/${q}`;
+  }
+
+  function listingsHtml(d) {
+    const g = state.listings && state.listings[String(d.id)];
+    const link = `<a class="chip-btn nv-link" href="${naverUrl(d)}" target="_blank"
+        rel="noopener">네이버부동산 ↗</a>`;
+    if (!g) {
+      return `<div class="section-title">🏷️ 현재 매물</div>
+        <div class="empty">아직 수집되지 않은 단지입니다 ${link}</div>`;
+    }
+    const trade = state.listingTrade;
+    const rows = (g[trade] || []).slice();
+    const nS = (g.sale || []).length, nJ = (g.jeonse || []).length;
+    const at = g.at ? g.at.slice(0, 10) : "";
+    const tabs = `<div class="lst-tabs">
+      <button data-lt="sale" class="${trade === "sale" ? "active" : ""}">매매 ${nS}</button>
+      <button data-lt="jeonse" class="${trade === "jeonse" ? "active" : ""}">전세 ${nJ}</button>
+    </div>`;
+    let body;
+    if (!rows.length) {
+      body = '<div class="empty">해당 유형 매물 없음</div>';
+    } else {
+      body = `<table class="txns lst-table"><thead><tr>
+          <th>호가</th><th>평</th><th>층</th><th>동·향</th>
+          ${trade === "sale" ? "<th>실거래대비</th>" : ""}</tr></thead><tbody>
+        ${rows.map((r) => `<tr>
+          <td><a href="${r.url}" target="_blank" rel="noopener">${fmt(r.p)}${r.mo ? `/${r.mo}` : ""}</a></td>
+          <td>${r.py != null ? r.py + "평" : "-"}</td>
+          <td>${r.fl != null ? r.fl + (r.ft ? "/" + r.ft : "") : "-"}</td>
+          <td>${[r.dong, r.dir].filter(Boolean).join(" ") || "-"}</td>
+          ${trade === "sale" ? `<td>${premBadge(r.prem)}</td>` : ""}
+        </tr>`).join("")}
+      </tbody></table>`;
+    }
+    return `<div class="section-title">🏷️ 현재 매물
+        <span class="lst-at">${at ? at + " 기준" : ""}</span> ${link}</div>
+      ${tabs}${body}`;
+  }
+
+  // 호가 vs 같은크기(±12%)·최근1년 실거래 중앙값 괴리
+  function premBadge(prem) {
+    if (prem == null) return '<span class="prem-na" title="같은 크기 최근 실거래 표본 부족">-</span>';
+    const cls = prem > 0 ? "up" : prem < 0 ? "down" : "flat";
+    const sign = prem > 0 ? "+" : "";
+    return `<span class="prem ${cls}" title="같은 크기(±12%) 최근 1년 실거래 중앙값 대비">${sign}${prem}%</span>`;
+  }
+
+  function bindListings() {
+    document.querySelectorAll(".lst-tabs button").forEach((b) =>
+      b.addEventListener("click", () => {
+        state.listingTrade = b.dataset.lt;
+        renderPanel();
+      }));
   }
 
   // 입지(역세권·초품아) 한 줄 — 도보 약 67m/분 환산
@@ -1042,6 +1119,8 @@
 
       ${buildingInfo(d)}
 
+      ${listingsHtml(d)}
+
       ${costCalcHtml(si)}
 
       <div class="btn-row">
@@ -1068,6 +1147,7 @@
     $("fav-toggle").addEventListener("click", () => toggleFavorite(d));
     $("csv-btn").addEventListener("click", () => downloadCSV(d));
     bindCostCalc(si);
+    bindListings();
     el.querySelectorAll(".chart-tabs button").forEach((b) =>
       b.addEventListener("click", () => { state.chartMode = b.dataset.mode; renderPanel(); }));
     el.querySelectorAll("[data-area]").forEach((b) =>

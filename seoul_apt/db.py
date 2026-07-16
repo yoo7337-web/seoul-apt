@@ -133,6 +133,30 @@ CREATE TABLE IF NOT EXISTS poi (
     UNIQUE(kind, name, lat, lon)
 );
 
+CREATE TABLE IF NOT EXISTS listing (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    source         TEXT NOT NULL,      -- 'naver' | 'zigbang'
+    item_id        TEXT NOT NULL,      -- 매물 고유번호(대표매물 articleNumber 등)
+    complex_id     INTEGER REFERENCES complex(complex_id),
+    trade_type     TEXT NOT NULL,      -- 'sale' | 'jeonse' | 'wolse'
+    price_manwon   INTEGER,            -- 매매가/보증금(만원)
+    monthly_manwon INTEGER,            -- 월세(만원), 0/NULL이면 전세·매매
+    area_m2        REAL,               -- 전용면적(㎡)
+    floor          INTEGER,            -- 해당 층
+    floor_total    INTEGER,            -- 총 층
+    dong           TEXT,               -- 동 이름
+    direction      TEXT,               -- 향(정규화: 남/남동 등)
+    description     TEXT,              -- 매물 설명(중개사 코멘트)
+    confirm_date   TEXT,               -- 매물 확인일 'YYYY-MM-DD'
+    url            TEXT,               -- 매물 상세 링크
+    first_seen     TEXT NOT NULL,      -- 최초 수집 시각
+    last_seen      TEXT NOT NULL,      -- 마지막 수집 시각
+    status         TEXT NOT NULL DEFAULT 'open',  -- 'open' | 'gone'(내려감)
+    UNIQUE(source, item_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_listing_complex ON listing(complex_id, trade_type);
+
 CREATE INDEX IF NOT EXISTS idx_sale_complex_date ON sale_txn(complex_id, deal_date);
 CREATE INDEX IF NOT EXISTS idx_rent_complex_date ON rent_txn(complex_id, deal_date);
 CREATE INDEX IF NOT EXISTS idx_complex_lawd ON complex(lawd_cd);
@@ -185,6 +209,10 @@ def _migrate(conn: sqlite3.Connection) -> None:
         ("subway_nm", "TEXT"),           # 최근접 역명(+노선)
         ("school_m", "INTEGER"),         # 최근접 초등학교 직선거리(m)
         ("poi_fetched_at", "TEXT"),      # POI 최근접 계산 시각(증분 skip용)
+        # 매물(네이버·직방) 단지번호 매핑 캐시(1회 매칭 후 재사용)
+        ("naver_no", "TEXT"),            # 네이버부동산 complexNo
+        ("zigbang_id", "INTEGER"),       # 직방 danji id
+        ("listing_matched_at", "TEXT"),  # 매물 단지 매칭 시각(재매칭 skip용)
     ]:
         if name not in ccols:
             conn.execute(f"ALTER TABLE complex ADD COLUMN {name} {decl}")

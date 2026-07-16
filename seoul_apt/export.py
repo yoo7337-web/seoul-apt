@@ -45,6 +45,7 @@ def export_all(conn, kakao_js_key: str | None = None) -> dict:
     ppy_trend = {}   # 대시보드용: 구별 월별 평단가(경량)
     val_items = []   # 밸류에이션 종합(대시보드 밸류에이션 섹션용)
     totals = {"sale": 0, "rent": 0, "complex": 0}
+    listing_summary = _listing_summary(conn)   # {complex_id: {ns, nj, minp}}
 
     for lawd_cd, name in config.SEOUL_DISTRICTS.items():
         monthly = aggregate.district_monthly(conn, lawd_cd)
@@ -116,11 +117,14 @@ def export_all(conn, kakao_js_key: str | None = None) -> dict:
                     "sw": c["subway_m"],         # 최근접 지하철역 거리(m)
                     "swn": c["subway_nm"],       # 최근접 역명(+노선)
                     "el": c["school_m"],         # 최근접 초등학교 거리(m)
+                    **_marker_listing(listing_summary.get(c["id"])),
                 })
 
     _write_json(export_dir / "markers.json", {"markers": markers})
     _write_json(export_dir / "reb" / "seoul_index.json",
                 aggregate.reb_series(conn))
+    # 현재 매물(호가) — 단지별 그룹. 별도 파일 지연 로드(마커 용량 보호).
+    _write_json(export_dir / "listings.json", listings_payload(conn, now))
     # 청약·분양(진행중 + 최근 1년 마감분)
     _write_json(export_dir / "subscription.json", {
         "generated": now.isoformat(timespec="seconds"),
@@ -159,6 +163,68 @@ def _val_short(v: dict) -> dict:
     """밸류에이션 객체를 밸류에이션.json 용 경량 키로 축약."""
     return {"pos": v["pos"], "vp": v["vs_peak"], "jr": v["jr"],
             "ppy": v["cur_ppy"], "m": v["months"]}
+
+
+def _listing_summary(conn) -> dict:
+    """단지별 open 매물 요약: {complex_id: {ns(매매수), nj(전세수), minp(최저매매호가)}}."""
+    out = {}
+    for r in conn.execute(
+        "SELECT complex_id, trade_type, COUNT(*) n, MIN(price_manwon) minp "
+        "FROM listing WHERE status='open' GROUP BY complex_id, trade_type"):
+        d = out.setdefault(r["complex_id"], {"ns": 0, "nj": 0, "minp": None})
+        if r["trade_type"] == "sale":
+            d["ns"] = r["n"]
+            d["minp"] = r["minp"]
+        elif r["trade_type"] == "jeonse":
+            d["nj"] = r["n"]
+    return out
+
+
+def _marker_listing(summ: dict | None) -> dict:
+    """마커에 얹을 매물 요약(있을 때만 키 추가 - 용량 절약)."""
+    if not summ:
+        return {}
+    out = {}
+    if summ.get("ns"):
+        out["ls"] = summ["ns"]      # 매매 매물수
+    if summ.get("nj"):
+        out["lj"] = summ["nj"]      # 전세 매물수
+    return out
+
+
+def listings_payload(conn, now) -> dict:
+    """현재 open 매물을 단지별 그룹으로. 매매만 호가 괴리(prem) 계산.
+
+    구조: {generated, complexes: {complex_id: {no(naver_no), at(수집시각),
+      sale: [{p, mo, py, fl, ft, dong, dir, prem, d(확인일), url}...], jeonse: [...]}}}
+    """
+    from . import listings as L
+    rows = conn.execute(
+        "SELECT l.*, c.naver_no FROM listing l JOIN complex c "
+        "ON c.complex_id=l.complex_id WHERE l.status='open' "
+        "ORDER BY l.trade_type, l.price_manwon").fetchall()
+    out = {}
+    for r in rows:
+        cid = r["complex_id"]
+        grp = out.setdefault(str(cid), {"no": r["naver_no"], "at": None,
+                                        "sale": [], "jeonse": [], "wolse": []})
+        py = round(r["area_m2"] * config.PYEONG_PER_SQM) if r["area_m2"] else None
+        prem = None
+        if r["trade_type"] == "sale":
+            prem = L.asking_premium(conn, cid, r["area_m2"], r["price_manwon"], "sale")
+        item = {"p": r["price_manwon"], "py": py, "fl": r["floor"],
+                "ft": r["floor_total"], "dong": r["dong"], "dir": r["direction"],
+                "d": r["confirm_date"], "url": r["url"]}
+        if r["monthly_manwon"]:
+            item["mo"] = r["monthly_manwon"]
+        if prem is not None:
+            item["prem"] = prem
+        bucket = r["trade_type"] if r["trade_type"] in grp else "sale"
+        grp[bucket].append(item)
+        # 수집시각은 가장 최근 last_seen
+        if grp["at"] is None or (r["last_seen"] and r["last_seen"] > grp["at"]):
+            grp["at"] = r["last_seen"]
+    return {"generated": now.isoformat(timespec="seconds"), "complexes": out}
 
 
 def subscription_items(conn, today: str) -> list[dict]:
