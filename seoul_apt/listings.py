@@ -397,22 +397,36 @@ def asking_premium(conn, complex_id, area_m2, price_manwon, trade_type) -> float
 
 
 # ── 수집 오케스트레이션 ──────────────────────────────────────────────────
-def _target_complexes(conn, scope: str) -> list:
-    """수집 대상 단지 rows(complex_id, apt_nm, lat, lon, naver_no)."""
-    base = ("SELECT complex_id, apt_nm, lat, lon, naver_no FROM complex "
-            "WHERE lat IS NOT NULL AND lon IS NOT NULL")
-    if scope == "seoul":
-        return conn.execute(base).fetchall()
-    # favorites+watch 는 프런트 localStorage라 서버가 모름 → watchlist.yml 관심구 +
-    # 거래 활발(최근 1년 표본 많은) 단지로 근사. seoul 외 기본값.
-    return conn.execute(
-        base + " AND complex_id IN ("
-        "  SELECT complex_id FROM sale_txn WHERE canceled=0 "
-        "  AND deal_date>=date('now','-365 days') "
-        "  GROUP BY complex_id HAVING COUNT(*)>=3)").fetchall()
+ACTIVE_FILTER = (
+    " AND complex_id IN ("
+    "  SELECT complex_id FROM sale_txn WHERE canceled=0 "
+    "  AND deal_date>=date('now','-365 days') "
+    "  GROUP BY complex_id HAVING COUNT(*)>=3)")
 
 
-def collect(conn, scope="watch", source="auto", limit=None, resume=True) -> dict:
+def _target_complexes(conn, scope: str, district: str | None = None,
+                      active_only: bool = True) -> list:
+    """수집 대상 단지 rows(complex_id, apt_nm, lat, lon, naver_no).
+
+    district(lawd_cd)를 주면 그 구로 한정. active_only=True 면 최근 1년 매매
+    3건 이상인 단지만(거래 없는 단지는 매물도 거의 없어 요청 낭비).
+    """
+    sql = ("SELECT complex_id, apt_nm, lat, lon, naver_no FROM complex "
+           "WHERE lat IS NOT NULL AND lon IS NOT NULL")
+    params = []
+    if district:
+        sql += " AND lawd_cd=?"
+        params.append(district)
+    if scope == "seoul" and not district:
+        return conn.execute(sql, params).fetchall()
+    # favorites 는 프런트 localStorage라 서버가 모름 → 거래 활발 단지로 근사
+    if active_only:
+        sql += ACTIVE_FILTER
+    return conn.execute(sql, params).fetchall()
+
+
+def collect(conn, scope="watch", source="auto", limit=None, resume=True,
+            district=None, active_only=True) -> dict:
     """매물 수집. source: auto(네이버 우선)|naver|zigbang."""
     now = _now()
     naver = None
@@ -424,7 +438,7 @@ def collect(conn, scope="watch", source="auto", limit=None, resume=True) -> dict
                 raise RuntimeError(f"curl_cffi 미설치 등으로 네이버 클라이언트 생성 실패: {e}")
     zig = ZigbangClient() if source in ("auto", "zigbang") else None
 
-    targets = _target_complexes(conn, scope)
+    targets = _target_complexes(conn, scope, district, active_only)
     state = load_state() if resume else {"done_complex_ids": []}
     done = set(state.get("done_complex_ids", []))
     stats = {"complexes": 0, "listings": 0, "naver": 0, "zigbang": 0,

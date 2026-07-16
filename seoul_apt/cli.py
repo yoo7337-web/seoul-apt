@@ -132,10 +132,27 @@ def cmd_aireco(conn, args):
         print(text)
 
 
+def _lawd_cd(v: str | None) -> str | None:
+    """'광진구' 또는 '11215' → lawd_cd. 못 찾으면 예외."""
+    if not v:
+        return None
+    if v in config.SEOUL_DISTRICTS:
+        return v
+    for cd, name in config.SEOUL_DISTRICTS.items():
+        if name == v or name.rstrip("구") == v.rstrip("구"):
+            return cd
+    raise RuntimeError(f"'{v}' 는 서울 자치구가 아닙니다. 예: 광진구 또는 11215")
+
+
 def cmd_listings(conn, args):
     from . import listings
+    lawd = _lawd_cd(args.district)
+    if lawd:
+        print(f"[listings] 대상 구: {config.SEOUL_DISTRICTS[lawd]}"
+              + ("" if args.active_only else " (거래 없는 단지 포함)"))
     stats = listings.collect(conn, scope=args.scope, source=args.source,
-                             limit=args.limit, resume=not args.restart)
+                             limit=args.limit, resume=not args.restart,
+                             district=lawd, active_only=args.active_only)
     print(f"[listings] 단지 {stats['complexes']} / 매물 {stats['listings']} "
           f"(네이버 {stats['naver']} · 직방 {stats['zigbang']})"
           + (" · ⚠차단으로 중단(다음 실행 재개)" if stats.get("blocked") else ""))
@@ -230,6 +247,10 @@ def build_parser() -> argparse.ArgumentParser:
     ls = sub.add_parser("listings", help="현재 매물(호가) 수집 - 네이버부동산+직방")
     ls.add_argument("--scope", choices=["watch", "seoul"], default="watch",
                     help="watch=거래활발 단지(기본), seoul=전역 스윕")
+    ls.add_argument("--district", default=None,
+                    help="자치구 한정(예: 광진구 또는 11215)")
+    ls.add_argument("--all-complexes", dest="active_only", action="store_false",
+                    help="거래 없는 단지까지 포함(기본은 최근1년 매매 3건+만)")
     ls.add_argument("--source", choices=["auto", "naver", "zigbang"], default="auto",
                     help="auto=네이버 우선+직방폴백(기본)")
     ls.add_argument("--limit", type=int, default=None, help="처리 단지 수 제한")

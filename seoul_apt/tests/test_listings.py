@@ -165,6 +165,30 @@ def test_upsert_revives_relisted():
     conn.close()
 
 
+def test_target_complexes_district_filter():
+    """--district 로 그 구만, active_only 로 거래있는 단지만 대상."""
+    conn = db.connect(":memory:")
+    gj = _seed_complex(conn, apt="광장힐스테이트", lawd="11215", umd="광장동",
+                       lat=37.5470, lon=127.1030)
+    gn = _seed_complex(conn, apt="은마", lawd="11680")          # 다른 구
+    quiet = _seed_complex(conn, apt="거래없는단지", lawd="11215", umd="구의동",
+                          lat=37.5400, lon=127.0850)
+    recent = (date.today() - timedelta(days=30)).isoformat()
+    for i in range(3):     # 광진구 활발 단지에만 거래
+        db.insert_sale(conn, gj, recent, 84.9, 5 + i, 150000)
+    for i in range(3):
+        db.insert_sale(conn, gn, recent, 76.79, 5 + i, 340000)
+    conn.commit()
+
+    ids = [r["complex_id"] for r in
+           listings._target_complexes(conn, "watch", "11215", True)]
+    assert ids == [gj]                       # 광진구 + 거래활발만
+    ids_all = [r["complex_id"] for r in
+               listings._target_complexes(conn, "watch", "11215", False)]
+    assert set(ids_all) == {gj, quiet}       # --all-complexes 면 조용한 단지도
+    conn.close()
+
+
 def test_state_roundtrip(tmp_path, monkeypatch):
     p = tmp_path / "listings_state.json"
     monkeypatch.setattr(listings, "STATE_PATH", p)
