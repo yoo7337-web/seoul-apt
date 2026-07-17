@@ -6,7 +6,7 @@
   <title>서울 아파트 시세 지도</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=32">
+  <link rel="stylesheet" href="css/style.css?v=33">
   <script src="js/firebase-config.js?v=1"></script>
   <script src="js/auth.js?v=1"></script>
 </head>
@@ -19,6 +19,7 @@
     <div class="brand-chip"><span class="logo">🏙️</span><b>서울아파트</b></div>
     <button id="btn-dashboard" class="chip-btn nav-link">📊 대시보드</button>
     <button id="btn-buy" class="chip-btn nav-link">🎯 매수후보</button>
+    <button id="btn-cost" class="chip-btn nav-link">🧮 비용계산</button>
     <div class="search-box">
       <span class="s-icon">🔍</span>
       <input id="search-input" type="search" placeholder="단지명 검색" autocomplete="off">
@@ -157,6 +158,36 @@
       <div class="table-scroll" id="cmp-table-wrap"></div>
     </section>
   </aside>
+
+  <!-- 실구매 비용 계산 패널(대시보드·매수후보와 같은 왼쪽 슬롯 공유) -->
+  <aside id="cost-panel" class="dash-panel hidden">
+    <div class="dash-head">
+      <h1>🧮 실구매 비용 계산</h1>
+      <button id="cost-close" class="dash-close" title="닫기">✕</button>
+    </div>
+    <section class="page-section">
+      <div class="desc"><b>지도 가격 푯말을 여기로 드래그</b>하거나 단지명을 검색해
+        추가 — 매수가·취득세·중개보수·대출을 반영한 <b>필요 현금</b>을 나란히 비교합니다.</div>
+      <div class="cost-opts">
+        <label>보유 주택
+          <select id="cost-homes">
+            <option value="1">1주택(무주택 포함)</option>
+            <option value="2">2주택(조정, 중과 8%)</option>
+            <option value="3">3주택 이상(중과 12%)</option>
+          </select></label>
+        <label>대출 LTV <b id="cost-ltv-val">40%</b>
+          <input type="range" id="cost-ltv" min="0" max="40" step="5" value="40"></label>
+      </div>
+      <div class="cmp-bar">
+        <input id="cost-search" type="search" list="cost-datalist" placeholder="단지명 입력 후 선택" autocomplete="off">
+        <datalist id="cost-datalist"></datalist>
+        <button id="cost-load-fav" class="d-chip">★ 관심단지 불러오기</button>
+        <button id="cost-clear" class="d-chip">비우기</button>
+      </div>
+      <div class="table-scroll" id="cost-table-wrap"></div>
+      <div class="cost-notice" id="cost-notice"></div>
+    </section>
+  </aside>
   <div id="dash-resizer" class="dash-resizer hidden" title="드래그해서 너비 조절"></div>
 
   <!-- 필터 패널(오른쪽 분할, 슬라이더는 JS 생성) -->
@@ -197,7 +228,7 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
   <script src="js/charts.js?v=7"></script>
-  <script src="js/dashboard.js?v=31"></script>
-  <script src="js/app.js?v=54"></script>
+  <script src="js/dashboard.js?v=34"></script>
+  <script src="js/app.js?v=61"></script>
 </body>
 </html>

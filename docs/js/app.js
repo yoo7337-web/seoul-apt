@@ -128,6 +128,8 @@
     $("dash-close").addEventListener("click", () => toggleDashboard(false));
     $("btn-buy").addEventListener("click", toggleBuy);
     $("buy-close").addEventListener("click", () => toggleBuy(false));
+    $("btn-cost").addEventListener("click", toggleCost);
+    $("cost-close").addEventListener("click", () => toggleCost(false));
     bindDashResizer();
     bindFilterUI();
     $("panel-close").addEventListener("click", () => $("panel").classList.add("hidden"));
@@ -556,25 +558,29 @@
   }
 
   // 대시보드 분할 패널 토글 (지도는 오른쪽으로 밀려 함께 표시)
-  // 대시보드·매수후보 패널은 같은 왼쪽 슬롯을 공유(하나만 열림)
+  // 대시보드·매수후보·비용계산 패널은 같은 왼쪽 슬롯을 공유(하나만 열림)
+  const LEFT_PANELS = ["dash", "buy", "cost"];
   function togglePanel(which, force) {
     const panel = $(which + "-panel");
     const willOpen = typeof force === "boolean" ? force
       : panel.classList.contains("hidden");
-    const other = which === "dash" ? "buy" : "dash";
-    $(other + "-panel").classList.add("hidden");   // 반대편 닫기
+    LEFT_PANELS.forEach((p) => {                    // 나머지 닫기
+      if (p !== which) $(p + "-panel").classList.add("hidden");
+    });
     panel.classList.toggle("hidden", !willOpen);
-    const anyOpen = !$("dash-panel").classList.contains("hidden")
-      || !$("buy-panel").classList.contains("hidden");
+    const anyOpen = LEFT_PANELS.some((p) => !$(p + "-panel").classList.contains("hidden"));
     document.body.classList.toggle("dash-open", anyOpen);   // 맵 shift 공유
     $("dash-resizer").classList.toggle("hidden", !anyOpen);
     if (willOpen && window.SeoulDash) {
-      which === "dash" ? SeoulDash.open() : SeoulDash.openBuy();
+      if (which === "dash") SeoulDash.open();
+      else if (which === "buy") SeoulDash.openBuy();
+      else if (which === "cost") SeoulDash.openCost();
     }
     setTimeout(() => { if (state.map) state.map.relayout(); }, 80);
   }
   function toggleDashboard(force) { togglePanel("dash", force); }
   function toggleBuy(force) { togglePanel("buy", force); }
+  function toggleCost(force) { togglePanel("cost", force); }
 
   // 대시보드 패널 너비를 드래그로 조절
   const DASH_MIN = 320;
@@ -704,6 +710,7 @@
       return true;
     },
     getProfile: loadProfile,   // 매수후보 패널의 '내 프로필만' 필터용
+    calcCost,   // 비용계산 패널(dashboard.js)이 재사용
     onChange: null,   // dashboard.js 가 등록: (Set) => void
   };
 
@@ -943,9 +950,14 @@
     const stamp = eok <= 1 ? 7 : eok <= 10 ? 15 : 35;
     const etc = stamp + 50;
     const costs = acq + edu + farm + brok + etc;
-    const loan = price * ltvPct / 100;
+    // 규제지역(서울 전역) 주담대 한도 캡(2025-10~): 15억↓ 6억 / 15~25억 4억 /
+    // 25억↑ 2억. LTV 를 아무리 높여도 이 상한을 못 넘는다(만원).
+    const loanCap = eok <= 15 ? 60000 : eok <= 25 ? 40000 : 20000;
+    const rawLoan = price * ltvPct / 100;
+    const loan = Math.min(rawLoan, loanCap);
+    const loanCapped = rawLoan > loanCap;
     return { acqRate, acq, eduRate, edu, farmRate, farm, brokRate, brok,
-             etc, costs, loan, cash: price - loan + costs };
+             etc, costs, loan, loanCap, loanCapped, cash: price - loan + costs };
   }
 
   // ── 현재 매물(호가) ─────────────────────────────────────────────────
@@ -1037,55 +1049,6 @@
     return `<div class="loc-info">${parts.join('<span class="loc-sep">·</span>')}</div>`;
   }
 
-  function costCalcHtml(si) {
-    if (!si || !si.price) return "";
-    return `<details class="cost-calc">
-      <summary>💰 실구매 비용 계산 <span class="sel-hint">취득세·중개보수·대출 가정</span></summary>
-      <div class="cc-row"><label>매수가(만원)</label>
-        <input type="number" id="cc-price" value="${si.price}" step="1000" min="0"></div>
-      <div class="cc-row"><label>보유 주택</label>
-        <select id="cc-homes">
-          <option value="1">1주택(무주택 포함)</option>
-          <option value="2">2주택(조정, 중과 8%)</option>
-          <option value="3">3주택 이상(중과 12%)</option>
-        </select></div>
-      <div class="cc-row"><label>대출 LTV <b id="cc-ltv-val">40%</b></label>
-        <input type="range" id="cc-ltv" min="0" max="70" step="5" value="40"></div>
-      <div id="cc-result"></div>
-      <div class="cc-note">2026년 기준 단순 참고 — 국민주택채권·대출이자·보유세 미포함,
-        실제 세액·요율은 상이할 수 있음</div>
-    </details>`;
-  }
-
-  function bindCostCalc(si) {
-    const priceEl = $("cc-price");
-    if (!priceEl) return;
-    const excluM2 = si && si.py ? si.py * M2_PER_PY : null;
-    const render = () => {
-      const price = +priceEl.value || 0;
-      const homes = +$("cc-homes").value;
-      const ltv = +$("cc-ltv").value;
-      $("cc-ltv-val").textContent = ltv + "%";
-      if (!price) { $("cc-result").innerHTML = ""; return; }
-      const c = calcCost(price, homes, ltv, excluM2);
-      const won = (v) => v >= 10000 ? fmt(Math.round(v))
-        : Math.round(v).toLocaleString() + "만";
-      $("cc-result").innerHTML = `<table class="rank-table cc-table"><tbody>
-        <tr><td>취득세 (${c.acqRate.toFixed(1)}%)</td><td>${won(c.acq)}</td></tr>
-        <tr><td>지방교육세 (${c.eduRate.toFixed(1)}%)</td><td>${won(c.edu)}</td></tr>
-        ${c.farm ? `<tr><td>농어촌특별세 (${c.farmRate}%, 전용85㎡초과)</td><td>${won(c.farm)}</td></tr>` : ""}
-        <tr><td>중개보수 상한 (${c.brokRate}%+VAT)</td><td>${won(c.brok)}</td></tr>
-        <tr><td>기타 (인지세·법무 대략)</td><td>${won(c.etc)}</td></tr>
-        <tr><td><b>부대비용 합계</b></td><td><b>${won(c.costs)}</b></td></tr>
-        <tr><td>대출금 (LTV ${ltv}%)</td><td>−${won(c.loan)}</td></tr>
-        <tr class="cc-cash"><td><b>필요 현금</b></td><td><b>${won(c.cash)}</b></td></tr>
-      </tbody></table>`;
-    };
-    ["cc-price", "cc-homes", "cc-ltv"].forEach((id) =>
-      $(id).addEventListener("input", render));
-    render();
-  }
-
   function renderPanel() {
     const d = state.currentDetail;
     const si = detailInfo(d, false), ji = detailInfo(d, true);
@@ -1121,8 +1084,6 @@
 
       ${listingsHtml(d)}
 
-      ${costCalcHtml(si)}
-
       <div class="btn-row">
         <button id="fav-toggle" class="${isFav ? "active" : ""}">
           ${isFav ? "★ 관심단지" : "☆ 관심단지"}</button>
@@ -1146,7 +1107,6 @@
     $("panel").classList.remove("hidden");
     $("fav-toggle").addEventListener("click", () => toggleFavorite(d));
     $("csv-btn").addEventListener("click", () => downloadCSV(d));
-    bindCostCalc(si);
     bindListings();
     el.querySelectorAll(".chart-tabs button").forEach((b) =>
       b.addEventListener("click", () => { state.chartMode = b.dataset.mode; renderPanel(); }));

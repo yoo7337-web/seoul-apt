@@ -48,6 +48,11 @@
         if (mkAll && cmpIds.length) renderCmpBody();
       }, 60);
     },
+    // 실구매 비용 계산 패널
+    openCost: async () => {
+      const ok = await init();
+      if (ok) renderCost();
+    },
     refresh: () => { if (inited) {                       // 관심구 별표 갱신
       renderRankTable(); renderMarketPhase();
       if (valData) renderValAll();
@@ -802,6 +807,177 @@
       th.addEventListener("click", () => {
         if (window.SeoulMap) window.SeoulMap.focusComplex(+th.dataset.id);
       }));
+  }
+
+  // ── 5g) 실구매 비용 계산(드래그로 단지 추가 → 필요현금 비교) ──────────
+  const M2_PER_PY = 3.305785;
+  let costIds = [], costHomes = 1, costLtv = 40;
+  const costPrice = {};   // id -> 사용자 편집 매수가(만원). 없으면 대표 최근매매가
+  const COST_MAX = 5;
+  try {
+    const saved = JSON.parse(localStorage.getItem("seoul_apt_cost") || "{}");
+    costIds = saved.ids || []; costHomes = saved.homes || 1;
+    costLtv = saved.ltv != null ? saved.ltv : 40;
+    Object.assign(costPrice, saved.price || {});
+  } catch { /* 기본값 */ }
+
+  function saveCost() {
+    localStorage.setItem("seoul_apt_cost", JSON.stringify(
+      { ids: costIds, homes: costHomes, ltv: costLtv, price: costPrice }));
+  }
+  function addCost(id) {
+    if (costIds.includes(id)) return;
+    if (costIds.length >= COST_MAX) costIds.shift();
+    costIds.push(id);
+    saveCost(); renderCostBody();
+  }
+  // 단지의 기본 매수가(대표평형 최근매매가, 만원)와 전용면적(㎡)
+  function costDefaults(mk) {
+    const o = mk.rep && mk.sale_area ? mk.sale_area[mk.rep] : null;
+    const price = o ? o.p : (mk.sale || null);
+    const m2 = o && o.py ? o.py * M2_PER_PY : null;
+    return { price, m2 };
+  }
+
+  async function renderCost() {
+    if (!$("cost-table-wrap")) return;
+    (meta.districts || []).forEach((d) => { GU_NAME[d.lawd_cd] = d.name; });
+    await loadMk();
+    bindCostBar();
+    $("cost-homes").value = String(costHomes);
+    $("cost-ltv").value = String(costLtv);
+    $("cost-ltv-val").textContent = costLtv + "%";
+    renderCostBody();
+    renderCostNotice();
+  }
+
+  function renderCostNotice() {
+    $("cost-notice").innerHTML =
+      `<b>2026-07 규제 반영</b> · 서울 전역 규제지역 — 주담대 <b>LTV 40%</b>,
+       한도 <b>15억↓ 6억 / 15~25억 4억 / 25억↑ 2억</b>. 취득세 서울 전역 조정지역
+       (2주택 8%·3주택+ 12%). 토지거래허가구역은 <b>2년 실거주 의무</b>(갭투자 제한),
+       1주택 전세대출도 DSR 반영(스트레스금리 3%).<br>
+       <span class="muted">참고용 · 국민주택채권·보유세·DSR 개인한도·생애최초 우대 등은
+       미반영. 실제 세액·대출은 개인 조건·정책 변경에 따라 다를 수 있습니다.</span>`;
+  }
+
+  function costWon(v) {
+    return v >= 10000 ? SeoulCharts.fmt(Math.round(v))
+      : Math.round(v).toLocaleString() + "만";
+  }
+
+  function renderCostBody() {
+    const wrap = $("cost-table-wrap");
+    const mks = costIds.map((id) => mkAll.find((m) => m.id === id)).filter(Boolean);
+    if (!mks.length) {
+      wrap.innerHTML = '<div class="empty">지도 가격 푯말을 드래그하거나 단지명을 검색해 추가하세요.</div>';
+      return;
+    }
+    const calc = window.SeoulMap && SeoulMap.calcCost;
+    const rows = [
+      ["매수가(만원)", (m, c, def) =>
+        `<input class="cost-price-inp" data-id="${m.id}" type="number" step="1000" min="0"
+           value="${costPrice[m.id] != null ? costPrice[m.id] : (def.price || 0)}">`],
+      ["취득세", (m, c) => c ? `${costWon(c.acq)} <span class="muted">(${c.acqRate.toFixed(1)}%)</span>` : "-"],
+      ["지방교육세", (m, c) => c ? costWon(c.edu) : "-"],
+      ["농특세", (m, c) => c && c.farm ? costWon(c.farm) : "-"],
+      ["중개보수", (m, c) => c ? `${costWon(c.brok)} <span class="muted">(${c.brokRate}%+VAT)</span>` : "-"],
+      ["기타(인지·법무)", (m, c) => c ? costWon(c.etc) : "-"],
+      ["부대비용 합계", (m, c) => c ? `<b>${costWon(c.costs)}</b>` : "-"],
+      ["대출금", (m, c) => c
+        ? `−${costWon(c.loan)}${c.loanCapped ? ` <span class="cost-cap">한도 ${costWon(c.loanCap)}</span>` : ""}` : "-"],
+      ["필요 현금", (m, c) => c ? `<b class="cost-cash">${costWon(c.cash)}</b>` : "-"],
+    ];
+    let html = `<table class="rank-table cmp-table cost-table2"><thead><tr><th></th>`
+      + mks.map((m, i) => `<th class="cmp-head" data-id="${m.id}">
+          <i style="background:${COLORS[i % COLORS.length]}"></i>${m.apt}
+          <b class="cost-del" data-del="${m.id}" title="제거">✕</b></th>`).join("")
+      + "</tr></thead><tbody>";
+    rows.forEach(([label, fn]) => {
+      html += `<tr><td class="cmp-label">${label}</td>`
+        + mks.map((m) => {
+          const def = costDefaults(m);
+          const price = costPrice[m.id] != null ? costPrice[m.id] : (def.price || 0);
+          const c = calc && price ? calc(price, costHomes, costLtv, def.m2) : null;
+          return `<td>${fn(m, c, def)}</td>`;
+        }).join("") + "</tr>";
+    });
+    wrap.innerHTML = html + "</tbody></table>";
+    // 열 헤더 클릭 = 지도, ✕ = 제거
+    wrap.querySelectorAll(".cmp-head").forEach((th) =>
+      th.addEventListener("click", (e) => {
+        if (e.target.classList.contains("cost-del")) return;
+        if (window.SeoulMap) window.SeoulMap.focusComplex(+th.dataset.id);
+      }));
+    wrap.querySelectorAll(".cost-del").forEach((b) =>
+      b.addEventListener("click", (e) => {
+        e.stopPropagation();
+        costIds = costIds.filter((x) => x !== +b.dataset.del);
+        delete costPrice[+b.dataset.del];
+        saveCost(); renderCostBody();
+      }));
+    // 매수가 편집 → 즉시 재계산
+    wrap.querySelectorAll(".cost-price-inp").forEach((inp) =>
+      inp.addEventListener("input", () => {
+        costPrice[+inp.dataset.id] = +inp.value || 0;
+        saveCost(); renderCostBody();
+      }));
+  }
+
+  function bindCostBar() {
+    const inp = $("cost-search");
+    if (inp._bound) return;
+    inp._bound = true;
+    inp.addEventListener("input", () => {
+      const q = inp.value.trim();
+      if (q.length < 2 || q.includes("#")) return;
+      const hits = mkAll.filter((m) => m.apt.includes(q)).slice(0, 20);
+      $("cost-datalist").innerHTML = hits.map((m) =>
+        `<option value="${m.apt} · ${GU_NAME[m.lawd_cd] || m.lawd_cd} #${m.id}">`).join("");
+    });
+    inp.addEventListener("change", () => {
+      const mch = inp.value.match(/#(\d+)$/);
+      if (!mch) return;
+      addCost(+mch[1]);
+      inp.value = "";
+    });
+    $("cost-homes").addEventListener("change", (e) => {
+      costHomes = +e.target.value; saveCost(); renderCostBody();
+    });
+    $("cost-ltv").addEventListener("input", (e) => {
+      costLtv = +e.target.value;
+      $("cost-ltv-val").textContent = costLtv + "%";
+      saveCost(); renderCostBody();
+    });
+    $("cost-load-fav").addEventListener("click", () => {
+      let favs = [];
+      try { favs = JSON.parse(localStorage.getItem("seoul_apt_favs") || "[]"); }
+      catch { favs = []; }
+      favs.forEach((f) => { if (costIds.length < COST_MAX && !costIds.includes(f.id)) costIds.push(f.id); });
+      saveCost(); renderCostBody();
+    });
+    $("cost-clear").addEventListener("click", () => {
+      costIds = []; saveCost(); renderCostBody();
+    });
+    // 지도 가격 푯말 드래그 → 이 패널에 드롭하면 추가
+    const dz = $("cost-panel");
+    if (dz && !dz._dropBound) {
+      dz._dropBound = true;
+      dz.addEventListener("dragover", (e) => {
+        if ((e.dataTransfer.types || []).indexOf("text/plain") >= 0) {
+          e.preventDefault(); e.dataTransfer.dropEffect = "copy";
+          dz.classList.add("cmp-drop");
+        }
+      });
+      dz.addEventListener("dragleave", (e) => {
+        if (!dz.contains(e.relatedTarget)) dz.classList.remove("cmp-drop");
+      });
+      dz.addEventListener("drop", (e) => {
+        const d = e.dataTransfer.getData("text/plain");
+        dz.classList.remove("cmp-drop");
+        if (d && d.indexOf("cmp:") === 0) { e.preventDefault(); addCost(+d.slice(4)); }
+      });
+    }
   }
 
   // ── 6) 청약·분양 (서울) ─────────────────────────────────────────────

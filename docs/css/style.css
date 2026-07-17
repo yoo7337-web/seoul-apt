@@ -573,31 +573,41 @@ table.rank-table tbody tr[data-id]:hover { background: var(--accent-soft); }
 .val-area .fs-label { font-size: 13px; font-weight: 700; }
 .val-area .fs-val { font-size: 13px; font-weight: 800; color: var(--accent); }
 
-/* ── 실구매 비용 계산기 ────────────────────────────────────────────── */
-.cost-calc {
-  margin: 12px 0 4px; border-radius: 12px; background: var(--bg);
-  padding: 4px 14px 10px;
+/* ── 실구매 비용 계산 패널 ─────────────────────────────────────────── */
+.cost-opts {
+  display: flex; flex-wrap: wrap; gap: 14px; align-items: center;
+  margin: 10px 0; font-size: 12.5px;
 }
-.cost-calc summary {
-  cursor: pointer; font-size: 13px; font-weight: 800; padding: 8px 0;
-  user-select: none;
-}
-.cost-calc summary .sel-hint { font-weight: 500; margin-left: 4px; }
-.cc-row {
-  display: flex; align-items: center; gap: 10px; margin: 8px 0;
-  font-size: 12.5px;
-}
-.cc-row label { min-width: 110px; color: var(--muted); font-weight: 600; }
-.cc-row label b { color: var(--accent-dark); margin-left: 2px; }
-.cc-row input[type=number], .cc-row select {
-  flex: 1; padding: 6px 10px; border-radius: 8px; font-size: 13px;
+.cost-opts label { display: flex; align-items: center; gap: 6px;
+  color: var(--muted); font-weight: 600; }
+.cost-opts label b { color: var(--accent-dark); }
+.cost-opts select {
+  padding: 6px 10px; border-radius: 8px; font-size: 13px;
   border: 1px solid var(--border); background: var(--card); color: var(--text);
 }
-.cc-row input[type=range] { flex: 1; accent-color: var(--accent); }
-.cc-table { margin-top: 6px; }
-.cc-table td:last-child { text-align: right; font-variant-numeric: tabular-nums; }
-.cc-cash td { border-top: 2px solid var(--accent); color: var(--accent-dark); }
-.cc-note { margin-top: 8px; font-size: 10.5px; color: var(--muted); }
+.cost-opts input[type=range] { accent-color: var(--accent); width: 120px; }
+.cost-table2 td:not(.cmp-label) { text-align: right; font-variant-numeric: tabular-nums; }
+.cost-table2 .cost-price-inp {
+  width: 92px; padding: 4px 6px; border-radius: 6px; font-size: 12.5px;
+  text-align: right; border: 1px solid var(--border);
+  background: var(--card); color: var(--text);
+}
+.cost-table2 .cost-cash { color: var(--accent-dark); font-size: 14px; }
+.cost-table2 .cost-cap {
+  display: inline-block; font-size: 10px; font-weight: 700; color: #b45309;
+  background: #fef3c7; border-radius: 5px; padding: 1px 5px; margin-left: 3px;
+}
+.cost-table2 .muted { color: var(--muted); font-weight: 400; font-size: 11px; }
+.cost-table2 .cost-del { cursor: pointer; margin-left: 6px; color: var(--muted); font-size: 11px; }
+.cost-table2 .cost-del:hover { color: #ef4444; }
+.cost-notice {
+  margin-top: 14px; padding: 12px 14px; border-radius: 10px;
+  background: var(--accent-soft); font-size: 11.5px; line-height: 1.6;
+}
+.cost-notice .muted { color: var(--muted); }
+@media (prefers-color-scheme: dark) {
+  .cost-table2 .cost-cap { color: #fbbf24; background: rgba(251,191,36,.12); }
+}
 
 .section-title { font-size: 14px; font-weight: 700; margin: 18px 0 8px; }
 .chart-wrap { position: relative; height: 200px; margin-bottom: 8px; }
