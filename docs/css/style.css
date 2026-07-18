@@ -639,19 +639,24 @@ table.rank-table tbody tr[data-id]:hover { background: var(--accent-soft); }
 .cost-opts label b { color: var(--accent-dark); }
 .cost-opts select {
   padding: 6px 10px; border-radius: 8px; font-size: 13px;
-  border: 1px solid var(--border); background: var(--card); color: var(--text);
+  border: 1px solid var(--border); background: var(--surface); color: var(--text);
 }
 .cost-opts input[type=range] { accent-color: var(--accent); width: 120px; }
 .cost-table2 td:not(.cmp-label) { text-align: right; font-variant-numeric: tabular-nums; }
 .cost-table2 .cost-price-inp {
   width: 92px; padding: 4px 6px; border-radius: 6px; font-size: 12.5px;
   text-align: right; border: 1px solid var(--border);
-  background: var(--card); color: var(--text);
+  background: var(--surface); color: var(--text);
 }
 .cost-table2 .cost-bucket-sel {
   width: 100%; max-width: 118px; padding: 4px 6px; border-radius: 6px;
   font-size: 12px; border: 1px solid var(--border);
-  background: var(--card); color: var(--text); cursor: pointer;
+  background: var(--surface); color: var(--text); cursor: pointer;
+}
+/* 드롭다운 펼침 목록 글씨(OS 팝업) 가독성 - 명시적 색 지정 */
+.cost-table2 .cost-bucket-sel option,
+.cost-opts select option {
+  background: var(--surface); color: var(--text);
 }
 .cost-table2 .cost-cash { color: var(--accent-dark); font-size: 14px; }
 .cost-table2 .cost-cap {
