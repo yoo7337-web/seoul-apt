@@ -698,6 +698,13 @@ table.rank-table tbody tr[data-id]:hover { background: var(--accent-soft); }
 }
 .area-tabs { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 8px; }
 .area-tabs .d-chip { padding: 3px 10px; font-size: 11.5px; }
+/* 패널 상단 평형 선택기 - 눈에 띄게 */
+.area-select-top {
+  margin: 2px 0 12px; padding: 10px 12px; border-radius: 10px;
+  background: var(--accent-soft);
+}
+.area-select-top .fs-label { display: block; margin-bottom: 7px; font-size: 12.5px; }
+.area-select-top .area-tabs { margin-bottom: 0; }
 .area-tag {
   font-size: 11px; font-weight: 600; color: var(--accent-dark);
   background: var(--accent-soft); border-radius: 8px; padding: 1px 7px; margin-left: 4px;

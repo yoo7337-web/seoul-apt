@@ -215,6 +215,8 @@ def listings_payload(conn, now) -> dict:
         item = {"p": r["price_manwon"], "py": py, "fl": r["floor"],
                 "ft": r["floor_total"], "dong": r["dong"], "dir": r["direction"],
                 "d": r["confirm_date"], "url": r["url"]}
+        if r["area_m2"]:
+            item["b"] = config.area_bucket(r["area_m2"])   # 평형 버킷(프런트 필터용)
         if r["monthly_manwon"]:
             item["mo"] = r["monthly_manwon"]
         if prem is not None:

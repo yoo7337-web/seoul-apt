@@ -1002,16 +1002,25 @@
         <div class="empty">아직 수집되지 않은 단지입니다 ${link}</div>`;
     }
     const trade = state.listingTrade;
-    const rows = (g[trade] || []).slice();
-    const nS = (g.sale || []).length, nJ = (g.jeonse || []).length;
+    // 선택한 평형대가 있으면 그 버킷 매물만(b 없으면 py→㎡ 폴백)
+    const areaSel = state.detailArea;
+    const inArea = (r) => !areaSel
+      || (r.b ? r.b === areaSel
+             : (r.py != null && areaBucket(r.py * M2_PER_PY) === areaSel));
+    const rows = (g[trade] || []).filter(inArea);
+    const nS = (g.sale || []).filter(inArea).length;
+    const nJ = (g.jeonse || []).filter(inArea).length;
     const at = g.at ? g.at.slice(0, 10) : "";
+    const areaTag = areaSel ? ` <span class="area-tag">${areaSel}</span>` : "";
     const tabs = `<div class="lst-tabs">
       <button data-lt="sale" class="${trade === "sale" ? "active" : ""}">매매 ${nS}</button>
       <button data-lt="jeonse" class="${trade === "jeonse" ? "active" : ""}">전세 ${nJ}</button>
     </div>`;
     let body;
     if (!rows.length) {
-      body = '<div class="empty">해당 유형 매물 없음</div>';
+      body = areaSel
+        ? '<div class="empty">이 평형에 해당하는 매물 없음</div>'
+        : '<div class="empty">해당 유형 매물 없음</div>';
     } else {
       body = `<table class="txns lst-table"><thead><tr>
           <th>호가</th><th>평</th><th>층</th><th>동·향</th>
@@ -1025,7 +1034,7 @@
         </tr>`).join("")}
       </tbody></table>`;
     }
-    return `<div class="section-title">🏷️ 현재 매물
+    return `<div class="section-title">🏷️ 현재 매물${areaTag}
         <span class="lst-at">${at ? at + " 기준" : ""}</span> ${link}</div>
       ${tabs}${body}`;
   }
@@ -1075,6 +1084,7 @@
       <h2>${d.apt} ${d.is_peak ? '<span class="badge peak">신고가</span>' : ""}</h2>
       <div class="sub">${districtName(d.lawd_cd)}${d.umd ? " " + d.umd : ""} · ${buildYearText(d)}</div>
       ${locationInfo(d)}
+      ${areaSelectTop(d)}
       <div class="price-cards">
         <div class="card"><div class="label">최근 매매${cardArea(si)}</div>
           <div class="value">${si ? fmt(si.price) : "-"}${staleTag(si)}</div></div>
@@ -1107,7 +1117,6 @@
         <button data-mode="sale" class="${state.chartMode === "sale" ? "active" : ""}">매매</button>
         <button data-mode="jeonse" class="${state.chartMode === "jeonse" ? "active" : ""}">전세</button>
       </div>
-      ${areaTabs(d)}
       <div class="chart-wrap"><canvas id="detail-chart"></canvas></div>
 
       <div class="section-title">최근 매매 실거래${areaLabel()}</div>
@@ -1134,6 +1143,13 @@
     const chip = (val, txt) =>
       `<button class="d-chip${state.detailArea === val ? " on" : ""}" data-area="${val}">${txt}</button>`;
     return `<div class="area-tabs">${chip("", "전체")}${bks.map((b) => chip(b, b)).join("")}</div>`;
+  }
+  // 패널 상단 평형 선택기(라벨 포함). 여러 평형인 단지만 표시.
+  function areaSelectTop(d) {
+    const tabs = areaTabs(d);
+    if (!tabs) return "";
+    return `<div class="area-select-top">
+      <span class="fs-label">평형 선택</span>${tabs}</div>`;
   }
   function areaLabel() {
     return state.detailArea ? ` <span class="area-tag">${state.detailArea}</span>` : "";
