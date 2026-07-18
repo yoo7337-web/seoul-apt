@@ -817,19 +817,22 @@
 
   // ── 5g) 실구매 비용 계산(드래그로 단지 추가 → 필요현금 비교) ──────────
   const M2_PER_PY = 3.305785;
+  const COST_BUCKET_ORDER = ["~60㎡", "60~85㎡", "85~135㎡", "135㎡~"];
   let costIds = [], costHomes = 1, costLtv = 40;
-  const costPrice = {};   // id -> 사용자 편집 매수가(만원). 없으면 대표 최근매매가
+  const costPrice = {};    // id -> 사용자 편집 매수가(만원). 없으면 선택 평형 최근매매가
+  const costBucket = {};   // id -> 선택 평형대(전용면적 버킷). 없으면 대표평형(rep)
   const COST_MAX = 5;
   try {
     const saved = JSON.parse(localStorage.getItem("seoul_apt_cost") || "{}");
     costIds = saved.ids || []; costHomes = saved.homes || 1;
     costLtv = saved.ltv != null ? saved.ltv : 40;
     Object.assign(costPrice, saved.price || {});
+    Object.assign(costBucket, saved.bucket || {});
   } catch { /* 기본값 */ }
 
   function saveCost() {
     localStorage.setItem("seoul_apt_cost", JSON.stringify(
-      { ids: costIds, homes: costHomes, ltv: costLtv, price: costPrice }));
+      { ids: costIds, homes: costHomes, ltv: costLtv, price: costPrice, bucket: costBucket }));
   }
   function addCost(id) {
     if (costIds.includes(id)) return;
@@ -837,12 +840,26 @@
     costIds.push(id);
     saveCost(); renderCostBody();
   }
-  // 단지의 기본 매수가(대표평형 최근매매가, 만원)와 전용면적(㎡)
+  // 단지가 매매가를 가진 평형대 버킷 목록(표준 순서)
+  function costBuckets(mk) {
+    const sa = mk.sale_area || {};
+    return COST_BUCKET_ORDER.filter((b) => sa[b] && sa[b].p);
+  }
+  // 현재 선택된(또는 대표) 평형대
+  function costSelBucket(mk) {
+    const avail = costBuckets(mk);
+    const sel = costBucket[mk.id];
+    if (sel && avail.includes(sel)) return sel;
+    if (mk.rep && avail.includes(mk.rep)) return mk.rep;
+    return avail[0] || null;
+  }
+  // 선택 평형대의 기본 매수가(만원)·전용면적(㎡)·평
   function costDefaults(mk) {
-    const o = mk.rep && mk.sale_area ? mk.sale_area[mk.rep] : null;
+    const b = costSelBucket(mk);
+    const o = b && mk.sale_area ? mk.sale_area[b] : null;
     const price = o ? o.p : (mk.sale || null);
     const m2 = o && o.py ? o.py * M2_PER_PY : null;
-    return { price, m2 };
+    return { price, m2, py: o ? o.py : null, bucket: b };
   }
 
   async function renderCost() {
@@ -881,6 +898,17 @@
     }
     const calc = window.SeoulMap && SeoulMap.calcCost;
     const rows = [
+      ["평형대", (m, c, def) => {
+        const avail = costBuckets(m);
+        if (avail.length <= 1) {
+          return def.bucket ? `${def.bucket}${def.py ? ` <span class="muted">${def.py}평</span>` : ""}` : "-";
+        }
+        return `<select class="cost-bucket-sel" data-id="${m.id}">`
+          + avail.map((b) => {
+            const o = m.sale_area[b];
+            return `<option value="${b}"${b === def.bucket ? " selected" : ""}>${b}${o.py ? ` (${o.py}평)` : ""}</option>`;
+          }).join("") + "</select>";
+      }],
       ["매수가(만원)", (m, c, def) =>
         `<input class="cost-price-inp" data-id="${m.id}" type="number" step="1000" min="0"
            value="${costPrice[m.id] != null ? costPrice[m.id] : (def.price || 0)}">`],
@@ -920,6 +948,15 @@
         e.stopPropagation();
         costIds = costIds.filter((x) => x !== +b.dataset.del);
         delete costPrice[+b.dataset.del];
+        delete costBucket[+b.dataset.del];
+        saveCost(); renderCostBody();
+      }));
+    // 평형대 변경 → 그 평형 매매가로 초기화(수기 편집값 제거) 후 재계산
+    wrap.querySelectorAll(".cost-bucket-sel").forEach((sel) =>
+      sel.addEventListener("change", () => {
+        const id = +sel.dataset.id;
+        costBucket[id] = sel.value;
+        delete costPrice[id];   // 선택 평형 기본가로 되돌림
         saveCost(); renderCostBody();
       }));
     // 매수가 편집 → 즉시 재계산

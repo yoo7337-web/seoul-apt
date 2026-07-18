@@ -648,6 +648,11 @@ table.rank-table tbody tr[data-id]:hover { background: var(--accent-soft); }
   text-align: right; border: 1px solid var(--border);
   background: var(--card); color: var(--text);
 }
+.cost-table2 .cost-bucket-sel {
+  width: 100%; max-width: 118px; padding: 4px 6px; border-radius: 6px;
+  font-size: 12px; border: 1px solid var(--border);
+  background: var(--card); color: var(--text); cursor: pointer;
+}
 .cost-table2 .cost-cash { color: var(--accent-dark); font-size: 14px; }
 .cost-table2 .cost-cap {
   display: inline-block; font-size: 10px; font-weight: 700; color: #b45309;

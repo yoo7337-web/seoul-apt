@@ -80,6 +80,12 @@
   상태는 `localStorage seoul_apt_cost`. 렌더는 `dashboard.js renderCost/renderCostBody`,
   계산은 `app.js calcCost`(SeoulMap.calcCost로 노출해 재사용). 상세 패널 내
   기존 접이식 계산기(costCalcHtml)는 제거됨.
+- **평형대 선택**(2026-07-18): 단지마다 **평형대 드롭다운**(`.cost-bucket-sel`,
+  마커 `sale_area`의 매매가 있는 버킷만, 평 병기). 선택 평형대의 최근매매가·
+  전용면적으로 재계산 → 전용 85㎡ 초과 시 농특세 자동 반영, 대출 한도캡도
+  그 가격 기준. 기본은 대표평형(rep). 평형 바꾸면 수기편집 매수가는 리셋(그
+  평형 기본가로). `costBucket`(id→버킷) localStorage 저장. `costDefaults`가
+  `costSelBucket`으로 선택 평형 해석. 이전엔 대표평형만 반영됐음(개선).
 - **현행 규제 반영(2026-07)**: ⚠ 서울 전역이 규제지역이라 **주담대 한도 캡**이 핵심 —
   `calcCost`에서 `loanCap = eok<=15?6억 : eok<=25?4억 : 2억`(만원), `loan=min(가격×LTV,cap)`.
   이게 없으면 30억에 LTV 40%가 12억 대출로 잘못 나온다(실제 2억 캡). LTV 슬라이더 상한 40%.
