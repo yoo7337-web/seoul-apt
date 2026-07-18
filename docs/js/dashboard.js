@@ -53,6 +53,12 @@
       const ok = await init();
       if (ok) renderCost();
     },
+    // 청약·분양 패널(목록·경쟁률). init 이 renderSubs 를 이미 호출하지만
+    // 데이터 지연/실패 대비해 다시 렌더.
+    openSubs: async () => {
+      const ok = await init();
+      if (ok) renderSubs();
+    },
     refresh: () => { if (inited) {                       // 관심구 별표 갱신
       renderRankTable(); renderMarketPhase();
       if (valData) renderValAll();

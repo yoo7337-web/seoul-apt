@@ -123,7 +123,9 @@
       if (state.currentDetail) renderChart();
     });
     $("btn-favorites").addEventListener("click", showFavorites);
-    $("btn-subs").addEventListener("click", toggleSubs);
+    $("btn-subs").addEventListener("click", toggleSubsPanel);
+    $("subs-close").addEventListener("click", () => toggleSubsPanel(false));
+    $("subs-map-toggle").addEventListener("change", (e) => setSubsMarkers(e.target.checked));
     $("btn-dashboard").addEventListener("click", toggleDashboard);
     $("dash-close").addEventListener("click", () => toggleDashboard(false));
     $("btn-buy").addEventListener("click", toggleBuy);
@@ -559,7 +561,7 @@
 
   // 대시보드 분할 패널 토글 (지도는 오른쪽으로 밀려 함께 표시)
   // 대시보드·매수후보·비용계산 패널은 같은 왼쪽 슬롯을 공유(하나만 열림)
-  const LEFT_PANELS = ["dash", "buy", "cost"];
+  const LEFT_PANELS = ["dash", "buy", "cost", "subs"];
   function togglePanel(which, force) {
     const panel = $(which + "-panel");
     const willOpen = typeof force === "boolean" ? force
@@ -575,6 +577,10 @@
       if (which === "dash") SeoulDash.open();
       else if (which === "buy") SeoulDash.openBuy();
       else if (which === "cost") SeoulDash.openCost();
+      else if (which === "subs") SeoulDash.openSubs();
+    }
+    if (which === "subs" && willOpen && $("subs-map-toggle")) {
+      $("subs-map-toggle").checked = state.showSubs;   // 열 때 토글 동기화
     }
     setTimeout(() => { if (state.map) state.map.relayout(); }, 80);
   }
@@ -773,17 +779,23 @@
     });
   }
 
-  function toggleSubs() {
-    state.showSubs = !state.showSubs;
+  // 🏷️ 청약 버튼 = 청약 패널 열기(대시보드 등과 슬롯 공유). 지도 마커 표시는
+  // 패널 안 토글이 담당(setSubsMarkers).
+  function toggleSubsPanel(force) { togglePanel("subs", force); }
+
+  // 지도에 청약 마커 표시 여부(패널 안 토글 체크박스에서 호출)
+  function setSubsMarkers(on) {
+    state.showSubs = !!on;
     localStorage.setItem("seoul_apt_show_subs", state.showSubs ? "1" : "0");
     renderSubMarkers();
     updateSubsBtn();
   }
 
   function updateSubsBtn() {
-    const btn = $("btn-subs"), cnt = $("subs-count");
+    const btn = $("btn-subs"), cnt = $("subs-count"), tog = $("subs-map-toggle");
+    if (tog) tog.checked = state.showSubs;   // 패널 토글 상태 동기화
     if (!btn) return;
-    btn.classList.toggle("active", state.showSubs);
+    btn.classList.toggle("active", state.showSubs);   // 마커 켜져 있으면 버튼 강조
     const n = state.subs.filter((it) => {
       const k = subStatus(it).k;
       return k === "upcoming" || k === "open";

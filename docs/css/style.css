@@ -605,6 +605,16 @@ table.rank-table tbody tr[data-id]:hover { background: var(--accent-soft); }
   background: var(--accent-soft); font-size: 11.5px; line-height: 1.6;
 }
 .cost-notice .muted { color: var(--muted); }
+
+/* ── 청약 패널: 지도 표시 토글 ─────────────────────────────────────── */
+.subs-toggle {
+  display: flex; align-items: center; gap: 8px; cursor: pointer;
+  font-size: 13px; font-weight: 700; padding: 10px 12px; border-radius: 10px;
+  background: var(--accent-soft); user-select: none;
+}
+.subs-toggle input[type=checkbox] {
+  width: 18px; height: 18px; accent-color: var(--accent); cursor: pointer;
+}
 @media (prefers-color-scheme: dark) {
   .cost-table2 .cost-cap { color: #fbbf24; background: rgba(251,191,36,.12); }
 }

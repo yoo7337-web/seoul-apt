@@ -6,7 +6,7 @@
   <title>서울 아파트 시세 지도</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=33">
+  <link rel="stylesheet" href="css/style.css?v=34">
   <script src="js/firebase-config.js?v=1"></script>
   <script src="js/auth.js?v=1"></script>
 </head>
@@ -40,7 +40,7 @@
     </select>
     <button id="btn-filter" class="chip-btn">필터 <span id="filter-count" class="count hidden">0</span></button>
     <button id="btn-profile" class="chip-btn hidden" title="저장된 매수 프로필 적용/해제">💼 프로필</button>
-    <button id="btn-subs" class="chip-btn" title="청약·분양 마커 표시">🏷️ 청약 <span id="subs-count" class="count hidden">0</span></button>
+    <button id="btn-subs" class="chip-btn nav-link" title="청약·분양 목록·지도표시">🏷️ 청약 <span id="subs-count" class="count hidden">0</span></button>
     <button id="btn-favorites" class="chip-btn">★ 관심 <span id="fav-count" class="count">0</span></button>
     <a class="chip-btn nav-link nav-right" href="devlog.html">📝 개발일지</a>
   </header>
@@ -116,13 +116,6 @@
       <div class="desc" id="liq-desc">연간 거래 ÷ 세대수 = 회전율 (높을수록 사고팔기 쉬움)</div>
       <div class="table-scroll" id="liq-wrap"></div>
     </section>
-    <section class="page-section">
-      <h2>청약·분양 (서울)</h2>
-      <div class="desc">진행중·예정 분양공고 — 행 클릭 시 지도 이동</div>
-      <div class="table-scroll" id="subs-table-wrap"></div>
-      <div class="desc" style="margin-top:14px">최근 마감 경쟁률 상위</div>
-      <div class="table-scroll" id="subs-cmpet-wrap"></div>
-    </section>
   </aside>
 
   <!-- 매수 후보 찾기 패널(밸류에이션 + 단지 비교) - 대시보드와 같은 슬롯 공유 -->
@@ -188,6 +181,24 @@
       <div class="cost-notice" id="cost-notice"></div>
     </section>
   </aside>
+
+  <!-- 청약·분양 패널(대시보드 등과 같은 왼쪽 슬롯 공유) -->
+  <aside id="subs-panel" class="dash-panel hidden">
+    <div class="dash-head">
+      <h1>🏷️ 청약·분양</h1>
+      <button id="subs-close" class="dash-close" title="닫기">✕</button>
+    </div>
+    <section class="page-section">
+      <label class="subs-toggle">
+        <input type="checkbox" id="subs-map-toggle">
+        <span>지도에 청약 마커 표시</span>
+      </label>
+      <div class="desc" style="margin-top:10px">진행중·예정 분양공고 — 행 클릭 시 지도 이동</div>
+      <div class="table-scroll" id="subs-table-wrap"></div>
+      <div class="desc" style="margin-top:14px">최근 마감 경쟁률 상위</div>
+      <div class="table-scroll" id="subs-cmpet-wrap"></div>
+    </section>
+  </aside>
   <div id="dash-resizer" class="dash-resizer hidden" title="드래그해서 너비 조절"></div>
 
   <!-- 필터 패널(오른쪽 분할, 슬라이더는 JS 생성) -->
@@ -228,7 +239,7 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
   <script src="js/charts.js?v=7"></script>
-  <script src="js/dashboard.js?v=34"></script>
-  <script src="js/app.js?v=61"></script>
+  <script src="js/dashboard.js?v=35"></script>
+  <script src="js/app.js?v=65"></script>
 </body>
 </html>

@@ -87,6 +87,16 @@
   DSR 스트레스금리 3% 등은 계산 아닌 **안내 카드**로만(개인 조건별 정밀 대출한도·
   생애최초 우대·보유세는 미반영, 참고용 명시).
 
+## 청약·분양 UI (🏷️ 청약 패널, 2026-07-17 별도패널화)
+- 상단바 `#btn-subs` = **청약 패널 열기**(`togglePanel` 4-way, 대시보드·매수후보·
+  비용계산과 같은 왼쪽 슬롯 공유). 예전엔 이 버튼이 지도 마커 토글이었는데,
+  **지도 표시 여부는 패널 안 체크박스**(`#subs-map-toggle` → `setSubsMarkers`)가 담당.
+  청약 목록·경쟁률 표는 대시보드에서 이 패널로 이동(`#subs-table-wrap`,
+  `#subs-cmpet-wrap`, `dashboard.js renderSubs` + `SeoulDash.openSubs`).
+- 마커 표시 상태는 `localStorage seoul_apt_show_subs`(0/1). 헤더 버튼은 마커가
+  켜져 있으면 강조(active)되고 진행중·예정 건수 배지 유지. 청약 마커는
+  `app.js renderSubMarkers`(`.sub-bubble` 커스텀 오버레이, subVisibleOnMap 필터).
+
 ## 입지 레이어(역세권·초품아, `poi` 명령)
 
 - 데이터는 준불변이라 1회 적재 후 재계산만 하면 된다(daily Action 불필요).
