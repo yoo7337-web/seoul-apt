@@ -96,6 +96,13 @@
 - 마커 표시 상태는 `localStorage seoul_apt_show_subs`(0/1). 헤더 버튼은 마커가
   켜져 있으면 강조(active)되고 진행중·예정 건수 배지 유지. 청약 마커는
   `app.js renderSubMarkers`(`.sub-bubble` 커스텀 오버레이, subVisibleOnMap 필터).
+- **마커 상태 시각 구분**(2026-07-18): 접수중=초록+펄스(지금 청약 가능 강조),
+  예정=보라, 발표대기=주황, 완료=회색·투명도0.72·축소(subVisibleOnMap 이 완료를
+  마감 90일까지만 노출). 패널에 색 범례(`.subs-legend`) 표시.
+- **청약 목록·경쟁률 표 = 행 클릭 시 지도 이동**(`bindSubRows`, focusLatLng) +
+  **↗ 청약홈 링크**(각 공고 `url` = applyhome.co.kr 상세, 행클릭과 분리 `a` 태그).
+  ⚠ kakao CustomOverlay 는 뷰포트 근처에서만 DOM 에 붙어 프리뷰 초기엔 `.sub-bubble`
+  개수가 0으로 보일 수 있음 — 해당 위치로 focus 후 재확인.
 
 ## 입지 레이어(역세권·초품아, `poi` 명령)
 

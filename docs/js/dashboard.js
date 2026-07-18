@@ -1010,7 +1010,7 @@
       wrap.innerHTML = '<div class="empty">진행중·예정 청약 없음</div>';
     } else {
       let html = `<table class="rank-table"><thead><tr>
-        <th>상태</th><th>주택명</th><th>구</th><th>세대</th><th>접수기간</th><th>최고분양가</th><th>안전마진</th>
+        <th>상태</th><th>주택명</th><th>구</th><th>세대</th><th>접수기간</th><th>최고분양가</th><th>안전마진</th><th>청약홈</th>
         </tr></thead><tbody>`;
       active.forEach((it) => {
         const st = subStatus(it);
@@ -1019,20 +1019,18 @@
         const bm = mgns.length ? Math.max(...mgns) : null;
         const mgnTxt = bm == null ? "-"
           : `<span class="mgn ${bm > 0 ? "pos" : "neg"}">${bm > 0 ? "+" : ""}${bm}%</span>`;
+        const link = it.url
+          ? `<a class="sub-link" href="${it.url}" target="_blank" rel="noopener" title="청약홈 공고 보기">↗</a>` : "-";
         html += `<tr data-lat="${it.lat || ""}" data-lon="${it.lon || ""}">
           <td><span class="badge sub-badge-${st.k}">${st.label}</span></td>
           <td>${it.name}${it.kind === "remndr" ? ' <span class="sel-hint">(무순위)</span>' : ""}</td>
           <td>${it.gu || "-"}</td><td>${it.tot ? it.tot.toLocaleString() : "-"}</td>
           <td>${it.rcept_bgn || "-"} ~ ${it.rcept_end || "-"}</td>
-          <td>${top ? SeoulCharts.fmt(top) : "-"}</td><td>${mgnTxt}</td></tr>`;
+          <td>${top ? SeoulCharts.fmt(top) : "-"}</td><td>${mgnTxt}</td>
+          <td>${link}</td></tr>`;
       });
       wrap.innerHTML = html + "</tbody></table>";
-      wrap.querySelectorAll("tr[data-lat]").forEach((tr) =>
-        tr.addEventListener("click", () => {
-          if (window.SeoulMap && tr.dataset.lat) {
-            window.SeoulMap.focusLatLng(+tr.dataset.lat, +tr.dataset.lon);
-          }
-        }));
+      bindSubRows(wrap);
     }
 
     // 최근 마감 경쟁률 상위(주택형 최고 경쟁률 기준)
@@ -1051,13 +1049,30 @@
       return;
     }
     let ch = `<table class="rank-table"><thead><tr>
-      <th>주택명</th><th>구</th><th>접수마감</th><th>최고 경쟁률</th>
+      <th>주택명</th><th>구</th><th>접수마감</th><th>최고 경쟁률</th><th>청약홈</th>
       </tr></thead><tbody>`;
     rated.forEach(({ it, best }) => {
-      ch += `<tr><td>${it.name}</td><td>${it.gu || "-"}</td>
-        <td>${it.rcept_end || "-"}</td><td>${best.toLocaleString()} : 1</td></tr>`;
+      const link = it.url
+        ? `<a class="sub-link" href="${it.url}" target="_blank" rel="noopener" title="청약홈 공고 보기">↗</a>` : "-";
+      ch += `<tr data-lat="${it.lat || ""}" data-lon="${it.lon || ""}">
+        <td>${it.name}</td><td>${it.gu || "-"}</td>
+        <td>${it.rcept_end || "-"}</td><td>${best.toLocaleString()} : 1</td>
+        <td>${link}</td></tr>`;
     });
     cwrap.innerHTML = ch + "</tbody></table>";
+    bindSubRows(cwrap);
+  }
+
+  // 청약 표 공통: 행 클릭=지도 이동(청약홈 링크 클릭은 제외)
+  function bindSubRows(wrap) {
+    wrap.querySelectorAll("tr[data-lat]").forEach((tr) => {
+      if (!tr.dataset.lat) return;
+      tr.classList.add("row-clickable");
+      tr.addEventListener("click", (e) => {
+        if (e.target.closest("a")) return;   // 청약홈 링크는 통과
+        if (window.SeoulMap) window.SeoulMap.focusLatLng(+tr.dataset.lat, +tr.dataset.lon);
+      });
+    });
   }
 
   async function fetchJSON(url) {

@@ -28,6 +28,23 @@
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
+
+/* ── 얇고 투명한 스크롤바(전역) ─────────────────────────────────────── */
+* { scrollbar-width: thin; scrollbar-color: rgba(140,146,156,.35) transparent; }
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: rgba(140, 146, 156, .28); border-radius: 8px;
+  border: 2px solid transparent; background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover { background: rgba(140, 146, 156, .5); background-clip: padding-box; }
+::-webkit-scrollbar-corner { background: transparent; }
+@media (prefers-color-scheme: dark) {
+  * { scrollbar-color: rgba(150,156,166,.32) transparent; }
+  ::-webkit-scrollbar-thumb { background: rgba(150, 156, 166, .26); background-clip: padding-box; }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(150, 156, 166, .48); background-clip: padding-box; }
+}
+
 html, body { height: 100%; overflow: hidden; }
 body {
   font-family: "Noto Sans KR", -apple-system, "Malgun Gothic", sans-serif;
@@ -336,10 +353,49 @@ table.rank-table tbody tr[data-id]:hover { background: var(--accent-soft); }
   background: rgba(255, 255, 255, .25); border-radius: 8px;
   padding: 0 6px; font-size: 10px; font-weight: 700;
 }
+/* 진행중/예정/발표대기(live) = 컬러 강조, 완료(done) = 회색·축소 */
+.sub-bubble.upcoming .sb-price { background: #7c3aed; }     /* 예정=보라 */
+.sub-bubble.upcoming .sb-price::after { border-top-color: #7c3aed; }
 .sub-bubble.open .sb-price { background: #059669; }        /* 접수중=초록 */
 .sub-bubble.open .sb-price::after { border-top-color: #059669; }
-.sub-bubble.done .sb-price { background: #6b7280; }        /* 완료=회색 */
-.sub-bubble.done .sb-price::after { border-top-color: #6b7280; }
+.sub-bubble.wait .sb-price { background: #d97706; }        /* 발표대기=주황 */
+.sub-bubble.wait .sb-price::after { border-top-color: #d97706; }
+.sub-bubble.done { opacity: .72; transform: translateY(-6px) scale(.9); }
+.sub-bubble.done .sb-price {
+  background: #9ca3af; border-color: #f3f4f6; font-weight: 700;
+}
+.sub-bubble.done .sb-price::after { border-top-color: #9ca3af; }
+/* 접수중은 지금 청약 가능 - 초록 펄스로 강조 */
+.sub-bubble.open .sb-price {
+  box-shadow: 0 0 0 0 rgba(5, 150, 105, .55);
+  animation: subPulse 1.8s infinite;
+}
+@keyframes subPulse {
+  0% { box-shadow: 0 0 0 0 rgba(5, 150, 105, .5); }
+  70% { box-shadow: 0 0 0 9px rgba(5, 150, 105, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(5, 150, 105, 0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sub-bubble.open .sb-price { animation: none; }
+}
+/* 청약 패널 범례 */
+.subs-legend {
+  display: flex; flex-wrap: wrap; gap: 12px; margin: 10px 0 4px;
+  font-size: 11.5px; color: var(--muted);
+}
+.subs-legend i {
+  display: inline-block; width: 10px; height: 10px; border-radius: 50%;
+  margin-right: 4px; vertical-align: -1px;
+}
+.subs-legend .lg-open { background: #059669; }
+.subs-legend .lg-upcoming { background: #7c3aed; }
+.subs-legend .lg-wait { background: #d97706; }
+.subs-legend .lg-done { background: #9ca3af; }
+/* 청약홈 링크 · 클릭 가능한 행 */
+.sub-link { text-decoration: none; font-weight: 800; color: #03c75a; }
+.sub-link:hover { text-decoration: underline; }
+.row-clickable { cursor: pointer; }
+.row-clickable:hover { background: var(--accent-soft); }
 /* 상세 모달 상태 뱃지 */
 .badge.sub-badge-upcoming { background: #7c3aed; color: #fff; }
 .badge.sub-badge-open { background: #059669; color: #fff; }
