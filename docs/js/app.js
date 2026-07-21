@@ -36,6 +36,41 @@
   ];
   const F_CFG = Object.fromEntries(F_SLIDERS.map((s) => [s.key, s]));
 
+  // ── 매수 테마 프리셋(주식 스크리너의 '테마'처럼 필터 조합 원클릭 적용) ──
+  // range 에 명시한 키만 오버라이드, 나머지는 초기값. lo/hi 는 F_SLIDERS 단위.
+  const THEMES = [
+    { key: "rebound", icon: "💎", name: "낙폭과대 반등후보",
+      desc: "고점대비 -20%↑ 하락 + 1년 거래 5건↑ — 많이 빠졌는데 거래는 살아있는 단지",
+      range: { drop: { lo: 20 }, n1y: { lo: 5 } } },
+    { key: "mingap", icon: "💰", name: "최소갭 투자",
+      desc: "갭 2억↓ + 전세가율 65%↑ — 적은 현금 + 전세 하방쿠션",
+      range: { gap: { hi: 2 }, jr: { lo: 65 } } },
+    { key: "jdefense", icon: "🛡️", name: "전세방어 실수요",
+      desc: "전세가율 60%↑ + 세대수 500↑ + 거래 5건↑ — 하락장에 강한 단지",
+      range: { jr: { lo: 60 }, hh: { lo: 500 }, n1y: { lo: 5 } } },
+    { key: "station", icon: "🚇", name: "역세권 국평",
+      desc: "역 500m↓ + 24~35평 + 세대수 500↑ — 정석 실거주",
+      range: { sw: { hi: 500 }, area: { lo: 24, hi: 35 }, hh: { lo: 500 } } },
+    { key: "school", icon: "👨‍👩‍👧", name: "초품아 패밀리",
+      desc: "초등 400m↓ + 24~41평 + 세대수 700↑ — 가족 수요, 잘 팔림",
+      range: { el: { hi: 400 }, area: { lo: 24, hi: 41 }, hh: { lo: 700 } } },
+    { key: "newgrand", icon: "🌟", name: "신축 대단지",
+      desc: "입주 7년↓ + 세대수 1,000↑ — 신축 프리미엄",
+      range: { age: { hi: 7 }, hh: { lo: 1000 } } },
+    { key: "redev", icon: "🔨", name: "재건축 잠재",
+      desc: "연차 30년↑ + 용적률 200%↓ + 세대수 500↑ — 사업성 있는 후보",
+      range: { age: { lo: 30 }, far: { hi: 200 }, hh: { lo: 500 } } },
+    { key: "oldgrand", icon: "🏛️", name: "가성비 구축 대단지",
+      desc: "연차 20년↑ + 세대수 1,000↑ + 고점대비 -10%↑ — 싸게 사서 오래 보유",
+      range: { age: { lo: 20 }, hh: { lo: 1000 }, drop: { lo: 10 } } },
+    { key: "momentum", icon: "🚀", name: "신고가 모멘텀",
+      desc: "신고가 갱신 + 1년 거래 10건↑ — 시장 주도 단지",
+      range: { n1y: { lo: 10 } }, peak: true },
+    { key: "liquid", icon: "🔥", name: "환금성 최상",
+      desc: "1년 거래 20건↑ + 세대수 1,000↑ — 언제든 팔 수 있는 유동성",
+      range: { n1y: { lo: 20 }, hh: { lo: 1000 } } },
+  ];
+
   // 자치구 중심 좌표(구청 기준) - 저줌 지역 버블용
   const DISTRICT_CENTERS = {
     "11110": [37.5735, 126.9790], "11140": [37.5641, 126.9979],
@@ -69,6 +104,7 @@
     listingTrade: "sale",   // 매물 섹션 탭: 'sale' | 'jeonse'
     showSubs: localStorage.getItem("seoul_apt_show_subs") !== "0",
     profileOn: false,  // 💼 매수 프로필 적용 상태
+    themeKey: null,    // ⭐ 적용 중인 매수 테마 프리셋 키
   };
 
   const BUCKET_ORDER = ["~60㎡", "60~85㎡", "85~135㎡", "135㎡~"];
@@ -441,7 +477,7 @@
       }
       state.range[s.key] = { lo: a, hi: b };
       paintRange(s);
-      if (commit) onFilterChange();
+      if (commit) { clearThemeMark(); onFilterChange(); }
     };
     lo.addEventListener("input", () => upd(false));
     hi.addEventListener("input", () => upd(false));
@@ -450,14 +486,62 @@
     paintRange(s);
   }
   function buildFilterUI() {
-    let html = F_SLIDERS.map(rangeHtml).join("");
+    let html = `<div class="theme-box">
+      <span class="fs-label">⭐ 매수 테마 <span class="sel-hint">원클릭 필터 조합 · 다시 누르면 해제</span></span>
+      <div class="theme-chips">${THEMES.map((t) =>
+        `<button class="theme-chip" data-theme="${t.key}" title="${t.desc}">${t.icon} ${t.name}</button>`).join("")}
+      </div></div>`;
+    html += F_SLIDERS.map(rangeHtml).join("");
     html += `<label class="fs-toggle"><input type="checkbox" id="f-minusgap"> 마이너스 갭 보기 (전세>매매)</label>`;
     html += `<label class="fs-toggle"><input type="checkbox" id="f-peak"> 신고가 단지만</label>`;
     $("filter-body").innerHTML = html;
     F_SLIDERS.forEach(bindRange);
-    $("f-minusgap").addEventListener("change", (e) => { state.minusGap = e.target.checked; onFilterChange(); });
-    $("f-peak").addEventListener("change", (e) => { state.peak = e.target.checked; onFilterChange(); });
+    $("f-minusgap").addEventListener("change", (e) => { state.minusGap = e.target.checked; clearThemeMark(); onFilterChange(); });
+    $("f-peak").addEventListener("change", (e) => { state.peak = e.target.checked; clearThemeMark(); onFilterChange(); });
+    document.querySelectorAll(".theme-chip").forEach((b) =>
+      b.addEventListener("click", () => applyTheme(b.dataset.theme)));
   }
+
+  // 테마 프리셋 적용/해제. 적용 = 필터 초기화 후 테마 조합만 세팅(누적 아님).
+  function applyTheme(key) {
+    if (state.themeKey === key) {          // 같은 칩 재클릭 = 해제
+      state.themeKey = null;
+      resetFilters();
+      paintThemeChips();
+      toast("테마 해제");
+      return;
+    }
+    const t = THEMES.find((x) => x.key === key);
+    if (!t) return;
+    F_SLIDERS.forEach((s) => {             // 초기화 + 테마 오버라이드
+      const o = (t.range && t.range[s.key]) || {};
+      state.range[s.key] = {
+        lo: o.lo != null ? o.lo : s.min,
+        hi: o.hi != null ? o.hi : s.max,
+      };
+      const lo = $("rlo-" + s.key), hi = $("rhi-" + s.key);
+      if (lo) { lo.value = state.range[s.key].lo; hi.value = state.range[s.key].hi; paintRange(s); }
+    });
+    state.minusGap = !!t.minusGap;
+    state.peak = !!t.peak;
+    if ($("f-minusgap")) $("f-minusgap").checked = state.minusGap;
+    if ($("f-peak")) $("f-peak").checked = state.peak;
+    state.themeKey = key;
+    paintThemeChips();
+    onFilterChange();
+    toast(`${t.icon} ${t.name} 적용`);
+  }
+  function paintThemeChips() {
+    document.querySelectorAll(".theme-chip").forEach((b) =>
+      b.classList.toggle("on", b.dataset.theme === state.themeKey));
+  }
+  // 슬라이더·토글을 수동 조작하면 테마 조합이 깨진 것 → 칩 강조 해제
+  function clearThemeMark() {
+    if (!state.themeKey) return;
+    state.themeKey = null;
+    paintThemeChips();
+  }
+
   function resetFilters() {
     F_SLIDERS.forEach((s) => {
       state.range[s.key] = { lo: s.min, hi: s.max };
@@ -468,6 +552,7 @@
     state.minusGap = state.peak = false;
     if ($("f-minusgap")) $("f-minusgap").checked = false;
     if ($("f-peak")) $("f-peak").checked = false;
+    clearThemeMark();
     onFilterChange();
   }
   function onFilterChange() { updateFilterBadge(); applyFilters(); }

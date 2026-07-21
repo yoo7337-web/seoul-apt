@@ -698,6 +698,25 @@ table.rank-table tbody tr[data-id]:hover { background: var(--accent-soft); }
 }
 .area-tabs { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 8px; }
 .area-tabs .d-chip { padding: 3px 10px; font-size: 11.5px; }
+/* 매수 테마 프리셋 칩(필터 패널 상단) */
+.theme-box {
+  margin-bottom: 16px; padding: 12px; border-radius: 12px;
+  background: var(--accent-soft);
+}
+.theme-box .fs-label { display: block; margin-bottom: 8px; font-size: 12.5px; }
+.theme-box .sel-hint { font-weight: 500; font-size: 11px; }
+.theme-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.theme-chip {
+  padding: 6px 11px; font-size: 12px; font-weight: 600; cursor: pointer;
+  border: 1px solid var(--border); border-radius: 16px;
+  background: var(--surface); color: var(--text);
+  transition: transform .08s;
+}
+.theme-chip:hover { transform: translateY(-1px); border-color: var(--accent); }
+.theme-chip.on {
+  background: var(--accent); border-color: var(--accent); color: #fff;
+}
+
 /* 패널 상단 평형 선택기 - 눈에 띄게 */
 .area-select-top {
   margin: 2px 0 12px; padding: 10px 12px; border-radius: 10px;
