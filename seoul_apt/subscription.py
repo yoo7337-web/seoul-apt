@@ -82,6 +82,11 @@ def _field(raw: dict, *names, default=None):
     return default
 
 
+def _api_date(iso: str, kind: str) -> str:
+    """API 조회조건용 날짜. 임의공급(optn)만 'YYYYMMDD', 나머지는 'YYYY-MM-DD'."""
+    return iso.replace("-", "") if kind == "optn" else iso
+
+
 class ApplyhomeClient:
     def __init__(self, service_key: str, debug: bool = False):
         self.key = service_key
@@ -136,7 +141,10 @@ class ApplyhomeClient:
         ep = _KIND_EP[kind][0]
         raws = self._get_rows(ep, {
             "SUBSCRPT_AREA_CODE_NM::EQ": "서울",
-            "RCRIT_PBLANC_DE::GTE": since,
+            # GTE 는 서버측 문자열 비교라 저장 포맷과 같은 모양으로 넣어야 한다.
+            # 임의공급은 '20260721', 나머지는 '2026-07-21' - 섞으면 필터가 사실상
+            # 무시돼(‘0’>‘-’) 전 기간이 딸려온다(임의공급 149건 과다수신 확인).
+            "RCRIT_PBLANC_DE::GTE": _api_date(since, kind),
         })
         return [_parse_notice(r, kind) for r in raws]
 

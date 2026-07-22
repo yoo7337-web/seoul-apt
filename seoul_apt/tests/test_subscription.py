@@ -64,6 +64,14 @@ def test_optn_yyyymmdd_dates_normalized():
     assert _parse_notice(RAW_NOTICE, "apt")["rcept_bgnde"] == "2026-07-10"
 
 
+def test_api_date_matches_operation_format():
+    """조회조건 GTE 는 서버측 문자열 비교 - 오퍼레이션 저장 포맷과 모양을 맞춰야 한다."""
+    from seoul_apt.subscription import _api_date
+    assert _api_date("2026-07-15", "optn") == "20260715"
+    assert _api_date("2026-07-15", "apt") == "2026-07-15"
+    assert _api_date("2026-07-15", "remndr") == "2026-07-15"
+
+
 def test_parse_and_upsert_updates_schedule():
     conn = db.connect(":memory:")
     n = _parse_notice(RAW_NOTICE, "apt")
