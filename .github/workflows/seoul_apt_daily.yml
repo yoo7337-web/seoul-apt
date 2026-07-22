@@ -24,6 +24,7 @@ concurrency:
 jobs:
   update:
     runs-on: ubuntu-latest
+    timeout-minutes: 60      # 6h 무한 대기 방지 - 문제 시 빠르게 실패해 알림
     steps:
       - uses: actions/checkout@v4
 
@@ -57,10 +58,13 @@ jobs:
           fi
           python -m seoul_apt.cli geocode
           python -m seoul_apt.cli poi
-          python -m seoul_apt.cli building
           python -m seoul_apt.cli gongsi
           python -m seoul_apt.cli reb
           python -m seoul_apt.cli subscription || echo "청약 수집 실패(계속 진행)"
+          # 건축물대장은 남은 단지가 수천 개라 전체 처리 시 6h 타임아웃 →
+          # 매 실행 800개씩만 증분 처리(며칠에 걸쳐 backlog 소진). 핵심 데이터
+          # 수집(위)이 끝난 뒤 마지막에 돌려, 느려도 실거래 export를 막지 않게 함.
+          python -m seoul_apt.cli building --limit 800 || echo "건축물대장 일부 실패(계속 진행)"
 
       - name: Export JSON
         env:
