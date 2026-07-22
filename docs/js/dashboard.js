@@ -54,7 +54,7 @@
       const ok = await init();
       if (ok) renderCost();
     },
-    // 청약·분양 패널(접수중·예정 목록). init 이 renderSubs 를 이미 호출하지만
+    // 청약·분양 패널(목록·경쟁률). init 이 renderSubs 를 이미 호출하지만
     // 데이터 지연/실패 대비해 다시 렌더.
     openSubs: async () => {
       const ok = await init();
@@ -1062,7 +1062,7 @@
   }
 
   async function renderSubs() {
-    const wrap = $("subs-table-wrap");
+    const wrap = $("subs-table-wrap"), cwrap = $("subs-cmpet-wrap");
     if (!wrap) return;
     let items = [];
     try { items = (await fetchJSON(DATA + "subscription.json")).items || []; }
@@ -1071,10 +1071,18 @@
     // 진행중·예정 목록(접수 시작일 오름차순)
     const active = items.filter((it) => ["upcoming", "open", "wait"].includes(subStatus(it).k))
       .sort((a, b) => (a.rcept_bgn || "9999") < (b.rcept_bgn || "9999") ? -1 : 1);
+    // 지금 넣을 수 있는 건(접수중)과 곧 열리는 건(예정)을 건수로 먼저 알려준다.
+    // 접수중이 0이어도 예정이 있으면 '없다'고 오해하지 않도록.
+    const cnt = { open: 0, upcoming: 0, wait: 0 };
+    active.forEach((it) => { cnt[subStatus(it).k] += 1; });
+    const summary = `<div class="subs-summary">
+      <span class="badge sub-badge-open">접수중 ${cnt.open}건</span>
+      <span class="badge sub-badge-upcoming">접수 예정 ${cnt.upcoming}건</span>
+      <span class="badge sub-badge-wait">발표대기 ${cnt.wait}건</span></div>`;
     if (!active.length) {
-      wrap.innerHTML = '<div class="empty">진행중·예정 청약 없음</div>';
+      wrap.innerHTML = summary + '<div class="empty">진행중·예정 청약 없음</div>';
     } else {
-      let html = `<table class="rank-table"><thead><tr>
+      let html = summary + `<table class="rank-table"><thead><tr>
         <th>상태</th><th>주택명</th><th>유형</th><th>구</th><th>세대</th><th>접수기간</th><th>최고분양가</th><th>안전마진</th><th>청약홈</th>
         </tr></thead><tbody>`;
       active.forEach((it) => {
@@ -1098,6 +1106,35 @@
       wrap.innerHTML = html + "</tbody></table>";
       bindSubRows(wrap);
     }
+
+    // 최근 마감 경쟁률 상위(주택형 최고 경쟁률 기준)
+    if (!cwrap) return;
+    const rated = items
+      .map((it) => {
+        const best = Math.max(0, ...(it.cmpet || [])
+          .map((c) => parseFloat(c.rate) || 0));
+        return { it, best };
+      })
+      .filter((x) => x.best > 0)
+      .sort((a, b) => b.best - a.best)
+      .slice(0, 15);
+    if (!rated.length) {
+      cwrap.innerHTML = '<div class="empty">경쟁률 데이터 없음</div>';
+      return;
+    }
+    let ch = `<table class="rank-table"><thead><tr>
+      <th>주택명</th><th>구</th><th>접수마감</th><th>최고 경쟁률</th><th>청약홈</th>
+      </tr></thead><tbody>`;
+    rated.forEach(({ it, best }) => {
+      const link = it.url
+        ? `<a class="sub-link" href="${it.url}" target="_blank" rel="noopener" title="청약홈 공고 보기">↗</a>` : "-";
+      ch += `<tr data-lat="${it.lat || ""}" data-lon="${it.lon || ""}">
+        <td>${it.name}</td><td>${it.gu || "-"}</td>
+        <td>${it.rcept_end || "-"}</td><td>${best.toLocaleString()} : 1</td>
+        <td>${link}</td></tr>`;
+    });
+    cwrap.innerHTML = ch + "</tbody></table>";
+    bindSubRows(cwrap);
   }
 
   // 청약 표 공통: 행 클릭=지도 이동(청약홈 링크 클릭은 제외)

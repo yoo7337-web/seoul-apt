@@ -81,8 +81,7 @@ def cmd_subscription(conn, args):
         debug=getattr(args, "debug", False))
     print(f"[subscription] APT {stats['apt']} / 무순위·불법행위재공급 {stats['remndr']} "
           f"/ 임의공급 {stats.get('optn', 0)} / 주택형 {stats['models']} "
-          f"/ 지오코딩 {stats['geocoded']} "
-          f"(마감분 제외 {stats.get('skipped_past', 0)} · 정리 {stats.get('purged', 0)})")
+          f"/ 경쟁률 {stats['cmpet']} / 지오코딩 {stats['geocoded']}")
 
 
 def cmd_reb(conn, args):
@@ -213,7 +212,7 @@ def build_parser() -> argparse.ArgumentParser:
     bd.add_argument("--limit", type=int, default=None, help="처리 개수 제한")
     bd.set_defaults(func=cmd_building)
 
-    sb = sub.add_parser("subscription", help="청약홈 분양정보 수집(접수중·예정만)")
+    sb = sub.add_parser("subscription", help="청약홈 분양정보·경쟁률 수집")
     sb.add_argument("--since", default=None, help="모집공고일 시작 YYYY-MM-DD")
     sb.add_argument("--debug", action="store_true",
                     help="첫 응답의 필드명 목록 출력(API 필드 확인용)")

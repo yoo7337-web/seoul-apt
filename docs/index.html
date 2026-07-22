@@ -6,7 +6,7 @@
   <title>서울 아파트 시세 지도</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=41">
+  <link rel="stylesheet" href="css/style.css?v=42">
   <script src="js/firebase-config.js?v=1"></script>
   <script src="js/auth.js?v=1"></script>
 </head>
@@ -202,10 +202,12 @@
         <span><i class="lg-open"></i>접수중</span>
         <span><i class="lg-upcoming"></i>예정</span>
         <span><i class="lg-wait"></i>발표대기</span>
+        <span><i class="lg-done"></i>완료</span>
       </div>
-      <div class="desc" style="margin-top:6px">접수 진행중·예정 분양공고 — 행 클릭 시 지도 이동 · ↗ 청약홈
-        <br>접수가 끝난 공고는 표시하지 않습니다.</div>
+      <div class="desc" style="margin-top:6px">진행중·예정 분양공고 — 행 클릭 시 지도 이동 · ↗ 청약홈</div>
       <div class="table-scroll" id="subs-table-wrap"></div>
+      <div class="desc" style="margin-top:14px">최근 마감 경쟁률 상위 — 행 클릭 시 지도 이동 · ↗ 청약홈</div>
+      <div class="table-scroll" id="subs-cmpet-wrap"></div>
     </section>
   </aside>
   <div id="dash-resizer" class="dash-resizer hidden" title="드래그해서 너비 조절"></div>
@@ -248,7 +250,7 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
   <script src="js/charts.js?v=7"></script>
-  <script src="js/dashboard.js?v=48"></script>
-  <script src="js/app.js?v=79"></script>
+  <script src="js/dashboard.js?v=46"></script>
+  <script src="js/app.js?v=77"></script>
 </body>
 </html>

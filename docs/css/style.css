@@ -416,6 +416,9 @@ table.rank-table tbody tr[data-id]:hover { background: var(--accent-soft); }
 .badge.sub-badge-open { background: #059669; color: #fff; }
 .badge.sub-badge-wait { background: #d97706; color: #fff; }
 .badge.sub-badge-done { background: #6b7280; color: #fff; }
+/* 청약 상태별 건수 요약(목록 위) */
+.subs-summary { display: flex; flex-wrap: wrap; gap: 6px; margin: 2px 0 10px; }
+.subs-summary .badge { font-size: 11.5px; }
 /* 청약 토글 버튼 활성 상태 */
 .chip-btn.active { color: #7c3aed; font-weight: 800; }
 /* 청약 안전마진 */

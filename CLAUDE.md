@@ -113,30 +113,23 @@
 - 상단바 `#btn-subs` = **청약 패널 열기**(`togglePanel` 4-way, 대시보드·매수후보·
   비용계산과 같은 왼쪽 슬롯 공유). 예전엔 이 버튼이 지도 마커 토글이었는데,
   **지도 표시 여부는 패널 안 체크박스**(`#subs-map-toggle` → `setSubsMarkers`)가 담당.
-  청약 목록은 대시보드에서 이 패널로 이동(`#subs-table-wrap`,
-  `dashboard.js renderSubs` + `SeoulDash.openSubs`).
+  청약 목록·경쟁률 표는 대시보드에서 이 패널로 이동(`#subs-table-wrap`,
+  `#subs-cmpet-wrap`, `dashboard.js renderSubs` + `SeoulDash.openSubs`).
 - 마커 표시 상태는 `localStorage seoul_apt_show_subs`(0/1). 헤더 버튼은 마커가
   켜져 있으면 강조(active)되고 진행중·예정 건수 배지 유지. 청약 마커는
   `app.js renderSubMarkers`(`.sub-bubble` 커스텀 오버레이, subVisibleOnMap 필터).
 - **마커 상태 시각 구분**(2026-07-18): 접수중=초록+펄스(지금 청약 가능 강조),
-  예정=보라, 발표대기=주황. 패널에 색 범례(`.subs-legend`) 표시.
-- ⭐ **접수 마감분은 취급하지 않는다**(2026-07-23, 사용자 요청): 청약은 지금부터
-  접수 가능한 건만 의미가 있다. 3단 방어 —
-  ① 수집: `collect_subscriptions` 가 `is_past(rcept_endde, today)` 면 저장 자체를
-     건너뛰고(주택형 API 호출도 절약), 끝으로 `db.purge_past_subscriptions()` 로
-     그새 마감된 기존 행을 주택형까지 삭제.
-  ② export: `subscription_items` 가 `rcept_endde >= today` 만 내보냄.
-  ③ 프런트: `subVisibleOnMap` 이 `done` 상태를 제외(캐시된 옛 JSON 방어).
-  종료일 NULL 은 '일정 미확정'으로 보고 **보존**한다. 마감 공고를 안 남기므로
-  **경쟁률(subscription_cmpet·ApplyhomeInfoCmpetRtSvc)은 기능째 제거**했다
-  (경쟁률은 마감 공고에만 존재해 같이 성립 불가).
-- ⚠ **청약홈 날짜 포맷이 오퍼레이션마다 다르다**(2026-07-23 사고): APT·무순위는
-  `2026-07-27`, **임의공급(getOPTLttotPblancDetail)은 `20260727`**. 섞인 채 문자열
-  비교하면 `'20260108' > '2026-07-23'`(`'0'`>`'-'`)이 되어 **지난 임의공급 공고가
-  전부 미래로 취급**돼 마감 필터가 통째로 무력화된다(실제 18건 오노출). 저장 전
-  반드시 `subscription._norm_date()` 를 거칠 것. 기존 행은 `db._migrate()` 가 1회
-  정규화한다.
-- **청약 목록 = 행 클릭 시 지도 이동**(`bindSubRows`, focusLatLng) +
+  예정=보라, 발표대기=주황, 완료=회색·투명도0.72·축소(subVisibleOnMap 이 완료를
+  마감 90일까지만 노출). 패널에 색 범례(`.subs-legend`) 표시.
+- ⚠ **청약홈 날짜 포맷이 오퍼레이션마다 다르다**(2026-07-23 발견·수정): APT·무순위는
+  `2026-07-27`, **임의공급(getOPTLttotPblancDetail)은 `20260727`**. 상태 판정
+  (`subStatus`)이 날짜 **문자열 비교**라, 섞이면 `'20260108' > '2026-07-23'`
+  (`'0'`>`'-'`)이 되어 **지난 임의공급 공고가 전부 '예정'으로 오표시**된다(실제
+  18건). 저장 전 반드시 `subscription._norm_date()` 를 거칠 것 — `_parse_notice`
+  의 날짜 6종에 적용돼 있다. 기존 행은 `db._migrate()` 가 1회 정규화한다.
+  (청약 범위 자체는 **진행중·예정 + 최근 1년 마감분**을 유지 — 마감분은 경쟁률
+  참고용이라 지우면 경쟁률 표가 성립하지 않는다.)
+- **청약 목록·경쟁률 표 = 행 클릭 시 지도 이동**(`bindSubRows`, focusLatLng) +
   **↗ 청약홈 링크**(각 공고 `url` = applyhome.co.kr 상세, 행클릭과 분리 `a` 태그).
   ⚠ kakao CustomOverlay 는 뷰포트 근처에서만 DOM 에 붙어 프리뷰 초기엔 `.sub-bubble`
   개수가 0으로 보일 수 있음 — 해당 위치로 focus 후 재확인.
@@ -193,10 +186,9 @@ Gemini 주간 자동추천과 별개로, 구독 Claude를 활용한 수동 큐�
   매매 `A_2024_00178` / 전세 `A_2024_00182` (표 메타용 `SttsApiTbl.do` 아님).
 - `.env`는 gitignore. `docs/js/config.js`에 카카오 JS 키가 주입되는데 이는
   도메인 제한이 걸린 공개용 키라 Actions가 커밋해도 무방(다른 키는 절대 커밋 금지).
-- 청약·분양(`subscription` 명령)은 data.go.kr **청약홈 분양정보 API 활용신청 승인**이
-  필요(15098547 — 기존 DATA_GO_KR_KEY 그대로). 미승인이면 401 로그만 남기고
-  건너뛴다. 필드명 확인은 `subscription --debug`. (경쟁률 API 15098905 는
-  마감 공고 미보관 결정으로 더 이상 쓰지 않는다.)
+- 청약·분양(`subscription` 명령)은 data.go.kr **청약홈 API 2종 활용신청 승인**이
+  필요(분양정보 15098547, 경쟁률 15098905 — 기존 DATA_GO_KR_KEY 그대로).
+  미승인이면 401 로그만 남기고 건너뛴다. 필드명 확인은 `subscription --debug`.
 - **가격 비교는 반드시 같은 크기·같은 시기**: 전세가율·안전마진·급매·주변시세는
   전용면적 ±12% + 최근 1~2년으로 한정해 매칭. 전 평형 혼합 중앙값 금지
   (한남더힐 전세가율 26%, 오피스텔 300% 왜곡 사고 이력).

@@ -3,8 +3,8 @@
 from datetime import date, timedelta
 
 from seoul_apt import db, export, notify
-from seoul_apt.subscription import (_parse_notice, _parse_model, extract_gu,
-                                    is_past)
+from seoul_apt.subscription import (_parse_notice, _parse_model, _parse_cmpet,
+                                    extract_gu)
 
 RAW_NOTICE = {
     "HOUSE_MANAGE_NO": 2026000123,
@@ -28,12 +28,40 @@ RAW_MODEL = {
     "SUPLY_HSHLDCO": "120", "SPSPLY_HSHLDCO": "80",
     "LTTOT_TOP_AMOUNT": "215,000",
 }
+RAW_CMPET = {
+    "HOUSE_MANAGE_NO": "2026000123", "HOUSE_TY": "084.9700A",
+    "RESIDE_SENM": "해당지역", "SUBSCRPT_RANK_CODE": 1,
+    "REQ_CNT": "3,120", "CMPET_RATE": "26.0",
+}
+
 
 def test_extract_gu():
     assert extract_gu("서울특별시 서초구 반포동 123-4") == "서초구"
     assert extract_gu("서울 강남구 대치동 316") == "강남구"
     assert extract_gu(None) is None
     assert extract_gu("경기도 성남시 분당구") is None   # 서울 아님
+
+
+def test_optn_yyyymmdd_dates_normalized():
+    """임의공급은 날짜를 'YYYYMMDD'로 준다 - 저장 전 'YYYY-MM-DD'로 통일해야 한다.
+
+    통일하지 않으면 '20260108' > '2026-07-23' ('0' > '-')이라 지난 임의공급
+    공고가 전부 '예정'으로 표시된다(실제 18건 오노출).
+    """
+    n = _parse_notice({
+        "HOUSE_MANAGE_NO": "opt1", "HOUSE_NM": "임의공급 단지",
+        "HOUSE_SECD_NM": "임의공급",
+        "RCRIT_PBLANC_DE": "20260105", "RCEPT_BGNDE": "20260108",
+        "RCEPT_ENDDE": "20260109", "PRZWNER_PRESNATN_DE": "20260115",
+    }, "optn")
+    assert n["rcrit_de"] == "2026-01-05"
+    assert n["rcept_bgnde"] == "2026-01-08"
+    assert n["rcept_endde"] == "2026-01-09"
+    assert n["przwner_de"] == "2026-01-15"
+    # 정규화 후에는 지난 공고로 올바르게 비교된다(‘예정’ 오판 방지)
+    assert n["rcept_endde"] < "2026-07-23"
+    # 이미 하이픈 포맷(APT·무순위)은 그대로 통과
+    assert _parse_notice(RAW_NOTICE, "apt")["rcept_bgnde"] == "2026-07-10"
 
 
 def test_parse_and_upsert_updates_schedule():
@@ -56,12 +84,13 @@ def test_parse_and_upsert_updates_schedule():
     conn.close()
 
 
-def test_models_and_export_items():
+def test_models_cmpet_and_export_items():
     conn = db.connect(":memory:")
     n = _parse_notice(RAW_NOTICE, "apt")
     n["fetched_at"] = "t"
     db.upsert_subscription(conn, n)
     db.upsert_subscription_model(conn, _parse_model(RAW_MODEL, "2026000123"))
+    db.upsert_subscription_cmpet(conn, _parse_cmpet(RAW_CMPET, "2026000123"))
     conn.commit()
 
     items = export.subscription_items(conn, "2026-07-06")
@@ -70,81 +99,14 @@ def test_models_and_export_items():
     assert it["gu"] == "서초구"
     assert it["models"] == [{"ty": "084.9700A", "ar": 112.4, "hh": 120,
                              "shh": 80, "price": 215000}]
-    conn.close()
-
-
-def test_export_excludes_closed_notices():
-    """접수가 끝난 공고는 하루만 지나도 내보내지 않는다(마감분 미노출)."""
-    conn = db.connect(":memory:")
-    for hmn, endde in [("open", "2026-07-12"),     # 접수중/예정
-                       ("today", "2026-07-06"),    # 오늘 마감 - 아직 접수 가능
-                       ("closed", "2026-07-05")]:  # 어제 마감 - 제외
-        n = _parse_notice({**RAW_NOTICE, "HOUSE_MANAGE_NO": hmn,
-                           "RCEPT_ENDDE": endde}, "apt")
-        n["fetched_at"] = "t"
-        db.upsert_subscription(conn, n)
-    # 종료일 미정(NULL)은 일정 미확정이라 남긴다
-    conn.execute("INSERT INTO subscription (house_manage_no,kind,house_nm,"
-                 "fetched_at) VALUES ('tbd','apt','일정미정','t')")
-    conn.commit()
-
-    ids = {it["id"] for it in export.subscription_items(conn, "2026-07-06")}
-    assert ids == {"open", "today", "tbd"}
-    conn.close()
-
-
-def test_optn_yyyymmdd_dates_normalized():
-    """임의공급은 날짜를 'YYYYMMDD'로 준다 - 저장 전 'YYYY-MM-DD'로 통일해야 한다.
-
-    통일하지 않으면 '20260108' > '2026-07-23' ('0' > '-')이라 지난 임의공급
-    공고가 전부 미래로 취급돼 마감 필터가 무력화된다(실제 발생한 사고).
-    """
-    n = _parse_notice({
-        "HOUSE_MANAGE_NO": "opt1", "HOUSE_NM": "임의공급 단지",
-        "HOUSE_SECD_NM": "임의공급",
-        "RCRIT_PBLANC_DE": "20260105", "RCEPT_BGNDE": "20260108",
-        "RCEPT_ENDDE": "20260109", "PRZWNER_PRESNATN_DE": "20260115",
-    }, "optn")
-    assert n["rcept_bgnde"] == "2026-01-08"
-    assert n["rcept_endde"] == "2026-01-09"
-    assert n["rcrit_de"] == "2026-01-05"
-    assert n["przwner_de"] == "2026-01-15"
-    # 이미 하이픈 포맷(APT·무순위)은 그대로 통과
-    assert _parse_notice(RAW_NOTICE, "apt")["rcept_bgnde"] == "2026-07-10"
-
-    # 정규화 후에는 지난 공고로 올바르게 판정된다
-    assert is_past(n["rcept_endde"], "2026-07-23") is True
-
-    conn = db.connect(":memory:")
-    n["fetched_at"] = "t"
-    db.upsert_subscription(conn, n)
-    conn.commit()
-    assert export.subscription_items(conn, "2026-07-23") == []
-    conn.close()
-
-
-def test_is_past_and_purge():
-    assert is_past("2026-07-05", "2026-07-06") is True
-    assert is_past("2026-07-06", "2026-07-06") is False   # 오늘 마감은 살아있음
-    assert is_past(None, "2026-07-06") is False           # 일정 미확정은 보존
-
-    conn = db.connect(":memory:")
-    for hmn, endde in [("keep", "2026-07-12"), ("gone", "2026-07-05")]:
-        n = _parse_notice({**RAW_NOTICE, "HOUSE_MANAGE_NO": hmn,
-                           "RCEPT_ENDDE": endde}, "apt")
-        n["fetched_at"] = "t"
-        db.upsert_subscription(conn, n)
-        db.upsert_subscription_model(conn, _parse_model(RAW_MODEL, hmn))
-    conn.commit()
-
-    assert db.purge_past_subscriptions(conn, "2026-07-06") == 1
-    rows = {r["house_manage_no"] for r in conn.execute(
-        "SELECT house_manage_no FROM subscription")}
-    assert rows == {"keep"}
-    # 삭제된 공고의 주택형도 함께 정리(고아 행 방지)
-    mrows = {r["house_manage_no"] for r in conn.execute(
-        "SELECT house_manage_no FROM subscription_model")}
-    assert mrows == {"keep"}
+    assert it["cmpet"][0]["rate"] == "26.0"
+    assert it["cmpet"][0]["resd"] == "해당지역 1순위"   # 순위 병기(덮어쓰기 방지)
+    # 1년 넘게 지난 마감 공고는 제외
+    old = _parse_notice({**RAW_NOTICE, "HOUSE_MANAGE_NO": "9",
+                         "RCEPT_ENDDE": "2024-01-05"}, "apt")
+    old["fetched_at"] = "t"
+    db.upsert_subscription(conn, old)
+    assert len(export.subscription_items(conn, "2026-07-06")) == 1
     conn.close()
 
 
@@ -156,17 +118,16 @@ def test_safety_margin_in_export():
                       "apt")
     n["lat"], n["lon"] = 37.4990, 127.0620
     n["fetched_at"] = "t"
-    # 접수중인 공고여야 export 에 실린다(마감분은 제외되므로 종료일을 미래로)
-    open_endde = (date.today() + timedelta(days=7)).isoformat()
     conn.execute("INSERT INTO subscription (house_manage_no,kind,house_nm,adres,"
                  "rcept_endde,lat,lon,fetched_at) VALUES (?,?,?,?,?,?,?,?)",
                  (n["house_manage_no"], "apt", n["house_nm"], n["adres"],
-                  open_endde, n["lat"], n["lon"], "t"))
+                  "2026-07-20", n["lat"], n["lon"], "t"))
     db.upsert_subscription_model(conn, _parse_model(
         {"HOUSE_MANAGE_NO": n["house_manage_no"], "HOUSE_TY": "084.9700A",
          "SUPLY_AR": "112.4", "SUPLY_HSHLDCO": "100",
          "LTTOT_TOP_AMOUNT": "100000"}, n["house_manage_no"]))
     # 주변 단지(같은 좌표 인근) 84㎡ 최근 실거래 12억×3건 → 마진 +16.7%
+    from datetime import date
     cid = db.upsert_complex(conn, "11680", "대치동", "인근아파트", 2015, "2")
     db.set_coords(conn, cid, 37.4992, 127.0622, "t")
     for i in range(3):

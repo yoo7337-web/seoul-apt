@@ -1,13 +1,13 @@
-"""청약홈 분양정보 수집 (한국부동산원, data.go.kr odcloud API).
+"""청약홈 분양정보·경쟁률 수집 (한국부동산원, data.go.kr odcloud API).
 
-서비스: ApplyhomeInfoDetailSvc (DATA_GO_KR_KEY 로 활용신청 필요)
-  - APT 공고/주택형, 무순위·잔여세대(+불법행위 재공급), 임의공급
+서비스 2종(둘 다 DATA_GO_KR_KEY 로 활용신청 필요):
+  - 분양정보: ApplyhomeInfoDetailSvc  (APT 공고/주택형, 무순위·잔여세대)
+  - 경쟁률  : ApplyhomeInfoCmpetRtSvc (주택형별 접수건수·경쟁률)
 호출 형식: GET https://api.odcloud.kr/api/<svc>/v1/<op>
              ?page=&perPage=&cond[필드::EQ]=값&serviceKey=
 응답: {"data":[{...대문자_스네이크 필드...}], "totalCount": n, ...}
 
-수집 범위: 서울(SUBSCRPT_AREA_CODE_NM='서울'), 기본 최근 18개월 공고 중
-**접수가 아직 끝나지 않은 것만**(마감분은 청약할 수 없어 저장하지 않는다).
+수집 범위: 서울(SUBSCRPT_AREA_CODE_NM='서울'), 기본 최근 18개월 공고.
 필드명이 API 버전에 따라 다를 수 있어 _field() 로 후보명을 순차 조회한다.
 """
 
@@ -23,12 +23,14 @@ from .geocode import KakaoGeocoder, KAKAO_ADDR_URL, KAKAO_KEYWORD_URL
 KST = timezone(timedelta(hours=9))
 BASE = "https://api.odcloud.kr/api"
 DETAIL_SVC = f"{BASE}/ApplyhomeInfoDetailSvc/v1"
+CMPET_SVC = f"{BASE}/ApplyhomeInfoCmpetRtSvc/v1"
 
 OP_APT = f"{DETAIL_SVC}/getAPTLttotPblancDetail"          # APT 분양공고(특별/1·2순위)
 OP_APT_MDL = f"{DETAIL_SVC}/getAPTLttotPblancMdl"          # APT 주택형별
 OP_REMNDR = f"{DETAIL_SVC}/getRemndrLttotPblancDetail"     # 무순위/잔여세대 + 불법행위 재공급
 OP_REMNDR_MDL = f"{DETAIL_SVC}/getRemndrLttotPblancMdl"
 OP_OPTN = f"{DETAIL_SVC}/getOPTLttotPblancDetail"          # 임의공급
+OP_APT_CMPET = f"{CMPET_SVC}/getAPTLttotPblancCmpet"       # APT 경쟁률
 
 # API 오퍼레이션 → (엔드포인트, 주택형 엔드포인트|None)
 _KIND_EP = {
@@ -145,6 +147,12 @@ class ApplyhomeClient:
         raws = self._get_rows(ep, {"HOUSE_MANAGE_NO::EQ": house_manage_no})
         return [_parse_model(r, house_manage_no) for r in raws]
 
+    def fetch_cmpet(self, house_manage_no: str) -> list[dict]:
+        """APT 경쟁률(무순위는 전용 오퍼레이션이 없어 APT 만)."""
+        raws = self._get_rows(OP_APT_CMPET,
+                              {"HOUSE_MANAGE_NO::EQ": house_manage_no})
+        return [_parse_cmpet(r, house_manage_no) for r in raws]
+
 
 # ── 파싱(테스트 가능하도록 분리) ─────────────────────────────────────────
 def _parse_notice(raw: dict, kind: str) -> dict:
@@ -190,12 +198,20 @@ def _parse_model(raw: dict, house_manage_no: str) -> dict:
     }
 
 
-def is_past(rcept_endde: str | None, today: str) -> bool:
-    """접수가 이미 끝난 공고인가(접수 종료일 < 오늘).
-
-    종료일이 비어 있으면 일정 미확정으로 보고 '지나지 않음'으로 판단해 남긴다.
-    """
-    return bool(rcept_endde) and rcept_endde < today
+def _parse_cmpet(raw: dict, house_manage_no: str) -> dict:
+    # 같은 주택형·지역에 1·2순위 행이 따로 오므로 순위를 구분 라벨에 포함
+    resd = (_field(raw, "RESIDE_SENM", "RESIDE_SECD_NM",
+                   "RESIDE_SECD") or "").strip()
+    rank = _to_int(_field(raw, "SUBSCRPT_RANK_CODE"))
+    if rank:
+        resd = f"{resd} {rank}순위".strip()
+    return {
+        "house_manage_no": house_manage_no,
+        "house_ty": (_field(raw, "HOUSE_TY", "TP") or "-").strip(),
+        "reside_secd": resd,
+        "req_cnt": _to_int(_field(raw, "REQ_CNT", "RCEPT_CNT")),
+        "cmpet_rate": (str(_field(raw, "CMPET_RATE") or "").strip() or None),
+    }
 
 
 def _norm_date(v) -> str | None:
@@ -204,8 +220,8 @@ def _norm_date(v) -> str | None:
     ⚠ 오퍼레이션마다 포맷이 다르다: APT·무순위는 '2026-07-27', 임의공급
     (getOPTLttotPblancDetail)은 '20260727'로 준다. 섞인 채 문자열 비교를 하면
     '20260108' > '2026-07-23' ('0' > '-')이 되어 지난 공고가 미래로 취급된다
-    (접수 마감 필터가 임의공급에 대해 통째로 무력화된 사고). 저장 전에 반드시
-    이 함수를 거칠 것.
+    (임의공급 공고의 접수중/예정/완료 판정이 통째로 뒤집힌 사고). 저장 전에
+    반드시 이 함수를 거칠 것.
     """
     if v is None:
         return None
@@ -229,20 +245,14 @@ def extract_gu(adres: str | None) -> str | None:
 def collect_subscriptions(conn, data_key: str, kakao_key: str | None = None,
                           since: str | None = None,
                           debug: bool = False) -> dict:
-    """공고+주택형 수집 → upsert → 지오코딩. 통계 dict 반환.
-
-    접수가 이미 끝난 공고는 청약할 수 없어 의미가 없으므로 아예 저장하지 않는다
-    (접수 종료일 < 오늘이면 건너뜀). 종료일이 비어 있는 공고는 일정 미확정으로
-    보고 남긴다. 지난 공고를 안 받으므로 주택형 API 호출도 그만큼 줄어든다.
-    """
+    """공고+주택형+경쟁률 수집 → upsert → 지오코딩. 통계 dict 반환."""
     if since is None:
         since = (date.today() - timedelta(days=DEFAULT_SINCE_MONTHS * 30)) \
             .isoformat()
     client = ApplyhomeClient(data_key, debug=debug)
     now = datetime.now(KST).isoformat(timespec="seconds")
     today = date.today().isoformat()
-    stats = {"apt": 0, "remndr": 0, "optn": 0, "models": 0,
-             "skipped_past": 0, "purged": 0, "geocoded": 0}
+    stats = {"apt": 0, "remndr": 0, "optn": 0, "models": 0, "cmpet": 0, "geocoded": 0}
 
     for kind in ("apt", "remndr", "optn"):
         try:
@@ -252,9 +262,6 @@ def collect_subscriptions(conn, data_key: str, kakao_key: str | None = None,
             continue
         for n in notices:
             if not n["house_manage_no"] or not n["house_nm"]:
-                continue
-            if is_past(n["rcept_endde"], today):
-                stats["skipped_past"] += 1
                 continue
             n["fetched_at"] = now
             db.upsert_subscription(conn, n)
@@ -266,12 +273,16 @@ def collect_subscriptions(conn, data_key: str, kakao_key: str | None = None,
                     stats["models"] += 1
             except SubscriptionAPIError as e:
                 print(f"[subscription] 주택형 조회 실패({n['house_nm']}): {e}")
+            # 경쟁률 - 접수 마감된 APT 공고만 존재
+            if kind == "apt" and n["rcept_endde"] and n["rcept_endde"] <= today:
+                try:
+                    for c in client.fetch_cmpet(n["house_manage_no"]):
+                        db.upsert_subscription_cmpet(conn, c)
+                        stats["cmpet"] += 1
+                except SubscriptionAPIError as e:
+                    print(f"[subscription] 경쟁률 조회 실패({n['house_nm']}): {e}")
             time.sleep(config.REQUEST_SLEEP)
         conn.commit()
-
-    # 이전 실행에서 쌓인 공고 중 그새 접수가 끝난 것 정리
-    stats["purged"] = db.purge_past_subscriptions(conn, today)
-    conn.commit()
 
     if kakao_key:
         stats["geocoded"] = _geocode_missing(conn, kakao_key)

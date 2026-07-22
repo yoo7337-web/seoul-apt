@@ -115,6 +115,15 @@ CREATE TABLE IF NOT EXISTS subscription_model (
     PRIMARY KEY (house_manage_no, house_ty)
 );
 
+CREATE TABLE IF NOT EXISTS subscription_cmpet (
+    house_manage_no TEXT NOT NULL REFERENCES subscription(house_manage_no),
+    house_ty        TEXT NOT NULL,
+    reside_secd     TEXT NOT NULL DEFAULT '',  -- 거주지역 구분(해당지역 등)
+    req_cnt         INTEGER,          -- 접수건수
+    cmpet_rate      TEXT,             -- 경쟁률(문자열: '12.5', '△5' 형태 존재)
+    PRIMARY KEY (house_manage_no, house_ty, reside_secd)
+);
+
 CREATE TABLE IF NOT EXISTS poi (
     id     INTEGER PRIMARY KEY AUTOINCREMENT,
     kind   TEXT NOT NULL,             -- 'subway' | 'elem'
@@ -212,10 +221,8 @@ def _migrate(conn: sqlite3.Connection) -> None:
     scols = {r["name"] for r in conn.execute("PRAGMA table_info(subscription)")}
     if "secd_nm" not in scols:
         conn.execute("ALTER TABLE subscription ADD COLUMN secd_nm TEXT")
-    # 경쟁률은 마감된 공고에만 존재 - 지난 청약을 보관하지 않기로 해 함께 폐기
-    conn.execute("DROP TABLE IF EXISTS subscription_cmpet")
     # 임의공급 오퍼레이션이 'YYYYMMDD'로 주던 날짜를 'YYYY-MM-DD'로 통일.
-    # 섞여 있으면 문자열 비교가 뒤집혀 마감 공고가 걸러지지 않는다(사고 이력).
+    # 섞여 있으면 문자열 비교가 뒤집혀(‘0’>‘-’) 지난 공고가 '예정'으로 뜬다.
     for c in ("rcrit_de", "rcept_bgnde", "rcept_endde", "przwner_de",
               "cntrct_bgnde", "cntrct_endde"):
         conn.execute(
@@ -404,21 +411,16 @@ def upsert_subscription_model(conn, m: dict) -> None:
     )
 
 
-def purge_past_subscriptions(conn, today: str) -> int:
-    """접수가 끝난 공고와 그 주택형을 삭제. 삭제한 공고 수 반환.
-
-    청약은 접수 가능한 건만 의미가 있어 마감분은 보관하지 않는다. 원천이
-    청약홈 API라 필요하면 언제든 다시 받을 수 있다(종료일 NULL은 일정 미확정
-    이므로 보존).
-    """
+def upsert_subscription_cmpet(conn, c: dict) -> None:
     conn.execute(
-        """DELETE FROM subscription_model WHERE house_manage_no IN
-           (SELECT house_manage_no FROM subscription
-            WHERE rcept_endde IS NOT NULL AND rcept_endde < ?)""", (today,))
-    cur = conn.execute(
-        "DELETE FROM subscription "
-        "WHERE rcept_endde IS NOT NULL AND rcept_endde < ?", (today,))
-    return cur.rowcount or 0
+        """INSERT INTO subscription_cmpet
+           (house_manage_no, house_ty, reside_secd, req_cnt, cmpet_rate)
+           VALUES (:house_manage_no, :house_ty, :reside_secd, :req_cnt,
+                   :cmpet_rate)
+           ON CONFLICT(house_manage_no, house_ty, reside_secd) DO UPDATE SET
+             req_cnt=excluded.req_cnt, cmpet_rate=excluded.cmpet_rate""",
+        c,
+    )
 
 
 def subscriptions_without_coords(conn) -> list[sqlite3.Row]:

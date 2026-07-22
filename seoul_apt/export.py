@@ -263,16 +263,17 @@ def listings_payload(conn, now) -> dict:
 
 
 def subscription_items(conn, today: str) -> list[dict]:
-    """청약·분양 export 항목 - 접수 진행중/예정 공고만.
+    """청약·분양 export 항목 - 접수 예정/진행중 + 최근 1년 내 마감 공고.
 
-    접수가 끝난 공고는 청약할 수 없어 내보내지 않는다(종료일 NULL은 일정
-    미확정이라 남김). 주택형(models)을 공고에 병합하며, 상태 계산은 프런트에서
+    주택형(models)·경쟁률(cmpet)을 공고에 병합한다. 상태 계산은 프런트에서
     날짜로 수행하므로 여기서는 원자료만 담는다.
     """
+    cutoff = (datetime.fromisoformat(today) - timedelta(days=365)) \
+        .date().isoformat()
     rows = conn.execute(
         """SELECT * FROM subscription
            WHERE rcept_endde IS NULL OR rcept_endde >= ?
-           ORDER BY rcept_bgnde""", (today,)).fetchall()
+           ORDER BY rcept_bgnde DESC""", (cutoff,)).fetchall()
     items = []
     for r in rows:
         hmn = r["house_manage_no"]
@@ -295,6 +296,12 @@ def subscription_items(conn, today: str) -> list[dict]:
                     mo["mgn"] = round(
                         (nb["median"] - m["top_amount"]) / nb["median"] * 100, 1)
             models.append(mo)
+        cmpet = [{
+            "ty": c["house_ty"], "resd": c["reside_secd"],
+            "req": c["req_cnt"], "rate": c["cmpet_rate"],
+        } for c in conn.execute(
+            "SELECT * FROM subscription_cmpet WHERE house_manage_no=? "
+            "ORDER BY house_ty", (hmn,))]
         items.append({
             "id": hmn, "kind": r["kind"], "secd": r["secd_nm"],
             "name": r["house_nm"],
@@ -306,7 +313,7 @@ def subscription_items(conn, today: str) -> list[dict]:
             "przwner": r["przwner_de"],
             "cntrct_bgn": r["cntrct_bgnde"], "cntrct_end": r["cntrct_endde"],
             "mvn": r["mvn_ym"], "cnstrct": r["cnstrct_nm"], "url": r["url"],
-            "models": models,
+            "models": models, "cmpet": cmpet,
         })
     return items
 
