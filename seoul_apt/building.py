@@ -9,6 +9,7 @@
 """
 
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone, timedelta
 
 import requests
@@ -166,31 +167,44 @@ class BuildingClient:
 
 
 def collect_buildings(conn, data_key: str, kakao_key: str,
-                      lawd_cd: str | None = None, limit: int | None = None) -> dict:
-    """건축물대장 정보 없는 단지를 조회해 저장. 통계 dict 반환."""
+                      lawd_cd: str | None = None, limit: int | None = None,
+                      max_workers: int = 8) -> dict:
+    """건축물대장 정보 없는 단지를 조회해 저장. 통계 dict 반환.
+
+    단지당 카카오 주소검색 1회 + 정부API 1~2회를 순차 호출해 건당 약 1.6초가
+    걸린다(실측) - 수천 건 단위에서는 이게 병목이라 **네트워크 조회는 스레드풀로
+    병렬화**하고(각 단지 조회는 완전히 독립적), DB 기록만 메인 스레드에서 순차
+    처리한다(SQLite 쓰기는 스레드 안전이 아님 + 커밋 순서를 단순하게 유지).
+    """
     client = BuildingClient(data_key, kakao_key)
     targets = db.complexes_without_building(conn, lawd_cd, limit)
     stats = {"tried": 0, "filled": 0, "failed": 0}
-    for i, row in enumerate(targets, 1):
+
+    def _fetch(row):
         gu = config.SEOUL_DISTRICTS.get(row["lawd_cd"], "")
         try:
-            info = client.fetch(gu, row["umd_nm"], row["jibun"])
+            return row, client.fetch(gu, row["umd_nm"], row["jibun"]), None
         except BuildingAPIError as e:
-            # 일시적 오류 - bldg_fetched_at 을 채우지 않아 다음 실행에 재시도됨
-            print(f"[building] {row['apt_nm']} 실패(재시도 예정): {e}")
-            stats["failed"] += 1
-            time.sleep(config.REQUEST_SLEEP)
-            continue
-        now = datetime.now(KST).isoformat(timespec="seconds")
-        if info:
-            db.set_building(conn, row["complex_id"], info["households"],
-                            info["far"], info["bcr"], info["approval_date"], now)
-            stats["filled"] += 1
-        else:
-            # 조회는 성공했으나 매칭되는 주소/데이터가 없음 - 재조회 방지 위해 시각만 기록
-            db.set_building(conn, row["complex_id"], None, None, None, None, now)
-        # 느린 API 대기 중 쓰기 락을 쥐지 않도록 매 행 즉시 커밋(동시 수집 안전)
-        conn.commit()
-        stats["tried"] += 1
-        time.sleep(config.REQUEST_SLEEP)
+            return row, None, e
+
+    with ThreadPoolExecutor(max_workers=max_workers) as ex:
+        futures = [ex.submit(_fetch, row) for row in targets]
+        for fut in as_completed(futures):
+            row, info, err = fut.result()
+            if err is not None:
+                # 일시적 오류 - bldg_fetched_at 을 채우지 않아 다음 실행에 재시도됨
+                print(f"[building] {row['apt_nm']} 실패(재시도 예정): {err}")
+                stats["failed"] += 1
+                continue
+            now = datetime.now(KST).isoformat(timespec="seconds")
+            if info:
+                db.set_building(conn, row["complex_id"], info["households"],
+                                info["far"], info["bcr"], info["approval_date"], now)
+                stats["filled"] += 1
+            else:
+                # 조회는 성공했으나 매칭되는 주소/데이터가 없음 - 재조회 방지 위해 시각만 기록
+                db.set_building(conn, row["complex_id"], None, None, None, None, now)
+            # 느린 API 대기 중 쓰기 락을 쥐지 않도록 매 건 즉시 커밋
+            conn.commit()
+            stats["tried"] += 1
     return stats

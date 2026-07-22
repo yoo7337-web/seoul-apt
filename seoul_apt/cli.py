@@ -67,7 +67,8 @@ def cmd_building(conn, args):
         print("[building] KAKAO_REST_KEY 없음 - 건너뜀(주소→법정동 변환 불가)")
         return
     stats = building.collect_buildings(conn, data_key, kakao_key,
-                                       args.district, args.limit)
+                                       args.district, args.limit,
+                                       max_workers=getattr(args, "workers", 10))
     print(f"[building] 조회 {stats['tried']} / 정보확보 {stats['filled']} "
           f"/ 실패(재시도예정) {stats['failed']}")
 
@@ -211,6 +212,8 @@ def build_parser() -> argparse.ArgumentParser:
     bd = sub.add_parser("building", help="건축물대장 부가정보(세대수·용적률·건폐율)")
     bd.add_argument("--district", default=None, help="특정 구 LAWD_CD")
     bd.add_argument("--limit", type=int, default=None, help="처리 개수 제한")
+    bd.add_argument("--workers", type=int, default=10,
+                    help="동시 조회 스레드 수(기본 10 - 단지별 조회는 서로 독립적)")
     bd.set_defaults(func=cmd_building)
 
     sb = sub.add_parser("subscription", help="청약홈 분양정보·경쟁률 수집")
