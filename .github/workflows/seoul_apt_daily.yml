@@ -40,7 +40,8 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: bash scripts/db_release.sh pull
 
-      - name: Collect data
+      # 핵심 데이터(실거래·지수·청약) - 빠르게 끝남. 이게 export/commit 되어야 함.
+      - name: Collect core data
         env:
           DATA_GO_KR_KEY: ${{ secrets.DATA_GO_KR_KEY }}
           REB_API_KEY: ${{ secrets.REB_API_KEY }}
@@ -61,10 +62,18 @@ jobs:
           python -m seoul_apt.cli gongsi
           python -m seoul_apt.cli reb
           python -m seoul_apt.cli subscription || echo "청약 수집 실패(계속 진행)"
-          # 건축물대장은 남은 단지가 수천 개라 전체 처리 시 6h 타임아웃 →
-          # 매 실행 800개씩만 증분 처리(며칠에 걸쳐 backlog 소진). 핵심 데이터
-          # 수집(위)이 끝난 뒤 마지막에 돌려, 느려도 실거래 export를 막지 않게 함.
-          python -m seoul_apt.cli building --limit 800 || echo "건축물대장 일부 실패(계속 진행)"
+
+      # 건축물대장은 남은 단지가 수천 개라 느림 → 별도 스텝 + 20분 하드 타임아웃
+      # + continue-on-error. 20분 안에 처리한 만큼만 DB에 남고(부분진척 보존),
+      # 실패/타임아웃해도 아래 export/commit 은 그대로 진행돼 실거래가 유실 안 됨.
+      # 매 실행 800개씩 → 며칠에 걸쳐 backlog(약 6천개) 소진.
+      - name: Building info (best-effort batch)
+        timeout-minutes: 20
+        continue-on-error: true
+        env:
+          DATA_GO_KR_KEY: ${{ secrets.DATA_GO_KR_KEY }}
+          KAKAO_REST_KEY: ${{ secrets.KAKAO_REST_KEY }}
+        run: python -m seoul_apt.cli building --limit 800
 
       - name: Export JSON
         env:

@@ -20,6 +20,7 @@
     // 지도(app.js)의 선택 변경을 대시보드에 반영
     if (window.SeoulMap) window.SeoulMap.onChange = () => refresh();
     refresh();
+    renderSources();
     initNewOld();
     renderPeakShare();
     renderRebChart();
@@ -128,6 +129,21 @@
     wrap.querySelectorAll("tr[data-lawd]").forEach((tr) =>
       tr.addEventListener("click", () => toggleSel(tr.dataset.lawd)));
     $("rank-desc").textContent = `기준: ${meta.last_updated_display || "-"} · 만원/평`;
+  }
+
+  // ── 데이터 기준일(소스별 실제 기준일자) ─────────────────────────────
+  function renderSources() {
+    const wrap = $("src-table-wrap");
+    if (!wrap) return;
+    $("src-updated").textContent =
+      `자동 갱신: 매일 09:00 KST · 마지막 처리 ${meta.last_updated_display || "-"}`;
+    const rows = meta.sources || [];
+    if (!rows.length) { wrap.innerHTML = '<div class="empty">기준일 정보 없음</div>'; return; }
+    wrap.innerHTML = `<table class="rank-table"><thead><tr>
+      <th>데이터</th><th>기준일</th><th>비고</th></tr></thead><tbody>${
+      rows.map((s) => `<tr><td>${s.k}</td><td><b>${s.d}</b></td>
+        <td style="color:var(--muted)">${s.note || ""}</td></tr>`).join("")
+    }</tbody></table>`;
   }
 
   // ── 2) 평단가 추이(선택 구 연동, 미선택 시 상위5 미리보기) ──────────

@@ -149,6 +149,7 @@ def export_all(conn, kakao_js_key: str | None = None) -> dict:
     _write_json(export_dir / "meta.json", {
         "last_updated": now.isoformat(timespec="seconds"),
         "last_updated_display": now.strftime("%Y-%m-%d %H:%M KST"),
+        "sources": data_sources(conn),   # 데이터 소스별 실제 기준일자
         "districts": district_list,
         "rankings": aggregate.district_rankings(conn),
         "totals": totals,
@@ -163,6 +164,38 @@ def _val_short(v: dict) -> dict:
     """밸류에이션 객체를 밸류에이션.json 용 경량 키로 축약."""
     return {"pos": v["pos"], "vp": v["vs_peak"], "jr": v["jr"],
             "ppy": v["cur_ppy"], "m": v["months"]}
+
+
+def data_sources(conn) -> list[dict]:
+    """데이터 소스별 실제 기준일자 - 화면 '데이터 기준일'에 표시.
+
+    소스마다 기준이 다르다: 실거래=최신 계약일, 부동산원=발표 월(월간),
+    청약=수집시각, 건축물대장=수집 진척률, 매물=최신 확인일.
+    """
+    def one(q):
+        r = conn.execute(q).fetchone()
+        return r[0] if r else None
+
+    sale_max = one("SELECT MAX(deal_date) FROM sale_txn WHERE canceled=0")
+    rent_max = one("SELECT MAX(deal_date) FROM rent_txn")
+    reb_max = one("SELECT MAX(period) FROM reb_index")
+    sub_max = one("SELECT MAX(rcrit_de) FROM subscription")
+    bldg_done = one("SELECT COUNT(*) FROM complex WHERE bldg_fetched_at IS NOT NULL") or 0
+    bldg_tot = one("SELECT COUNT(*) FROM complex") or 0
+    lst_max = one("SELECT MAX(confirm_date) FROM listing WHERE status='open'")
+    lst_cnt = one("SELECT COUNT(*) FROM listing WHERE status='open'") or 0
+    return [
+        {"k": "실거래가(매매·전월세)", "d": sale_max or "-",
+         "note": f"국토부 · 최신 계약일 (전월세 {rent_max or '-'})"},
+        {"k": "시장지표(가격·수급·외지인·미분양)", "d": reb_max or "-",
+         "note": "한국부동산원 · 월간 발표"},
+        {"k": "청약·분양", "d": sub_max or "-",
+         "note": "청약홈 · 최신 모집공고일"},
+        {"k": "건축물대장(세대수·용적률)", "d": f"{bldg_done:,}/{bldg_tot:,} 단지",
+         "note": "건축HUB · 순차 수집 중"},
+        {"k": "현재 매물(호가)", "d": lst_max or "미수집",
+         "note": f"네이버부동산 · 수동 수집 {lst_cnt:,}건 (일부 구)"},
+    ]
 
 
 def _listing_summary(conn) -> dict:
