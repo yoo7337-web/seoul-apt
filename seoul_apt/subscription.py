@@ -25,11 +25,19 @@ BASE = "https://api.odcloud.kr/api"
 DETAIL_SVC = f"{BASE}/ApplyhomeInfoDetailSvc/v1"
 CMPET_SVC = f"{BASE}/ApplyhomeInfoCmpetRtSvc/v1"
 
-OP_APT = f"{DETAIL_SVC}/getAPTLttotPblancDetail"          # APT 분양공고
+OP_APT = f"{DETAIL_SVC}/getAPTLttotPblancDetail"          # APT 분양공고(특별/1·2순위)
 OP_APT_MDL = f"{DETAIL_SVC}/getAPTLttotPblancMdl"          # APT 주택형별
-OP_REMNDR = f"{DETAIL_SVC}/getRemndrLttotPblancDetail"     # 무순위/잔여세대
+OP_REMNDR = f"{DETAIL_SVC}/getRemndrLttotPblancDetail"     # 무순위/잔여세대 + 불법행위 재공급
 OP_REMNDR_MDL = f"{DETAIL_SVC}/getRemndrLttotPblancMdl"
+OP_OPTN = f"{DETAIL_SVC}/getOPTLttotPblancDetail"          # 임의공급
 OP_APT_CMPET = f"{CMPET_SVC}/getAPTLttotPblancCmpet"       # APT 경쟁률
+
+# API 오퍼레이션 → (엔드포인트, 주택형 엔드포인트|None)
+_KIND_EP = {
+    "apt": (OP_APT, OP_APT_MDL),
+    "remndr": (OP_REMNDR, OP_REMNDR_MDL),
+    "optn": (OP_OPTN, None),        # 임의공급은 주택형 오퍼레이션 미제공
+}
 
 DEFAULT_SINCE_MONTHS = 18   # 모집공고일 기준 수집 범위
 PER_PAGE = 100
@@ -124,8 +132,8 @@ class ApplyhomeClient:
         return rows
 
     def fetch_notices(self, kind: str, since: str) -> list[dict]:
-        """분양공고 목록(서울, 모집공고일>=since). kind: 'apt'|'remndr'."""
-        ep = OP_APT if kind == "apt" else OP_REMNDR
+        """분양공고 목록(서울, 모집공고일>=since). kind: 'apt'|'remndr'|'optn'."""
+        ep = _KIND_EP[kind][0]
         raws = self._get_rows(ep, {
             "SUBSCRPT_AREA_CODE_NM::EQ": "서울",
             "RCRIT_PBLANC_DE::GTE": since,
@@ -133,7 +141,9 @@ class ApplyhomeClient:
         return [_parse_notice(r, kind) for r in raws]
 
     def fetch_models(self, kind: str, house_manage_no: str) -> list[dict]:
-        ep = OP_APT_MDL if kind == "apt" else OP_REMNDR_MDL
+        ep = _KIND_EP[kind][1]
+        if not ep:                      # 임의공급 등 주택형 오퍼레이션 없는 유형
+            return []
         raws = self._get_rows(ep, {"HOUSE_MANAGE_NO::EQ": house_manage_no})
         return [_parse_model(r, house_manage_no) for r in raws]
 
@@ -146,10 +156,17 @@ class ApplyhomeClient:
 
 # ── 파싱(테스트 가능하도록 분리) ─────────────────────────────────────────
 def _parse_notice(raw: dict, kind: str) -> dict:
+    # 공급유형(HOUSE_SECD_NM): 무순위/불법행위 재공급/임의공급 등. remndr 오퍼레이션이
+    # 무순위와 불법행위 재공급을 함께 반환하므로 이 라벨로 구분한다. APT 정규공고는
+    # HOUSE_SECD_NM 이 '분양주택' 등이라, kind=apt 는 별도 라벨로 덮어씀.
+    secd = (_field(raw, "HOUSE_SECD_NM") or "").strip() or None
+    if kind == "apt":
+        secd = "일반공급"
     return {
         "house_manage_no": str(_field(raw, "HOUSE_MANAGE_NO") or ""),
         "pblanc_no": str(_field(raw, "PBLANC_NO") or "") or None,
         "kind": kind,
+        "secd_nm": secd,
         "house_nm": (_field(raw, "HOUSE_NM") or "").strip(),
         "adres": (_field(raw, "HSSPLY_ADRES") or "").strip() or None,
         "tot_suply": _to_int(_field(raw, "TOT_SUPLY_HSHLDCO")),
@@ -214,9 +231,9 @@ def collect_subscriptions(conn, data_key: str, kakao_key: str | None = None,
     client = ApplyhomeClient(data_key, debug=debug)
     now = datetime.now(KST).isoformat(timespec="seconds")
     today = date.today().isoformat()
-    stats = {"apt": 0, "remndr": 0, "models": 0, "cmpet": 0, "geocoded": 0}
+    stats = {"apt": 0, "remndr": 0, "optn": 0, "models": 0, "cmpet": 0, "geocoded": 0}
 
-    for kind in ("apt", "remndr"):
+    for kind in ("apt", "remndr", "optn"):
         try:
             notices = client.fetch_notices(kind, since)
         except SubscriptionAPIError as e:

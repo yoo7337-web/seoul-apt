@@ -396,6 +396,21 @@ table.rank-table tbody tr[data-id]:hover { background: var(--accent-soft); }
 .sub-link:hover { text-decoration: underline; }
 .row-clickable { cursor: pointer; }
 .row-clickable:hover { background: var(--accent-soft); }
+/* 청약 공급유형 태그 */
+.sub-type {
+  display: inline-block; font-size: 10.5px; font-weight: 700;
+  padding: 1px 6px; border-radius: 6px; white-space: nowrap;
+}
+.sub-type.st-normal { background: rgba(37,99,235,.12); color: #2563eb; }
+.sub-type.st-remndr { background: rgba(217,119,6,.14); color: #b45309; }
+.sub-type.st-optn { background: rgba(100,116,139,.15); color: #475569; }
+.sub-type.st-illegal { background: rgba(239,68,68,.14); color: #dc2626; }
+@media (prefers-color-scheme: dark) {
+  .sub-type.st-normal { color: #60a5fa; }
+  .sub-type.st-remndr { color: #fbbf24; }
+  .sub-type.st-optn { color: #94a3b8; }
+  .sub-type.st-illegal { color: #f87171; }
+}
 /* 상세 모달 상태 뱃지 */
 .badge.sub-badge-upcoming { background: #7c3aed; color: #fff; }
 .badge.sub-badge-open { background: #059669; color: #fff; }

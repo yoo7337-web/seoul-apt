@@ -1040,6 +1040,18 @@
   }
 
   // ── 6) 청약·분양 (서울) ─────────────────────────────────────────────
+  // 공급유형 태그(무순위/불법행위 재공급/임의공급/일반공급)
+  function subTypeTag(it) {
+    const secd = it.secd && it.secd !== "일반공급" ? it.secd
+      : it.kind === "remndr" ? "무순위/잔여"
+      : it.kind === "optn" ? "임의공급" : "일반공급";
+    const cls = secd.indexOf("불법") >= 0 ? "st-illegal"
+      : secd.indexOf("임의") >= 0 ? "st-optn"
+      : secd.indexOf("무순위") >= 0 || secd.indexOf("잔여") >= 0 ? "st-remndr"
+      : "st-normal";
+    return `<span class="sub-type ${cls}">${secd}</span>`;
+  }
+
   function subStatus(it) {
     const d = new Date();
     const t = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -1063,7 +1075,7 @@
       wrap.innerHTML = '<div class="empty">진행중·예정 청약 없음</div>';
     } else {
       let html = `<table class="rank-table"><thead><tr>
-        <th>상태</th><th>주택명</th><th>구</th><th>세대</th><th>접수기간</th><th>최고분양가</th><th>안전마진</th><th>청약홈</th>
+        <th>상태</th><th>주택명</th><th>유형</th><th>구</th><th>세대</th><th>접수기간</th><th>최고분양가</th><th>안전마진</th><th>청약홈</th>
         </tr></thead><tbody>`;
       active.forEach((it) => {
         const st = subStatus(it);
@@ -1076,7 +1088,8 @@
           ? `<a class="sub-link" href="${it.url}" target="_blank" rel="noopener" title="청약홈 공고 보기">↗</a>` : "-";
         html += `<tr data-lat="${it.lat || ""}" data-lon="${it.lon || ""}">
           <td><span class="badge sub-badge-${st.k}">${st.label}</span></td>
-          <td>${it.name}${it.kind === "remndr" ? ' <span class="sel-hint">(무순위)</span>' : ""}</td>
+          <td>${it.name}</td>
+          <td>${subTypeTag(it)}</td>
           <td>${it.gu || "-"}</td><td>${it.tot ? it.tot.toLocaleString() : "-"}</td>
           <td>${it.rcept_bgn || "-"} ~ ${it.rcept_end || "-"}</td>
           <td>${top ? SeoulCharts.fmt(top) : "-"}</td><td>${mgnTxt}</td>

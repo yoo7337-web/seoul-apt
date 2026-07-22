@@ -6,7 +6,7 @@
   <title>대시보드 - 서울 아파트 시세 지도</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=24">
+  <link rel="stylesheet" href="css/style.css?v=25">
   <script src="js/firebase-config.js?v=1"></script>
   <script src="js/auth.js?v=1"></script>
 </head>
@@ -20,6 +20,12 @@
   </header>
 
   <main class="page-wrap">
+    <section class="page-section">
+      <h2>📅 데이터 기준일</h2>
+      <div class="desc" id="src-updated">자동 갱신: 매일 09:00 KST</div>
+      <div class="table-scroll" id="src-table-wrap"></div>
+    </section>
+
     <section class="page-section">
       <h2>부동산원 가격지수 (서울)</h2>
       <div class="desc">한국부동산원 월간 아파트 매매·전세 가격지수</div>
@@ -56,6 +62,6 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
   <script src="js/charts.js?v=6"></script>
-  <script src="js/dashboard.js?v=28"></script>
+  <script src="js/dashboard.js?v=30"></script>
 </body>
 </html>

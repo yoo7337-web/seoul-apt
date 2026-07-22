@@ -86,7 +86,8 @@ CREATE TABLE IF NOT EXISTS fetch_log (
 CREATE TABLE IF NOT EXISTS subscription (
     house_manage_no TEXT PRIMARY KEY, -- 청약홈 주택관리번호
     pblanc_no       TEXT,             -- 공고번호
-    kind            TEXT NOT NULL,    -- 'apt' | 'remndr'(무순위/잔여)
+    kind            TEXT NOT NULL,    -- 'apt' | 'remndr'(무순위/잔여) | 'optn'(임의공급)
+    secd_nm         TEXT,             -- 공급유형(무순위/불법행위 재공급/임의공급 등, API HOUSE_SECD_NM)
     house_nm        TEXT NOT NULL,    -- 주택명
     adres           TEXT,             -- 공급위치 주소
     tot_suply       INTEGER,          -- 공급규모(세대)
@@ -216,6 +217,10 @@ def _migrate(conn: sqlite3.Connection) -> None:
     ]:
         if name not in ccols:
             conn.execute(f"ALTER TABLE complex ADD COLUMN {name} {decl}")
+    # 청약 공급유형(무순위/불법행위 재공급/임의공급 구분)
+    scols = {r["name"] for r in conn.execute("PRAGMA table_info(subscription)")}
+    if "secd_nm" not in scols:
+        conn.execute("ALTER TABLE subscription ADD COLUMN secd_nm TEXT")
     conn.commit()
 
 
@@ -362,15 +367,16 @@ def upsert_subscription(conn, s: dict) -> None:
     좌표를 제외한 필드는 항상 최신값으로 갱신한다."""
     conn.execute(
         """INSERT INTO subscription
-           (house_manage_no, pblanc_no, kind, house_nm, adres, tot_suply,
+           (house_manage_no, pblanc_no, kind, secd_nm, house_nm, adres, tot_suply,
             rcrit_de, rcept_bgnde, rcept_endde, przwner_de,
             cntrct_bgnde, cntrct_endde, mvn_ym, cnstrct_nm, url, fetched_at)
-           VALUES (:house_manage_no, :pblanc_no, :kind, :house_nm, :adres,
+           VALUES (:house_manage_no, :pblanc_no, :kind, :secd_nm, :house_nm, :adres,
                    :tot_suply, :rcrit_de, :rcept_bgnde, :rcept_endde,
                    :przwner_de, :cntrct_bgnde, :cntrct_endde, :mvn_ym,
                    :cnstrct_nm, :url, :fetched_at)
            ON CONFLICT(house_manage_no) DO UPDATE SET
              pblanc_no=excluded.pblanc_no, kind=excluded.kind,
+             secd_nm=excluded.secd_nm,
              house_nm=excluded.house_nm, adres=excluded.adres,
              tot_suply=excluded.tot_suply, rcrit_de=excluded.rcrit_de,
              rcept_bgnde=excluded.rcept_bgnde, rcept_endde=excluded.rcept_endde,

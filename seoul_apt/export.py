@@ -180,6 +180,9 @@ def data_sources(conn) -> list[dict]:
     rent_max = one("SELECT MAX(deal_date) FROM rent_txn")
     reb_max = one("SELECT MAX(period) FROM reb_index")
     sub_max = one("SELECT MAX(rcrit_de) FROM subscription")
+    if sub_max and len(str(sub_max)) == 8 and str(sub_max).isdigit():
+        s = str(sub_max)
+        sub_max = f"{s[:4]}-{s[4:6]}-{s[6:]}"   # YYYYMMDD → YYYY-MM-DD
     bldg_done = one("SELECT COUNT(*) FROM complex WHERE bldg_fetched_at IS NOT NULL") or 0
     bldg_tot = one("SELECT COUNT(*) FROM complex") or 0
     lst_max = one("SELECT MAX(confirm_date) FROM listing WHERE status='open'")
@@ -303,7 +306,8 @@ def subscription_items(conn, today: str) -> list[dict]:
             "SELECT * FROM subscription_cmpet WHERE house_manage_no=? "
             "ORDER BY house_ty", (hmn,))]
         items.append({
-            "id": hmn, "kind": r["kind"], "name": r["house_nm"],
+            "id": hmn, "kind": r["kind"], "secd": r["secd_nm"],
+            "name": r["house_nm"],
             "adres": r["adres"], "gu": extract_gu(r["adres"]),
             "lat": r["lat"], "lon": r["lon"],
             "tot": r["tot_suply"],

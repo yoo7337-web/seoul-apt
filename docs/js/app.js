@@ -833,6 +833,14 @@
     if (it.przwner && t < it.przwner) return { k: "wait", label: "발표대기" };
     return { k: "done", label: "완료" };
   }
+  // 공급유형 라벨: 무순위/불법행위 재공급/임의공급 등(secd) 우선, 없으면 kind로 근사.
+  function subTypeLabel(it) {
+    if (it.secd && it.secd !== "일반공급") return it.secd;
+    if (it.kind === "apt") return "일반공급(특별·1·2순위)";
+    if (it.kind === "remndr") return "무순위/잔여세대";
+    if (it.kind === "optn") return "임의공급";
+    return "청약";
+  }
 
   function subVisibleOnMap(it) {
     if (!it.lat || !it.lon) return false;
@@ -851,8 +859,12 @@
       const st = subStatus(it);
       const el = document.createElement("div");
       el.className = `sub-bubble ${st.k}`;
+      // 불법행위재공급·임의공급은 마커에도 유형 표기(무순위·일반과 구분)
+      const tShort = it.secd === "불법행위 재공급" ? "불법재공급"
+        : it.secd === "임의공급" ? "임의공급"
+        : it.kind === "remndr" ? "무순위" : "청약";
       el.innerHTML =
-        `<div class="sb-price"><span class="sb-badge">${st.label}</span>청약</div>` +
+        `<div class="sb-price"><span class="sb-badge">${st.label}</span>${tShort}</div>` +
         `<div class="pb-name">${escapeHtml(it.name)}</div>`;
       el.addEventListener("click", () => showSubDetail(it));
       const ov = new kakao.maps.CustomOverlay({
@@ -891,7 +903,7 @@
 
   function showSubDetail(it) {
     const st = subStatus(it);
-    const kindTxt = it.kind === "remndr" ? "무순위/잔여세대" : "APT 분양";
+    const kindTxt = subTypeLabel(it);
     const sched = [
       ["모집공고", it.rcrit], ["청약접수", fmtRange(it.rcept_bgn, it.rcept_end)],
       ["당첨자발표", it.przwner], ["계약", fmtRange(it.cntrct_bgn, it.cntrct_end)],
