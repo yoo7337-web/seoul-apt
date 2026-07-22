@@ -416,6 +416,12 @@ table.rank-table tbody tr[data-id]:hover { background: var(--accent-soft); }
 .badge.sub-badge-open { background: #059669; color: #fff; }
 .badge.sub-badge-wait { background: #d97706; color: #fff; }
 .badge.sub-badge-done { background: #6b7280; color: #fff; }
+/* 웹 캘린더 보조 공고 표시(상세 미수록) */
+.sub-prov {
+  display: inline-block; font-size: 10px; font-weight: 700;
+  padding: 1px 5px; border-radius: 4px; vertical-align: 1px;
+  border: 1px dashed var(--muted); color: var(--muted); cursor: help;
+}
 /* 청약 상태별 건수 요약(목록 위) */
 .subs-summary { display: flex; flex-wrap: wrap; gap: 6px; margin: 2px 0 10px; }
 .subs-summary .badge { font-size: 11.5px; }

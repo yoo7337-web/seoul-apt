@@ -304,6 +304,7 @@ def subscription_items(conn, today: str) -> list[dict]:
             "ORDER BY house_ty", (hmn,))]
         items.append({
             "id": hmn, "kind": r["kind"], "secd": r["secd_nm"],
+            "src": r["src"] or "api",   # 'web' = 청약홈 캘린더 보조(일정만)
             "name": r["house_nm"],
             "adres": r["adres"], "gu": extract_gu(r["adres"]),
             "lat": r["lat"], "lon": r["lon"],

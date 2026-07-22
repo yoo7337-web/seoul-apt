@@ -1094,9 +1094,14 @@
           : `<span class="mgn ${bm > 0 ? "pos" : "neg"}">${bm > 0 ? "+" : ""}${bm}%</span>`;
         const link = it.url
           ? `<a class="sub-link" href="${it.url}" target="_blank" rel="noopener" title="청약홈 공고 보기">↗</a>` : "-";
+        // 웹 캘린더 보조 공고는 일정만 있고 세대·분양가·안전마진이 비어 있다.
+        // 표에 '-' 만 뜨면 데이터 누락처럼 보이므로 출처를 표시해 준다.
+        const prov = it.src === "web"
+          ? ' <span class="sub-prov" title="청약홈 캘린더에서 먼저 확인된 공고입니다. 공공데이터 반영 후 세대수·분양가·안전마진이 채워집니다.">캘린더</span>'
+          : "";
         html += `<tr data-lat="${it.lat || ""}" data-lon="${it.lon || ""}">
           <td><span class="badge sub-badge-${st.k}">${st.label}</span></td>
-          <td>${it.name}</td>
+          <td>${it.name}${prov}</td>
           <td>${subTypeTag(it)}</td>
           <td>${it.gu || "-"}</td><td>${it.tot ? it.tot.toLocaleString() : "-"}</td>
           <td>${it.rcept_bgn || "-"} ~ ${it.rcept_end || "-"}</td>

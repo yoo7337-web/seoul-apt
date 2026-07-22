@@ -81,7 +81,8 @@ def cmd_subscription(conn, args):
         debug=getattr(args, "debug", False))
     print(f"[subscription] APT {stats['apt']} / 무순위·불법행위재공급 {stats['remndr']} "
           f"/ 임의공급 {stats.get('optn', 0)} / 주택형 {stats['models']} "
-          f"/ 경쟁률 {stats['cmpet']} / 지오코딩 {stats['geocoded']}")
+          f"/ 경쟁률 {stats['cmpet']} / 웹캘린더 보조 {stats.get('web', 0)} "
+          f"/ 지오코딩 {stats['geocoded']}")
 
 
 def cmd_reb(conn, args):

@@ -260,7 +260,8 @@ def collect_subscriptions(conn, data_key: str, kakao_key: str | None = None,
     client = ApplyhomeClient(data_key, debug=debug)
     now = datetime.now(KST).isoformat(timespec="seconds")
     today = date.today().isoformat()
-    stats = {"apt": 0, "remndr": 0, "optn": 0, "models": 0, "cmpet": 0, "geocoded": 0}
+    stats = {"apt": 0, "remndr": 0, "optn": 0, "models": 0, "cmpet": 0,
+             "web": 0, "geocoded": 0}
 
     for kind in ("apt", "remndr", "optn"):
         try:
@@ -292,6 +293,14 @@ def collect_subscriptions(conn, data_key: str, kakao_key: str | None = None,
             time.sleep(config.REQUEST_SLEEP)
         conn.commit()
 
+    # 공공데이터 API 는 청약홈 웹보다 며칠 늦다 - 접수 임박 공고를 놓치지 않도록
+    # 캘린더에서 아직 API 에 없는 건만 보조로 채운다(일정만 있는 임시 레코드).
+    from . import applyhome_web
+    try:
+        stats["web"] = applyhome_web.supplement(conn)["added"]
+    except Exception as e:      # 보조 소스라 실패해도 API 수집분은 살린다
+        print(f"[subscription] 웹 캘린더 보조수집 건너뜀: {e}")
+
     if kakao_key:
         stats["geocoded"] = _geocode_missing(conn, kakao_key)
     conn.commit()
@@ -303,10 +312,18 @@ def _geocode_missing(conn, kakao_key: str) -> int:
     geocoder = KakaoGeocoder(kakao_key)
     done = 0
     for row in db.subscriptions_without_coords(conn):
-        coords = geocoder._query(KAKAO_ADDR_URL, {"query": row["adres"]})
-        if not coords:
-            coords = geocoder._query(
+        coords = None
+        if row["adres"]:
+            coords = geocoder._query(KAKAO_ADDR_URL, {"query": row["adres"]})
+        if not coords and row["house_nm"]:
+            # 주소 없는 공고(웹 캘린더 보조)는 주택명 키워드로 위치를 잡고,
+            # 그때 받은 주소를 같이 저장해 '구'까지 채운다(목록에 '-' 방지).
+            hit = geocoder.query_with_address(
                 KAKAO_KEYWORD_URL, {"query": f"서울 {row['house_nm']}"})
+            if hit:
+                coords = (hit[0], hit[1])
+                if not row["adres"] and hit[2]:
+                    db.set_subscription_adres(conn, row["house_manage_no"], hit[2])
         if coords:
             db.set_subscription_coords(conn, row["house_manage_no"],
                                        coords[0], coords[1])

@@ -102,6 +102,7 @@ CREATE TABLE IF NOT EXISTS subscription (
     url             TEXT,             -- 공고 상세 URL
     lat             REAL,
     lon             REAL,
+    src             TEXT DEFAULT 'api', -- 'api'(공공데이터) | 'web'(청약홈 캘린더 보조, 일정만)
     fetched_at      TEXT
 );
 
@@ -221,6 +222,8 @@ def _migrate(conn: sqlite3.Connection) -> None:
     scols = {r["name"] for r in conn.execute("PRAGMA table_info(subscription)")}
     if "secd_nm" not in scols:
         conn.execute("ALTER TABLE subscription ADD COLUMN secd_nm TEXT")
+    if "src" not in scols:      # 공공데이터 API / 청약홈 웹 캘린더 보조
+        conn.execute("ALTER TABLE subscription ADD COLUMN src TEXT DEFAULT 'api'")
     # 임의공급 오퍼레이션이 'YYYYMMDD'로 주던 날짜를 'YYYY-MM-DD'로 통일.
     # 섞여 있으면 문자열 비교가 뒤집혀(‘0’>‘-’) 지난 공고가 '예정'으로 뜬다.
     for c in ("rcrit_de", "rcept_bgnde", "rcept_endde", "przwner_de",
@@ -370,18 +373,29 @@ def set_building(conn, complex_id, households, far, bcr, approval_date,
 
 
 # ── 청약·분양 ────────────────────────────────────────────────────────────
-def upsert_subscription(conn, s: dict) -> None:
+def subscription_exists(conn, house_manage_no: str) -> bool:
+    return conn.execute(
+        "SELECT 1 FROM subscription WHERE house_manage_no=?",
+        (house_manage_no,)).fetchone() is not None
+
+
+def upsert_subscription(conn, s: dict, src: str = "api") -> None:
     """분양공고 upsert. 일정 변경(접수일 연기 등)이 재수집 시 반영되도록
-    좌표를 제외한 필드는 항상 최신값으로 갱신한다."""
+    좌표를 제외한 필드는 항상 최신값으로 갱신한다.
+
+    src='web'(청약홈 캘린더 보조)은 일정만 있어 API 값을 덮으면 손해다 —
+    호출부(applyhome_web.supplement)가 기존 공고를 걸러 신규만 넣는다.
+    반대로 API 가 나중에 따라잡으면 여기서 src='api' 로 승격된다.
+    """
     conn.execute(
         """INSERT INTO subscription
            (house_manage_no, pblanc_no, kind, secd_nm, house_nm, adres, tot_suply,
             rcrit_de, rcept_bgnde, rcept_endde, przwner_de,
-            cntrct_bgnde, cntrct_endde, mvn_ym, cnstrct_nm, url, fetched_at)
+            cntrct_bgnde, cntrct_endde, mvn_ym, cnstrct_nm, url, src, fetched_at)
            VALUES (:house_manage_no, :pblanc_no, :kind, :secd_nm, :house_nm, :adres,
                    :tot_suply, :rcrit_de, :rcept_bgnde, :rcept_endde,
                    :przwner_de, :cntrct_bgnde, :cntrct_endde, :mvn_ym,
-                   :cnstrct_nm, :url, :fetched_at)
+                   :cnstrct_nm, :url, :src, :fetched_at)
            ON CONFLICT(house_manage_no) DO UPDATE SET
              pblanc_no=excluded.pblanc_no, kind=excluded.kind,
              secd_nm=excluded.secd_nm,
@@ -391,8 +405,8 @@ def upsert_subscription(conn, s: dict) -> None:
              przwner_de=excluded.przwner_de, cntrct_bgnde=excluded.cntrct_bgnde,
              cntrct_endde=excluded.cntrct_endde, mvn_ym=excluded.mvn_ym,
              cnstrct_nm=excluded.cnstrct_nm, url=excluded.url,
-             fetched_at=excluded.fetched_at""",
-        s,
+             src=excluded.src, fetched_at=excluded.fetched_at""",
+        {**s, "src": src},
     )
 
 
@@ -424,9 +438,19 @@ def upsert_subscription_cmpet(conn, c: dict) -> None:
 
 
 def subscriptions_without_coords(conn) -> list[sqlite3.Row]:
+    """좌표 없는 공고. 웹 캘린더 보조 공고는 주소가 없어 주택명으로만 찾는다."""
     return conn.execute(
         "SELECT house_manage_no, house_nm, adres FROM subscription "
-        "WHERE lat IS NULL AND adres IS NOT NULL").fetchall()
+        "WHERE lat IS NULL AND (adres IS NOT NULL OR house_nm IS NOT NULL)"
+    ).fetchall()
+
+
+def set_subscription_adres(conn, house_manage_no, adres) -> None:
+    """주소 없는 공고(웹 캘린더 보조)에 지오코딩으로 얻은 주소를 채운다."""
+    conn.execute(
+        "UPDATE subscription SET adres=? WHERE house_manage_no=? AND adres IS NULL",
+        (adres, house_manage_no),
+    )
 
 
 def set_subscription_coords(conn, house_manage_no, lat, lon) -> None:

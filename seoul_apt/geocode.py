@@ -22,7 +22,16 @@ class KakaoGeocoder:
         self.session = requests.Session()
         self.session.headers.update({"Authorization": f"KakaoAK {rest_key}"})
 
-    def _query(self, url: str, params: dict) -> tuple[float, float] | None:
+    def query_with_address(self, url: str, params: dict) -> tuple | None:
+        """(lat, lon, 주소) 반환. 주소가 없는 공고(웹 캘린더 보조)의 구 판별용."""
+        doc = self._query_doc(url, params)
+        if not doc:
+            return None
+        addr = (doc.get("road_address_name") or doc.get("address_name")
+                or (doc.get("address") or {}).get("address_name"))
+        return float(doc["y"]), float(doc["x"]), addr
+
+    def _query_doc(self, url: str, params: dict) -> dict | None:
         for attempt in range(config.MAX_RETRY):
             try:
                 resp = self.session.get(url, params=params,
@@ -32,13 +41,17 @@ class KakaoGeocoder:
                     continue
                 resp.raise_for_status()
                 docs = resp.json().get("documents") or []
-                if not docs:
-                    return None
-                d = docs[0]
-                return float(d["y"]), float(d["x"])  # (lat, lon)
+                return docs[0] if docs else None
             except (requests.RequestException, KeyError, ValueError):
                 time.sleep(2 ** attempt)
         return None
+
+    def _query(self, url: str, params: dict) -> tuple[float, float] | None:
+        d = self._query_doc(url, params)
+        try:
+            return (float(d["y"]), float(d["x"])) if d else None   # (lat, lon)
+        except (KeyError, TypeError, ValueError):
+            return None
 
     def geocode(self, gu: str, umd: str | None, jibun: str | None,
                 apt_nm: str | None = None) -> tuple[float, float] | None:
