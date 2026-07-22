@@ -79,9 +79,23 @@
   `b`(=`config.area_bucket(area_m2)`) 기준, 없으면 `py→㎡` 폴백. 선택기는 예전
   차트 앞 위치에서 상단으로 이동(중복 제거).
 
+## 왼쪽 팝업 패널 레이아웃 (2026-07-23 분할→오버레이 전환)
+- 대시보드·매수후보·비용계산·청약·**필터**가 **하나의 왼쪽 팝업 슬롯**을 공유한다
+  (`app.js LEFT_PANELS`, `togglePanel`). 하나만 열리며, 열려 있는 걸 다시 누르면 닫힘.
+- 예전엔 대시보드류가 지도를 오른쪽으로 **밀고**(`body.dash-open #map{left:…}`) 필터는
+  오른쪽에서 밀어 지도가 양쪽에서 좁아졌다. 지금은 **지도는 그대로 두고 위에 겹쳐 뜬다** —
+  단지 상세 패널과 같은 모양(`left:12px; top:62px; bottom:12px; border-radius:16px`,
+  `--dash-w` 너비, 드래그 리사이즈). `.filter-panel` 은 `.dash-panel` 클래스를 함께 달아
+  같은 배치를 쓰고 padding 만 따로 준다(`--filter-w`·`body.filter-open` 은 폐기).
+- 지도 크기가 변하지 않으므로 **`map.relayout()` 호출은 제거**했다(예전엔 분할 때문에 필요).
+- ⚠ 겹쳐 뜨는 구조라 **`centerAvoidingPanel` 이 상세 패널뿐 아니라 열린 왼쪽 팝업까지**
+  가려진 폭으로 계산해야 한다. 왼쪽 가장자리부터 24px 이내로 이어진 세로 스트립들을
+  한 덩어리로 보고 그 오른쪽 끝 너머로 센터를 민다(팝업+상세가 12px 간격으로 나란히 뜸).
+  안 그러면 포커스한 단지가 팝업 밑에 숨는다(분할 시절엔 지도가 밀려 안 겪던 문제).
+
 ## 실구매 비용 계산기 (🧮 비용계산 탭, 2026-07-17 별도탭화)
-- 상단바 `#btn-cost` → `#cost-panel`(대시보드·매수후보와 같은 왼쪽 슬롯 공유,
-  `togglePanel` 3-way). 지도 가격 푯말을 **드래그**(`cmp:` prefix 재사용)하거나
+- 상단바 `#btn-cost` → `#cost-panel`(왼쪽 팝업 슬롯 공유, `togglePanel`).
+  지도 가격 푯말을 **드래그**(`cmp:` prefix 재사용)하거나
   단지명 검색으로 여러 단지를 끌어와 필요현금을 나란히 비교. 매수가 셀은 편집 가능.
   상태는 `localStorage seoul_apt_cost`. 렌더는 `dashboard.js renderCost/renderCostBody`,
   계산은 `app.js calcCost`(SeoulMap.calcCost로 노출해 재사용). 상세 패널 내
@@ -110,8 +124,7 @@
   새 테마 추가 시 THEMES 배열에 {key, icon, name, desc, range, peak?/minusGap?}만.
 
 ## 청약·분양 UI (🏷️ 청약 패널, 2026-07-17 별도패널화)
-- 상단바 `#btn-subs` = **청약 패널 열기**(`togglePanel` 4-way, 대시보드·매수후보·
-  비용계산과 같은 왼쪽 슬롯 공유). 예전엔 이 버튼이 지도 마커 토글이었는데,
+- 상단바 `#btn-subs` = **청약 패널 열기**(왼쪽 팝업 슬롯 공유). 예전엔 이 버튼이 지도 마커 토글이었는데,
   **지도 표시 여부는 패널 안 체크박스**(`#subs-map-toggle` → `setSubsMarkers`)가 담당.
   청약 목록·경쟁률 표는 대시보드에서 이 패널로 이동(`#subs-table-wrap`,
   `#subs-cmpet-wrap`, `dashboard.js renderSubs` + `SeoulDash.openSubs`).

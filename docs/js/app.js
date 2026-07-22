@@ -557,13 +557,8 @@
   }
   function onFilterChange() { updateFilterBadge(); applyFilters(); }
 
-  function toggleFilter(force) {
-    const open = typeof force === "boolean"
-      ? force : !document.body.classList.contains("filter-open");
-    document.body.classList.toggle("filter-open", open);
-    $("filter-panel").classList.toggle("hidden", !open);
-    setTimeout(() => { if (state.map) state.map.relayout(); }, 80);
-  }
+  // 필터도 다른 패널과 같은 왼쪽 팝업 슬롯을 쓴다(하나만 열림)
+  function toggleFilter(force) { togglePanel("filter", force); }
 
   function bindFilterUI() {
     buildFilterUI();
@@ -644,9 +639,9 @@
     if (state.map) renderMarkers();
   }
 
-  // 대시보드 분할 패널 토글 (지도는 오른쪽으로 밀려 함께 표시)
-  // 대시보드·매수후보·비용계산 패널은 같은 왼쪽 슬롯을 공유(하나만 열림)
-  const LEFT_PANELS = ["dash", "buy", "cost", "subs"];
+  // 왼쪽 팝업 패널 토글. 대시보드·매수후보·비용계산·청약·필터가 같은 슬롯을
+  // 공유해 하나만 열린다(지도 위에 겹쳐 뜨므로 동시에 열면 서로 가린다).
+  const LEFT_PANELS = ["dash", "buy", "cost", "subs", "filter"];
   function togglePanel(which, force) {
     const panel = $(which + "-panel");
     const willOpen = typeof force === "boolean" ? force
@@ -656,7 +651,7 @@
     });
     panel.classList.toggle("hidden", !willOpen);
     const anyOpen = LEFT_PANELS.some((p) => !$(p + "-panel").classList.contains("hidden"));
-    document.body.classList.toggle("dash-open", anyOpen);   // 맵 shift 공유
+    document.body.classList.toggle("dash-open", anyOpen);   // 상세패널 비켜주기용
     $("dash-resizer").classList.toggle("hidden", !anyOpen);
     if (willOpen && window.SeoulDash) {
       if (which === "dash") SeoulDash.open();
@@ -667,24 +662,22 @@
     if (which === "subs" && willOpen && $("subs-map-toggle")) {
       $("subs-map-toggle").checked = state.showSubs;   // 열 때 토글 동기화
     }
-    setTimeout(() => { if (state.map) state.map.relayout(); }, 80);
   }
   function toggleDashboard(force) { togglePanel("dash", force); }
   function toggleBuy(force) { togglePanel("buy", force); }
   function toggleCost(force) { togglePanel("cost", force); }
 
-  // 대시보드 패널 너비를 드래그로 조절
+  // 왼쪽 팝업 너비를 드래그로 조절(지도 크기는 그대로라 relayout 불필요)
   const DASH_MIN = 320;
-  function setDashWidth(px, relayout) {
+  function setDashWidth(px) {
     const max = Math.round(window.innerWidth * 0.8);
     px = Math.max(DASH_MIN, Math.min(Math.round(px), max));
     document.documentElement.style.setProperty("--dash-w", px + "px");
-    if (relayout && state.map) state.map.relayout();
     return px;
   }
   function bindDashResizer() {
     const saved = parseInt(localStorage.getItem("seoul_apt_dash_w"), 10);
-    if (saved) setDashWidth(saved, false);
+    if (saved) setDashWidth(saved);
     const rz = $("dash-resizer");
     let dragging = false, raf = 0;
     rz.addEventListener("pointerdown", (e) => {
@@ -695,7 +688,7 @@
       if (!dragging) return;
       const x = e.clientX;
       if (raf) return;
-      raf = requestAnimationFrame(() => { raf = 0; setDashWidth(x, true); });
+      raf = requestAnimationFrame(() => { raf = 0; setDashWidth(x - 12); });
     });
     const end = (e) => {
       if (!dragging) return;
@@ -705,7 +698,6 @@
       const w = parseInt(getComputedStyle(document.documentElement)
         .getPropertyValue("--dash-w"), 10);
       if (w) localStorage.setItem("seoul_apt_dash_w", w);
-      if (state.map) state.map.relayout();
     };
     rz.addEventListener("pointerup", end);
     rz.addEventListener("pointercancel", end);
@@ -735,24 +727,41 @@
     if (window.SeoulMap.onChange) window.SeoulMap.onChange(new Set(state.districts));
   }
 
-  // 방금 포커스한 좌표가 좌측 상세 패널에 가려지지 않도록 보정.
+  // 방금 포커스한 좌표가 왼쪽 패널들에 가려지지 않도록 보정.
   // setCenter만 하면 지도 컨테이너의 '진짜 중앙'에 놓이는데, 창 너비 1280px
-  // 안팎(매수후보 리스트+상세 패널이 함께 열린 흔한 폭)에서는 그 자리가 하필
-  // 열려 있는 상세 패널 밑이라 마커가 안 보인다(사고 이력). 패널이 지도 왼쪽에
-  // 붙은 세로 스트립일 때만 화면에 남는 폭 쪽으로 밀어서 센터링한다.
+  // 안팎(왼쪽 팝업+상세 패널이 함께 열린 흔한 폭)에서는 그 자리가 하필 열려
+  // 있는 패널 밑이라 마커가 안 보인다(사고 이력). 왼쪽에 붙은 세로 스트립
+  // 패널들의 오른쪽 끝까지를 '가려진 폭'으로 보고 남는 쪽으로 밀어서 센터링한다.
+  // ⚠ 패널이 지도를 밀어내지 않고 겹쳐 뜨므로(2026-07-23 팝업 전환) 상세 패널
+  // 뿐 아니라 열려 있는 왼쪽 팝업(대시보드·필터 등)도 함께 계산해야 한다.
   function centerAvoidingPanel(lat, lon) {
     const map = state.map;
     map.setCenter(new kakao.maps.LatLng(lat, lon));
-    const panelEl = $("panel"), mapEl = $("map");
-    if (!panelEl || !mapEl || panelEl.classList.contains("hidden")) return;
+    const mapEl = $("map");
+    if (!mapEl) return;
     const mapRect = mapEl.getBoundingClientRect();
-    const panelRect = panelEl.getBoundingClientRect();
-    const deadLeft = Math.max(0, panelRect.left - mapRect.left);
-    const deadRight = Math.min(mapRect.width, panelRect.right - mapRect.left);
-    const coversHeight = (Math.min(mapRect.height, panelRect.bottom - mapRect.top)
-      - Math.max(0, panelRect.top - mapRect.top)) >= mapRect.height * 0.5;
-    // 모바일 하단시트(가로 전체 폭)나 애매한 겹침은 보정하지 않는다
-    if (!coversHeight || deadLeft > 20 || deadRight <= 0 || deadRight >= mapRect.width) return;
+    const overlays = ["panel", ...LEFT_PANELS.map((p) => p + "-panel")]
+      .map((id) => $(id))
+      .filter((el) => el && !el.classList.contains("hidden"));
+    const strips = overlays.map((el) => {
+      const r = el.getBoundingClientRect();
+      const coversHeight = (Math.min(mapRect.height, r.bottom - mapRect.top)
+        - Math.max(0, r.top - mapRect.top)) >= mapRect.height * 0.5;
+      return {
+        left: Math.max(0, r.left - mapRect.left),
+        right: Math.min(mapRect.width, r.right - mapRect.left),
+        coversHeight,
+      };
+      // 모바일 하단시트(가로 전체 폭)나 애매한 겹침은 아래에서 걸러진다
+    }).filter((s) => s.coversHeight && s.right > 0 && s.right < mapRect.width)
+      .sort((a, b) => a.left - b.left);
+    // 왼쪽 가장자리부터 '이어 붙은' 패널들만 가려진 폭으로 친다. 팝업과 상세
+    // 패널은 12px 간격으로 나란히 뜨므로 한 덩어리로 이어진다.
+    let deadRight = 0;
+    strips.forEach((s) => {
+      if (s.left <= deadRight + 24) deadRight = Math.max(deadRight, s.right);
+    });
+    if (deadRight <= 0) return;
     const visibleWidth = mapRect.width - deadRight;
     if (visibleWidth < 80) return;   // 남는 폭이 너무 좁으면 보정 포기
     const desiredX = deadRight + visibleWidth / 2;
