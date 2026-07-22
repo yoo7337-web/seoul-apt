@@ -54,7 +54,7 @@
       const ok = await init();
       if (ok) renderCost();
     },
-    // 청약·분양 패널(목록·경쟁률). init 이 renderSubs 를 이미 호출하지만
+    // 청약·분양 패널(접수중·예정 목록). init 이 renderSubs 를 이미 호출하지만
     // 데이터 지연/실패 대비해 다시 렌더.
     openSubs: async () => {
       const ok = await init();
@@ -1062,7 +1062,7 @@
   }
 
   async function renderSubs() {
-    const wrap = $("subs-table-wrap"), cwrap = $("subs-cmpet-wrap");
+    const wrap = $("subs-table-wrap");
     if (!wrap) return;
     let items = [];
     try { items = (await fetchJSON(DATA + "subscription.json")).items || []; }
@@ -1098,35 +1098,6 @@
       wrap.innerHTML = html + "</tbody></table>";
       bindSubRows(wrap);
     }
-
-    // 최근 마감 경쟁률 상위(주택형 최고 경쟁률 기준)
-    if (!cwrap) return;
-    const rated = items
-      .map((it) => {
-        const best = Math.max(0, ...(it.cmpet || [])
-          .map((c) => parseFloat(c.rate) || 0));
-        return { it, best };
-      })
-      .filter((x) => x.best > 0)
-      .sort((a, b) => b.best - a.best)
-      .slice(0, 15);
-    if (!rated.length) {
-      cwrap.innerHTML = '<div class="empty">경쟁률 데이터 없음</div>';
-      return;
-    }
-    let ch = `<table class="rank-table"><thead><tr>
-      <th>주택명</th><th>구</th><th>접수마감</th><th>최고 경쟁률</th><th>청약홈</th>
-      </tr></thead><tbody>`;
-    rated.forEach(({ it, best }) => {
-      const link = it.url
-        ? `<a class="sub-link" href="${it.url}" target="_blank" rel="noopener" title="청약홈 공고 보기">↗</a>` : "-";
-      ch += `<tr data-lat="${it.lat || ""}" data-lon="${it.lon || ""}">
-        <td>${it.name}</td><td>${it.gu || "-"}</td>
-        <td>${it.rcept_end || "-"}</td><td>${best.toLocaleString()} : 1</td>
-        <td>${link}</td></tr>`;
-    });
-    cwrap.innerHTML = ch + "</tbody></table>";
-    bindSubRows(cwrap);
   }
 
   // 청약 표 공통: 행 클릭=지도 이동(청약홈 링크 클릭은 제외)

@@ -842,13 +842,11 @@
     return "청약";
   }
 
+  // 접수가 끝난 공고는 export 단계에서 이미 빠지지만, 캐시된 예전 JSON 이
+  // 남아 있을 수 있어 프런트에서도 한 번 더 거른다.
   function subVisibleOnMap(it) {
     if (!it.lat || !it.lon) return false;
-    const st = subStatus(it);
-    if (st.k !== "done") return true;
-    // 완료 공고는 접수마감 90일까지만 표시
-    if (!it.rcept_end) return false;
-    return (new Date(todayStr()) - new Date(it.rcept_end)) / 86400000 <= 90;
+    return subStatus(it).k !== "done";
   }
 
   function renderSubMarkers() {
@@ -926,17 +924,6 @@
           <td>${m.hh ?? "-"}</td><td>${m.shh ?? "-"}</td>
           <td>${m.price ? fmt(m.price) : "-"}</td>
           <td>${marginCell(m)}</td></tr>`).join("") +
-        `</tbody></table>`;
-    }
-    if (it.cmpet && it.cmpet.length) {
-      html += `<div class="section-title">청약 경쟁률</div>
-        <table class="rank-table"><thead><tr>
-          <th>주택형</th><th>구분</th><th>접수</th><th>경쟁률</th>
-        </tr></thead><tbody>` +
-        it.cmpet.map((c) => `<tr>
-          <td>${escapeHtml(c.ty)}</td><td>${escapeHtml(c.resd || "-")}</td>
-          <td>${c.req != null ? c.req.toLocaleString() : "-"}</td>
-          <td>${escapeHtml(c.rate || "-")}</td></tr>`).join("") +
         `</tbody></table>`;
     }
     if (it.url) {
