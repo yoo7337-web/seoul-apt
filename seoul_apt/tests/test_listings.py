@@ -195,3 +195,40 @@ def test_state_roundtrip(tmp_path, monkeypatch):
     assert listings.load_state() == {"done_complex_ids": []}
     listings.save_state({"done_complex_ids": [1, 2]})
     assert listings.load_state()["done_complex_ids"] == [1, 2]
+
+
+def test_complex_articles_logs_when_count_positive_but_list_empty(capsys):
+    """집계(count)엔 매물이 있는데 상세목록은 항상 비어 오는 네이버 쪽 현상
+    (광진구 현대프라임 등 표본의 ~7.5%에서 재현) - 매칭 오류나 우리 쪽 문제가
+    아니므로 '진짜 0건'과 구분되게 로그를 남겨야 한다(조용히 묻으면 안 됨)."""
+    client = object.__new__(listings.NaverLandClient)
+
+    def fake_fin(path, params):
+        if path == "/complex/building/article/count":
+            return [{"buildingNumber": 1, "articleCount": 39}]
+        if path == "/complex/building/article/list":
+            return {"articles": {}, "totalCount": 39}   # 실제 관측된 응답 모양
+        if path == "/complex/pyeongList":
+            return None
+        return None
+
+    client._fin = fake_fin
+    client.buildings = lambda no: []
+    client.pyeong_types = lambda no: [{"number": 1}]
+
+    out = client.complex_articles("84")
+    assert out == []
+    err = capsys.readouterr().out
+    assert "complexNumber=84" in err and "39건" in err and "네이버 노출제한 추정" in err
+
+
+def test_complex_articles_no_log_when_genuinely_empty(capsys):
+    """집계 자체가 0건이면(진짜 매물 없음) 경고를 남기지 않는다."""
+    client = object.__new__(listings.NaverLandClient)
+    client._fin = lambda path, params: [] if path == "/complex/building/article/count" else None
+    client.buildings = lambda no: []
+    client.pyeong_types = lambda no: []
+
+    out = client.complex_articles("999")
+    assert out == []
+    assert "네이버 노출제한" not in capsys.readouterr().out

@@ -160,6 +160,7 @@ class NaverLandClient:
         """
         bcount = self._fin("/complex/building/article/count", {"complexNumber": no}) or []
         active_bnos = [b["buildingNumber"] for b in bcount if b.get("articleCount")]
+        expected = sum(b.get("articleCount") or 0 for b in bcount)
         if not active_bnos:                    # count 비면 전체 동 시도
             active_bnos = [b["number"] for b in self.buildings(no)]
         pts = [p["number"] for p in self.pyeong_types(no)]
@@ -177,6 +178,13 @@ class NaverLandClient:
                         if rec and rec["item_id"] not in seen:
                             seen.add(rec["item_id"])
                             out.append(rec)
+        if expected and not out:
+            # 집계 API(건별 카운트)는 매물이 있다는데 상세 목록은 항상 비어 온다 -
+            # 약 40개 표본 중 3곳(~7.5%)에서 재현된 네이버 쪽 현상(광진구 현대프라임
+            # 등). 매칭 오류나 우리 쪽 차단이 아니라 이 단지에 한정된 응답이므로,
+            # '진짜 매물 없음'과 구분되게 로그로 남긴다(조용히 0건 기록 금지).
+            print(f"[listings] complexNumber={no} 집계상 매물 {expected}건이나 "
+                  f"상세 0건 반환 - 네이버 노출제한 추정(직방 폴백으로 보완)")
         return out
 
 
