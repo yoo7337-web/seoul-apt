@@ -1061,6 +1061,17 @@
     return { k: "done", label: "완료" };
   }
 
+  // 접수기간을 좁은 패널에서 한 줄에 들어가게 축약.
+  // 같은 날이면 하루짜리(무순위·임의공급 다수)라 한 번만, 같은 해면 종료일의
+  // 연도를 생략한다("2026-07-27 ~ 2026-07-30" → "2026-07-27 ~ 07-30").
+  function subPeriod(it) {
+    const b = it.rcept_bgn, e = it.rcept_end;
+    if (!b && !e) return "기간 미정";
+    if (!e || b === e) return b || e;
+    if (!b) return `~ ${e}`;
+    return `${b} ~ ${e.slice(0, 4) === b.slice(0, 4) ? e.slice(5) : e}`;
+  }
+
   async function renderSubs() {
     const wrap = $("subs-table-wrap"), cwrap = $("subs-cmpet-wrap");
     if (!wrap) return;
@@ -1082,33 +1093,43 @@
     if (!active.length) {
       wrap.innerHTML = summary + '<div class="empty">진행중·예정 청약 없음</div>';
     } else {
-      let html = summary + `<table class="rank-table"><thead><tr>
-        <th>상태</th><th>주택명</th><th>유형</th><th>구</th><th>세대</th><th>접수기간</th><th>최고분양가</th><th>안전마진</th><th>청약홈</th>
-        </tr></thead><tbody>`;
+      // 표(9열)가 아니라 카드로 쌓는다. 이 패널은 폭이 460px 안팎이라 9열을
+      // 넣으면 주택명 칸이 30px대로 눌려 한 글자씩 세로로 쪼개졌다(행높이 245px+).
+      let html = summary + '<div class="sub-list">';
       active.forEach((it) => {
         const st = subStatus(it);
         const top = Math.max(0, ...(it.models || []).map((m) => m.price || 0));
         const mgns = (it.models || []).filter((m) => m.mgn != null).map((m) => m.mgn);
         const bm = mgns.length ? Math.max(...mgns) : null;
-        const mgnTxt = bm == null ? "-"
-          : `<span class="mgn ${bm > 0 ? "pos" : "neg"}">${bm > 0 ? "+" : ""}${bm}%</span>`;
         const link = it.url
-          ? `<a class="sub-link" href="${it.url}" target="_blank" rel="noopener" title="청약홈 공고 보기">↗</a>` : "-";
+          ? `<a class="sub-link" href="${it.url}" target="_blank" rel="noopener" title="청약홈 공고 보기">↗</a>` : "";
         // 웹 캘린더 보조 공고는 일정만 있고 세대·분양가·안전마진이 비어 있다.
-        // 표에 '-' 만 뜨면 데이터 누락처럼 보이므로 출처를 표시해 준다.
+        // '-' 만 뜨면 데이터 누락처럼 보이므로 출처를 표시해 준다.
         const prov = it.src === "web"
           ? ' <span class="sub-prov" title="청약홈 캘린더에서 먼저 확인된 공고입니다. 공공데이터 반영 후 세대수·분양가·안전마진이 채워집니다.">캘린더</span>'
           : "";
-        html += `<tr data-lat="${it.lat || ""}" data-lon="${it.lon || ""}">
-          <td><span class="badge sub-badge-${st.k}">${st.label}</span></td>
-          <td>${it.name}${prov}</td>
-          <td>${subTypeTag(it)}</td>
-          <td>${it.gu || "-"}</td><td>${it.tot ? it.tot.toLocaleString() : "-"}</td>
-          <td>${it.rcept_bgn || "-"} ~ ${it.rcept_end || "-"}</td>
-          <td>${top ? SeoulCharts.fmt(top) : "-"}</td><td>${mgnTxt}</td>
-          <td>${link}</td></tr>`;
+        // 각 항목을 span 으로 감싸야 .sc-meta 의 flex gap 이 먹는다
+        // (맨텍스트로 이어 붙이면 '15억안전마진' 처럼 딱 붙어 보임)
+        const facts = [
+          top ? `<span>분양가 <b>${SeoulCharts.fmt(top)}</b></span>` : "",
+          bm == null ? ""
+            : `<span>안전마진 <span class="mgn ${bm > 0 ? "pos" : "neg"}">${bm > 0 ? "+" : ""}${bm}%</span></span>`,
+        ].filter(Boolean).join("");
+        html += `<div class="sub-card" data-lat="${it.lat || ""}" data-lon="${it.lon || ""}">
+          <div class="sc-top">
+            <span class="badge sub-badge-${st.k}">${st.label}</span>
+            <span class="sc-name">${it.name}${prov}</span>${link}
+          </div>
+          <div class="sc-meta">
+            ${subTypeTag(it)}
+            ${it.gu ? `<span>${it.gu}</span>` : ""}
+            ${it.tot ? `<span>${it.tot.toLocaleString()}세대</span>` : ""}
+            <span class="sc-date">${subPeriod(it)}</span>
+          </div>
+          ${facts ? `<div class="sc-meta">${facts}</div>` : ""}
+        </div>`;
       });
-      wrap.innerHTML = html + "</tbody></table>";
+      wrap.innerHTML = html + "</div>";
       bindSubRows(wrap);
     }
 
@@ -1143,13 +1164,14 @@
   }
 
   // 청약 표 공통: 행 클릭=지도 이동(청약홈 링크 클릭은 제외)
+  // 진행중·예정은 카드(.sub-card), 경쟁률은 표(tr) — 둘 다 좌표가 있으면 클릭 시 지도 이동
   function bindSubRows(wrap) {
-    wrap.querySelectorAll("tr[data-lat]").forEach((tr) => {
-      if (!tr.dataset.lat) return;
-      tr.classList.add("row-clickable");
-      tr.addEventListener("click", (e) => {
+    wrap.querySelectorAll("[data-lat]").forEach((el) => {
+      if (!el.dataset.lat) return;
+      el.classList.add("row-clickable");
+      el.addEventListener("click", (e) => {
         if (e.target.closest("a")) return;   // 청약홈 링크는 통과
-        if (window.SeoulMap) window.SeoulMap.focusLatLng(+tr.dataset.lat, +tr.dataset.lon);
+        if (window.SeoulMap) window.SeoulMap.focusLatLng(+el.dataset.lat, +el.dataset.lon);
       });
     });
   }

@@ -410,6 +410,27 @@ table.rank-table tbody tr[data-id]:hover { background: var(--accent-soft); }
 /* 청약 상태별 건수 요약(목록 위) */
 .subs-summary { display: flex; flex-wrap: wrap; gap: 6px; margin: 2px 0 10px; }
 .subs-summary .badge { font-size: 11.5px; }
+/* 진행중·예정 청약 카드 목록.
+   패널 폭이 460px 안팎이라 예전 9열 표는 주택명 칸이 30px대로 눌려 한 글자씩
+   세로로 쪼개졌다(행높이 245px+). 열 대신 줄로 쌓아 좁은 폭에서도 읽히게 한다. */
+.sub-list { display: flex; flex-direction: column; gap: 8px; }
+.sub-card {
+  border: 1px solid var(--border); border-radius: 10px; padding: 9px 11px;
+  background: var(--bg);
+}
+.sub-card.row-clickable:hover { background: var(--accent-soft); border-color: var(--accent); }
+.sc-top { display: flex; align-items: center; gap: 6px; }
+.sc-name {
+  flex: 1; min-width: 0; font-weight: 700; font-size: 13.5px;
+  word-break: keep-all;            /* 한글은 단어 단위로만 줄바꿈 */
+  overflow-wrap: anywhere;         /* 아주 긴 단어는 그때만 강제 분리 */
+}
+.sc-meta {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px;
+  margin-top: 5px; font-size: 11.5px; color: var(--muted);
+}
+.sc-meta b { color: var(--text); font-weight: 700; }
+.sc-date { white-space: nowrap; }  /* 날짜는 절대 중간에서 끊기지 않게 */
 /* 청약 토글 버튼 활성 상태 */
 .chip-btn.active { color: #7c3aed; font-weight: 800; }
 /* 청약 안전마진 */
@@ -794,6 +815,8 @@ table.txns tr.canceled td { color: var(--muted); text-decoration: line-through; 
 table.rank-table { width: 100%; border-collapse: collapse; font-size: 13px; }
 table.rank-table th, table.rank-table td {
   padding: 8px 6px; text-align: right; border-bottom: 1px solid var(--border);
+  /* 좁은 패널에서 한글이 글자 단위로 쪼개지지 않게 단어 경계로만 줄바꿈 */
+  word-break: keep-all;
 }
 table.rank-table th { color: var(--muted); font-weight: 500; }
 table.rank-table th:nth-child(-n+2), table.rank-table td:nth-child(-n+2) { text-align: left; }
