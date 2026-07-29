@@ -280,6 +280,22 @@ Gemini 주간 자동추천과 별개로, 구독 Claude를 활용한 수동 큐�
   넘긴다. `markerInfo()`도 `state.selectedId`가 자기 자신이면
   `state.detailArea`를 우선해 버블과 패널이 같은 평형을 보여주게 한다.
 
+## 🔒 export 안전 가드 (2026-07-30 판매 전 감사에서 신설)
+
+**로컬과 클라우드가 서로의 데이터를 덮어쓰는 사고가 실제로 났다** — 로컬에서 수집한
+매물 2,858건을 다음날 클라우드 daily export 가 206건으로 덮음(93% 소실). 구조상
+클라우드(Actions)는 Release DB로 실거래를 수집하고, **매물은 네이버 차단 위험 때문에
+로컬에서만** 수집하기 때문. 양방향 클로버링을 export 에서 막는다.
+
+- **낡은 DB 가드**(`export._guard_stale_db`): DB의 최신 계약일 < 배포된 meta.json 의
+  실거래 기준일이면 **export 를 중단**. 로컬 DB가 며칠 낡은 채 export 해서 최근
+  실거래가 통째로 빠진 구버전이 배포되는 걸 막는다. 강행은 `export --allow-stale`.
+  → 로컬 작업 전에는 `scripts/db_release.sh pull` 또는 `collect` 를 먼저.
+- **매물 보존 가드**: DB에 open 매물이 0건이면(=클라우드) `listings.json` 을 **새로
+  쓰지 않고 배포본 그대로 보존**. 마커의 매물 배지(`ls`/`lj`)도
+  `_published_listing_summary()` 가 배포된 markers.json 에서 승계한다.
+  ⚠ 새 파일을 추가할 때 "로컬에서만 만들어지는 산출물"이면 같은 보존 규칙을 적용할 것.
+
 ### 향후 과제로 남긴 것 (2026-07-10 감사, 우선순위 낮아 이번엔 미수정)
 - `sale_txn` UNIQUE 키가 (complex_id, deal_date, exclu_area, floor, amount_manwon)
   자연키라 같은 날·같은 단지·같은 평형·같은 층·같은 금액의 **서로 다른 두 건**이

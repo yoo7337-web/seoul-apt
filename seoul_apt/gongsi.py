@@ -88,6 +88,9 @@ def _ingest_frame(conn, df: pd.DataFrame, default_year: int | None) -> int:
     c_umd = _find_col(cols, "umd")
     c_area = _find_col(cols, "area")
     c_year = _find_col(cols, "year")
+    # 헤더에 단위가 적혀 있으면("공시가격(만원)"/"(원)") 추정하지 말고 그대로 신뢰
+    _h = str(c_price).replace(" ", "")
+    in_manwon = True if "만원" in _h else (False if "(원)" in _h or "[원]" in _h else None)
 
     inserted = 0
     for _, r in df.iterrows():
@@ -99,7 +102,7 @@ def _ingest_frame(conn, df: pd.DataFrame, default_year: int | None) -> int:
         apt_nm = str(r.get(c_apt, "")).strip()
         if not apt_nm:
             continue
-        price = _parse_price(r.get(c_price))
+        price = _parse_price(r.get(c_price), in_manwon)
         if price is None:
             continue
         area = _parse_float(r.get(c_area)) if c_area else None
@@ -153,15 +156,27 @@ def _match_complex(conn, lawd_cd, apt_nm, umd):
     return None, 0.0
 
 
-def _parse_price(val) -> int | None:
-    """공시가격(원) → 만원 정수."""
+# 원 단위로 볼 최소값. 서울 아파트 공시가는 최소 수천만원(=수천만 '원')이고,
+# 만원 단위로 적힌 값은 아무리 비싸도 100억=1,000,000(백만)을 넘지 않는다.
+# 그 사이(천만)를 경계로 두면 두 표기를 안전하게 가른다.
+# ⚠ 예전 경계는 10,000이라 **만원 단위 파일이 통째로 1/10,000 로 붕괴**했다
+#   (8.5억=85,000 → 8만원). 단위 추정은 반드시 이 폭으로 볼 것.
+_WON_MIN = 10_000_000
+
+
+def _parse_price(val, in_manwon: bool | None = None) -> int | None:
+    """공시가격 → 만원 정수. in_manwon 이 주어지면(헤더에 단위 명시) 그대로 신뢰."""
     if val is None:
         return None
     t = re.sub(r"[^\d]", "", str(val))
     if not t:
         return None
-    won = int(t)
-    return won // 10000 if won >= 10000 else won  # 이미 만원 단위면 그대로
+    n = int(t)
+    if in_manwon is True:
+        return n
+    if in_manwon is False:
+        return n // 10000
+    return n // 10000 if n >= _WON_MIN else n      # 단위 미상 → 값 크기로 추정
 
 
 def _parse_float(val) -> float | None:

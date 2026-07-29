@@ -49,15 +49,24 @@
       await loadScript(`https://www.gstatic.com/firebasejs/${V}/firebase-app-compat.js`);
       await loadScript(`https://www.gstatic.com/firebasejs/${V}/firebase-auth-compat.js`);
       firebase.initializeApp(window.firebaseConfig);
+      // 거부 사유를 기억해 둔다. signOut() 하면 onAuthStateChanged(null) 이 곧바로
+      // 다시 발화해 "로그인이 필요합니다"로 덮어써서, 사용자가 왜 막혔는지 못 보고
+      // 로그인만 반복하게 됐다(무한 루프처럼 보임).
+      let denied = null;
       firebase.auth().onAuthStateChanged((user) => {
-        if (!user) { showGate("서울 아파트 실거래 지도 — 로그인이 필요합니다"); return; }
+        if (!user) {
+          showGate(denied || "서울 아파트 실거래 지도 — 로그인이 필요합니다");
+          return;
+        }
         const email = (user.email || "").toLowerCase();
         const ok = (window.ALLOWED_EMAILS || []).some((e) => e.toLowerCase() === email);
         if (!ok) {
+          denied = `접근 권한이 없는 계정입니다 (${email}) — 다른 계정으로 로그인하세요`;
           firebase.auth().signOut();
-          showGate(`접근 권한이 없는 계정입니다 (${email})`);
+          showGate(denied);
           return;
         }
+        denied = null;
         hideGate();
         // 헤더에 로그아웃 버튼 (1회만)
         if (!document.getElementById("auth-out")) {

@@ -194,8 +194,10 @@
       sel.appendChild(o);
     });
     if (state.meta) {
+      // last_updated 는 export 를 돌린 시각(= 처리시각)이지 실거래 최신 계약일이 아니다.
+      // 소스별 실제 기준일은 대시보드 '📅 데이터 기준일' 표(meta.sources)에 있다.
       $("updated-label").textContent =
-        "데이터 기준일: " + (state.meta.last_updated_display || "—");
+        "마지막 갱신: " + (state.meta.last_updated_display || "—");
     } else {
       $("updated-label").textContent = "데이터 수집 전";
     }
@@ -377,6 +379,18 @@
     }[ch]));
   }
 
+  // 갭(매매−전세)은 반드시 '같은 평형'끼리 뺀다. m.sale/m.jeonse 는 전 평형 혼합
+  // 중앙값이라 매매 주력이 소형·전세 최근거래가 대형인 단지에서 갭이 뒤집혀
+  // '마이너스갭' 오탐이 났다(사고 이력). 전세가율과 같은 원칙으로 맞춘다.
+  // 기준 버킷 = 선택 평형, 없으면 매매 대표평형(상세 패널 detailInfo 와 동일).
+  function matchedGap(m) {
+    const b = state.area || m.rep;
+    if (!b) return null;
+    const s = m.sale_area && m.sale_area[b];
+    const j = m.jeonse_area && m.jeonse_area[b];
+    return (s && j) ? s.p - j.p : null;
+  }
+
   function filteredMarkers() {
     const R = state.range, nowYear = new Date().getFullYear();
     const active = (k) => R[k].lo > F_CFG[k].min || R[k].hi < F_CFG[k].max;
@@ -409,10 +423,11 @@
       if (active("n1y") && !inR("n1y", m.n1y)) return false;
       // 갭가격(억): 마이너스갭 토글 우선
       if (state.minusGap) {
-        if (m.sale == null || m.jeonse == null || (m.sale - m.jeonse) >= 0) return false;
+        const g = matchedGap(m);
+        if (g == null || g >= 0) return false;
       } else if (active("gap")) {
-        const g = (m.sale != null && m.jeonse != null) ? (m.sale - m.jeonse) / 10000 : null;
-        if (!inR("gap", g)) return false;
+        const g = matchedGap(m);
+        if (!inR("gap", g == null ? null : g / 10000)) return false;
       }
       if (state.peak && !m.is_peak) return false;
       // 고점대비 하락(%): drop은 음수(하락)/0(신고가) → 하락폭 -drop 으로 비교
@@ -1008,13 +1023,25 @@
     return o ? { price: o.p, py: o.py, stale: !!o.s } : null;
   }
   const cardArea = (info) => (info && info.py ? ` · ${info.py}평` : "");
+  // 평단가도 선택 평형 기준으로(d.ppy 는 전 평형 혼합) — 옆 카드들과 기준을 맞춘다
+  function panelPpy(d) {
+    const v = state.detailArea && (d.valuation_area || {})[state.detailArea];
+    return v ? v.cur_ppy : d.ppy;
+  }
   const staleTag = (info) =>
     (info && info.stale ? ' <span class="stale-tag">1년+</span>' : "");
 
   // 밸류에이션 게이지 - 장기 평단가 상 현재 위치 + 전세가율 하방 신호
   function valuationCard(d) {
-    const v = d.valuation;
+    // 평형을 고르면 그 평형 밸류에이션(valuation_area)으로 — 전 평형 혼합값과 판정이
+    // 갈릴 수 있어(전체 pos 86% vs 135㎡~ 70%) 매수후보 리스트 값과 어긋났다(사고 이력).
+    const va = d.valuation_area || {};
+    const scoped = state.detailArea && va[state.detailArea];
+    const v = scoped || d.valuation;
     if (!v) return "";
+    const scopeTag = scoped
+      ? `<span class="val-scope">${state.detailArea}</span>`
+      : (state.detailArea ? `<span class="val-scope">전체 평형</span>` : "");
     const pos = Math.max(0, Math.min(100, v.pos));
     const jrStrong = v.jr != null && v.jr >= 60;   // 전세가율 60%+ = 하방 쿠션 두꺼움
     let verdict, cls;
@@ -1031,7 +1058,7 @@
       ? `역대 고점 대비 <b>${v.vs_peak > 0 ? "+" : ""}${v.vs_peak}%</b>` : "";
     const jr = v.jr != null ? ` · 전세가율 ${v.jr}%` : "";
     return `<div class="valuation ${cls}">
-      <div class="val-head">📊 밸류에이션 <span class="val-verdict">${verdict}</span></div>
+      <div class="val-head">📊 밸류에이션 ${scopeTag}<span class="val-verdict">${verdict}</span></div>
       <div class="vg-track">
         <div class="vg-marker" style="left:${pos}%"><span>${pos}%</span></div></div>
       <div class="vg-labels"><span>5년저점 ${v.lo5.toLocaleString()}</span>
@@ -1042,7 +1069,10 @@
 
   // ── 실구매 비용 계산기 (2026년 기준 단순 참고) ──────────────────────
   // 취득세: 1주택 6억↓1% / 6~9억 선형(가액억×2/3−3)% / 9억↑3%; 2주택(조정)8%; 3주택+12%
-  function calcCost(price, homes, ltvPct, excluM2) {
+  // areaBucket: 전용면적 버킷 라벨("60~85㎡" 등). 농특세는 전용 85㎡ 초과만 내는데,
+  // 마커의 py(평)는 export 시 정수 반올림이라 역환산하면 84.97㎡가 85.95㎡로 부풀어
+  // 국민평형이 과세로 오판됐다(사고 이력). 버킷 경계가 정확히 85㎡라 버킷으로 판정한다.
+  function calcCost(price, homes, ltvPct, areaBucket) {
     const eok = price / 10000;
     let acqRate;
     if (homes >= 3) acqRate = 12;
@@ -1052,7 +1082,8 @@
     const acq = price * acqRate / 100;
     const eduRate = homes >= 2 ? 0.4 : acqRate / 10;      // 지방교육세
     const edu = price * eduRate / 100;
-    const bigArea = excluM2 != null && excluM2 > 85;       // 농특세: 전용85㎡ 초과만
+    // 농특세: 전용 85㎡ 초과만. 버킷을 모르면(대표평형 없음) 부과하지 않는다.
+    const bigArea = areaBucket === "85~135㎡" || areaBucket === "135㎡~";
     const farmRate = !bigArea ? 0 : homes >= 3 ? 1.0 : homes === 2 ? 0.6 : 0.2;
     const farm = price * farmRate / 100;
     // 중개보수 상한요율(매매) + VAT 10%
@@ -1070,12 +1101,17 @@
     const costs = acq + edu + farm + brok + etc;
     // 규제지역(서울 전역) 주담대 한도 캡(2025-10~): 15억↓ 6억 / 15~25억 4억 /
     // 25억↑ 2억. LTV 를 아무리 높여도 이 상한을 못 넘는다(만원).
-    const loanCap = eok <= 15 ? 60000 : eok <= 25 ? 40000 : 20000;
-    const rawLoan = price * ltvPct / 100;
+    // ⚠ 규제지역 다주택자(2주택 이상)는 주택 구입 목적 주담대 자체가 금지(LTV 0).
+    // 이걸 빼면 다주택 열의 '필요 현금'이 수억 과소 표시된다.
+    const loanBanned = homes >= 2;
+    const loanCap = loanBanned ? 0
+      : eok <= 15 ? 60000 : eok <= 25 ? 40000 : 20000;
+    const rawLoan = loanBanned ? 0 : price * ltvPct / 100;
     const loan = Math.min(rawLoan, loanCap);
     const loanCapped = rawLoan > loanCap;
     return { acqRate, acq, eduRate, edu, farmRate, farm, brokRate, brok,
-             etc, costs, loan, loanCap, loanCapped, cash: price - loan + costs };
+             etc, costs, loan, loanCap, loanCapped, loanBanned,
+             cash: price - loan + costs };
   }
 
   // ── 현재 매물(호가) ─────────────────────────────────────────────────
@@ -1194,8 +1230,8 @@
       <div class="price-cards">
         <div class="card"><div class="label">최근 매매${cardArea(si)}</div>
           <div class="value">${si ? fmt(si.price) : "-"}${staleTag(si)}</div></div>
-        <div class="card"><div class="label">평단가(만원/평)</div>
-          <div class="value small">${d.ppy ? Math.round(d.ppy).toLocaleString() : "-"}</div></div>
+        <div class="card"><div class="label">평단가(만원/평)${cardArea(si)}</div>
+          <div class="value small">${panelPpy(d) ? Math.round(panelPpy(d)).toLocaleString() : "-"}</div></div>
         <div class="card"><div class="label">최근 전세${cardArea(ji)}</div>
           <div class="value small">${ji ? fmt(ji.price) : "-"}${staleTag(ji)}</div></div>
         <div class="card"><div class="label">전세가율${cardArea(si)}</div>
@@ -1390,8 +1426,10 @@
         .then((d) => ({ f, d })).catch(() => null)
     )).then((results) => {
       const valid = results.filter(Boolean);
-      const cutoff = new Date(Date.now() - 30 * 86400000)
-        .toISOString().slice(0, 10);
+      // 거래일(deal_date)은 KST 날짜라 컷오프도 로컬 기준으로 만든다
+      // (toISOString 은 UTC라 00~09시엔 하루 어긋남)
+      const cd = new Date(Date.now() - 30 * 86400000);
+      const cutoff = `${cd.getFullYear()}-${String(cd.getMonth() + 1).padStart(2, "0")}-${String(cd.getDate()).padStart(2, "0")}`;
       let c = `<table class="rank-table"><thead><tr>
         <th>단지</th><th>자치구</th><th>최근매매</th><th>30일</th><th>직전대비</th><th></th>
         </tr></thead><tbody>`;
@@ -1410,8 +1448,10 @@
             chgTxt = `<span class="${cls}">${chg > 0 ? "+" : ""}${chg.toFixed(1)}%</span>`;
           }
         }
-        const peakMark = (d.valuation && last && d.valuation.peak
-          && last.amount >= d.valuation.peak) ? " 🚩" : "";
+        // 신고가는 백엔드가 같은 크기(±12%) 매칭으로 계산해 마커에 실어둔 is_peak 을 쓴다.
+        // (valuation.peak 은 평단가(만원/평)라 거래금액(만원)과 직접 비교하면 항상 참 - 사고 이력)
+        const fmk = state.markers.find((m) => m.id === f.id);
+        const peakMark = (fmk && fmk.is_peak) ? " 🚩" : "";
         c += `<tr class="fav-c-row" data-id="${f.id}" data-lawd="${f.lawd_cd}">
           <td>${f.apt}${peakMark}</td><td>${districtName(f.lawd_cd)}</td>
           <td>${last ? `${fmt(last.amount)} <span class="sel-hint">${last.date.slice(5)}</span>` : "-"}</td>

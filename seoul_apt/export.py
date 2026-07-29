@@ -37,15 +37,50 @@ def _write_json(path: Path, obj) -> None:
         json.dump(obj, f, ensure_ascii=False, separators=(",", ":"))
 
 
-def export_all(conn, kakao_js_key: str | None = None) -> dict:
+def _guard_stale_db(conn, export_dir: Path, allow_stale: bool) -> None:
+    """DB가 이미 배포된 산출물보다 낡았으면 export 를 막는다.
+
+    이 프로젝트는 클라우드(Actions)가 Release DB로 매일 수집하고, 매물(listings)만
+    로컬에서 수집한다. 그래서 **로컬 DB가 며칠 낡은 채 export 하면 최근 실거래가
+    통째로 빠진 구버전이 배포**된다(실제 발생). 최신 계약일을 비교해 사고를 막는다.
+    """
+    meta_path = export_dir / "meta.json"
+    if not meta_path.exists():
+        return
+    try:
+        with open(meta_path, encoding="utf-8") as f:
+            published = json.load(f)
+        prev = next((s["d"] for s in published.get("sources", [])
+                     if s.get("k", "").startswith("실거래")), None)
+    except (OSError, ValueError, KeyError):
+        return
+    cur = conn.execute(
+        "SELECT MAX(deal_date) FROM sale_txn WHERE canceled=0").fetchone()[0]
+    if not (prev and cur) or cur >= prev:
+        return
+    msg = (f"[export] ⚠ DB가 배포본보다 낡았습니다 (DB 최신 계약일 {cur} < 배포본 {prev}). "
+           f"이대로 export 하면 최근 실거래가 사라집니다. "
+           f"먼저 `scripts/db_release.sh pull` 로 최신 DB를 받거나 collect 를 실행하세요.")
+    if not allow_stale:
+        raise RuntimeError(msg + " (그래도 강행하려면 --allow-stale)")
+    print(msg + " — --allow-stale 지정으로 강행합니다.")
+
+
+def export_all(conn, kakao_js_key: str | None = None,
+               allow_stale: bool = False) -> dict:
     now = datetime.now(KST)
     export_dir = config.EXPORT_DIR
+    _guard_stale_db(conn, export_dir, allow_stale)
     markers = []
     district_list = []
     ppy_trend = {}   # 대시보드용: 구별 월별 평단가(경량)
     val_items = []   # 밸류에이션 종합(대시보드 밸류에이션 섹션용)
     totals = {"sale": 0, "rent": 0, "complex": 0}
     listing_summary = _listing_summary(conn)   # {complex_id: {ns, nj, minp}}
+    if not listing_summary:
+        # 매물은 로컬 전용 수집이라 클라우드 DB엔 없다. 그대로 두면 마커의 매물
+        # 배지(ls/lj)까지 매 클라우드 실행마다 사라진다 → 배포본에서 이어받는다.
+        listing_summary = _published_listing_summary(export_dir)
 
     for lawd_cd, name in config.SEOUL_DISTRICTS.items():
         monthly = aggregate.district_monthly(conn, lawd_cd)
@@ -124,7 +159,16 @@ def export_all(conn, kakao_js_key: str | None = None) -> dict:
     _write_json(export_dir / "reb" / "seoul_index.json",
                 aggregate.reb_series(conn))
     # 현재 매물(호가) — 단지별 그룹. 별도 파일 지연 로드(마커 용량 보호).
-    _write_json(export_dir / "listings.json", listings_payload(conn, now))
+    # ⚠ 매물은 **로컬 전용 수집**(네이버는 클라우드 IP 차단 위험)이라 클라우드 DB엔
+    # 없다. 그대로 쓰면 클라우드 daily 가 로컬이 올린 매물을 0건으로 덮어쓴다
+    # (실제로 2,858건 → 206건 소실). DB에 매물이 없으면 배포본을 그대로 보존한다.
+    lst_path = export_dir / "listings.json"
+    if conn.execute("SELECT COUNT(*) FROM listing WHERE status='open'").fetchone()[0]:
+        _write_json(lst_path, listings_payload(conn, now))
+    elif lst_path.exists():
+        print("[export] DB에 매물 0건 - 기존 listings.json 보존(로컬 수집분 보호)")
+    else:
+        _write_json(lst_path, listings_payload(conn, now))
     # 청약·분양(진행중 + 최근 1년 마감분)
     _write_json(export_dir / "subscription.json", {
         "generated": now.isoformat(timespec="seconds"),
@@ -196,6 +240,26 @@ def data_sources(conn) -> list[dict]:
         {"k": "현재 매물(호가)", "d": lst_max or "미수집",
          "note": f"네이버부동산 · 수동 수집 {lst_cnt:,}건 (일부 구)"},
     ]
+
+
+def _published_listing_summary(export_dir: Path) -> dict:
+    """이미 배포된 markers.json 에서 매물 요약(ls/lj)을 되살린다(로컬 수집분 보호)."""
+    path = export_dir / "markers.json"
+    if not path.exists():
+        return {}
+    try:
+        with open(path, encoding="utf-8") as f:
+            prev = json.load(f)
+    except (OSError, ValueError):
+        return {}
+    out = {}
+    for m in prev.get("markers", []):
+        if m.get("ls") or m.get("lj"):
+            out[m["id"]] = {"ns": m.get("ls") or 0, "nj": m.get("lj") or 0,
+                            "minp": None}
+    if out:
+        print(f"[export] DB에 매물 0건 - 배포본 마커에서 매물 배지 {len(out)}건 승계")
+    return out
 
 
 def _listing_summary(conn) -> dict:

@@ -6,9 +6,9 @@
   <title>서울 아파트 시세 지도</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=47">
+  <link rel="stylesheet" href="css/style.css?v=50">
   <script src="js/firebase-config.js?v=1"></script>
-  <script src="js/auth.js?v=1"></script>
+  <script src="js/auth.js?v=2"></script>
 </head>
 <body>
   <!-- 풀스크린 지도 -->
@@ -113,7 +113,7 @@
     </section>
     <section class="page-section">
       <h2>재건축 후보 스크리너</h2>
-      <div class="desc" id="redev-desc">연차 30년+ · 용적률 200% 미만 · 세대수 순 (건축물대장 수집분)</div>
+      <div class="desc" id="redev-desc">연차 30년+ · 용적률 200% 미만 · 용적률 낮은 순 (건축물대장 수집분)</div>
       <div class="table-scroll" id="redev-wrap"></div>
     </section>
     <section class="page-section">
@@ -226,7 +226,7 @@
     </div>
   </aside>
 
-  <div class="updated" id="updated-label">데이터 기준일: —</div>
+  <div class="updated" id="updated-label">마지막 갱신: —</div>
 
   <!-- 단지 상세 패널 -->
   <aside id="panel" class="panel hidden">
@@ -250,7 +250,7 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
   <script src="js/charts.js?v=7"></script>
-  <script src="js/dashboard.js?v=51"></script>
-  <script src="js/app.js?v=83"></script>
+  <script src="js/dashboard.js?v=56"></script>
+  <script src="js/app.js?v=95"></script>
 </body>
 </html>

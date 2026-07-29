@@ -169,15 +169,20 @@ def _buyer_outsider_rows(rows: list[dict]) -> list[tuple[str, str, float]]:
     return out
 
 
-def collect_reb(conn, api_key: str, start_ym: str, end_ym: str) -> int:
-    """설정된 통계표를 수집해 reb_index 에 적재. 적재 row 수 반환."""
+def collect_reb(conn, api_key: str, start_ym: str, end_ym: str,
+                force_start: bool = False) -> int:
+    """설정된 통계표를 수집해 reb_index 에 적재. 적재 row 수 반환.
+
+    기본은 증분(_stat_start: DB 최신 period 2개월 전부터). force_start=True 면
+    start_ym 을 그대로 써서 과거 구간도 재수집한다 — 안 그러면 사용자가
+    `--from 202001` 로 과거를 지정해도 DB에 최신값이 있어 조용히 무시됐다.
+    """
     client = RebClient(api_key)
     n = 0
     for statbl_id, stat_name, cycle in REB_STATS:
         try:
-            rows = client.fetch_stat(statbl_id, cycle,
-                                     _stat_start(conn, stat_name, start_ym),
-                                     end_ym)
+            begin = start_ym if force_start else _stat_start(conn, stat_name, start_ym)
+            rows = client.fetch_stat(statbl_id, cycle, begin, end_ym)
         except RebAPIError:
             continue
         for r in rows:

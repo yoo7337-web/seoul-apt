@@ -6,9 +6,9 @@
   <title>개발일지 - 서울 아파트 시세 지도</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=29">
+  <link rel="stylesheet" href="css/style.css?v=32">
   <script src="js/firebase-config.js?v=1"></script>
-  <script src="js/auth.js?v=1"></script>
+  <script src="js/auth.js?v=2"></script>
 </head>
 <body class="page">
   <header class="float-bar">
@@ -83,10 +83,16 @@
       $("idea-text").addEventListener("keydown", (e) => { if (e.key === "Enter") add(); });
       $("idea-copy").addEventListener("click", () => {
         const md = ideas.map((it) => `- [${it.done ? "x" : " "}] ${it.text}`).join("\n");
-        navigator.clipboard.writeText(md || "").then(() => {
-          const c = $("idea-copied"); c.classList.remove("hidden");
+        const flash = (txt) => {
+          const c = $("idea-copied");
+          c.textContent = txt; c.classList.remove("hidden");
           setTimeout(() => c.classList.add("hidden"), 1500);
-        });
+        };
+        // 권한 거부·비보안 컨텍스트에서 조용히 실패하지 않도록 폴백(prompt)
+        (navigator.clipboard ? navigator.clipboard.writeText(md || "")
+          : Promise.reject(new Error("clipboard unavailable")))
+          .then(() => flash("복사됨!"))
+          .catch(() => { window.prompt("아래 내용을 복사하세요", md || ""); });
       });
       render();
     })();

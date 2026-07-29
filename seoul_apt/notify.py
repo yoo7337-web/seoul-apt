@@ -372,6 +372,13 @@ def subscription_news(conn, known_ids: set, today: str,
 def _split(text: str, limit: int = TG_MAX_LEN) -> list[str]:
     chunks, cur = [], ""
     for line in text.split("\n"):
+        # 한 줄이 한도를 넘으면 줄 단위로는 못 자른다 → 강제 분할(안 하면 400 반복)
+        while len(line) > limit:
+            if cur:
+                chunks.append(cur)
+                cur = ""
+            chunks.append(line[:limit])
+            line = line[limit:]
         if len(cur) + len(line) + 1 > limit and cur:
             chunks.append(cur)
             cur = ""
@@ -381,9 +388,18 @@ def _split(text: str, limit: int = TG_MAX_LEN) -> list[str]:
     return chunks
 
 
+class PartialSendError(RuntimeError):
+    """여러 청크 중 일부만 발송된 상태. 상태 저장 여부 판단에 쓰인다."""
+
+    def __init__(self, msg: str, sent: int, total: int):
+        super().__init__(msg)
+        self.sent, self.total = sent, total
+
+
 def send_telegram(text: str, token: str, chat_id: str) -> None:
     url = TG_API.format(token=token)
     chunks = _split(text)
+    sent = 0
     for i, chunk in enumerate(chunks):
         payload = {"chat_id": chat_id, "text": chunk,
                    "parse_mode": "HTML", "disable_web_page_preview": True}
@@ -395,9 +411,11 @@ def send_telegram(text: str, token: str, chat_id: str) -> None:
                 wait = resp.json().get("parameters", {}).get("retry_after", 30)
                 time.sleep(wait + 1)
                 continue
-            raise RuntimeError(f"텔레그램 발송 실패 {resp.status_code}: {resp.text}")
+            raise PartialSendError(
+                f"텔레그램 발송 실패 {resp.status_code}: {resp.text}", sent, len(chunks))
         else:
-            raise RuntimeError("텔레그램 발송 실패: 재시도 초과")
+            raise PartialSendError("텔레그램 발송 실패: 재시도 초과", sent, len(chunks))
+        sent += 1
         if i < len(chunks) - 1:
             time.sleep(SEND_INTERVAL)
 
@@ -463,7 +481,15 @@ def run_alerts(conn, dry_run: bool = False) -> dict:
         print("[alerts] TELEGRAM_BOT_TOKEN/CHAT_ID 없음 - 발송 건너뜀")
         return stats
 
-    send_telegram(msg, token, chat)
+    try:
+        send_telegram(msg, token, chat)
+    except PartialSendError as e:
+        # 일부만 나갔는데 상태를 저장하면 나머지가 영영 유실되고, 저장 안 하면
+        # 다음 실행이 전체를 다시 보낸다. 조용히 넘어가지 않도록 명시적으로 알린다.
+        if e.sent:
+            print(f"[alerts] ⚠ {e.sent}/{e.total} 청크만 발송됨 - 상태 미저장이라 "
+                  f"다음 실행에서 전체가 재발송됩니다(중복 주의): {e}")
+        raise
     stats["sent"] = True
     if rows:
         state["last_sale_id"] = max(r["id"] for r in rows)

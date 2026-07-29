@@ -3,6 +3,11 @@
   "use strict";
   const DATA = "data/";
   const $ = (id) => document.getElementById(id);
+  // 공공데이터라 실위험은 낮지만 단지명·주택명을 innerHTML 로 넣으므로
+  // app.js 와 동일하게 이스케이프해 둔다(판매 제품 기준 통일).
+  const esc = (v) => String(v == null ? "" : v).replace(/[&<>"']/g, (ch) => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+  }[ch]));
   const COLORS = ["#ff7e00", "#2563eb", "#10b981", "#a855f7", "#ef4444",
                   "#0ea5e9", "#f59e0b", "#84cc16", "#ec4899", "#64748b"];
 
@@ -240,7 +245,7 @@
       <th>단지</th>${showGu ? "<th>자치구</th>" : ""}<th>법정동</th><th>준공</th><th>연차</th>
       <th>세대수</th><th>매매중앙값</th><th>평단가</th></tr></thead><tbody>`;
     rows.forEach((c) => {
-      html += `<tr data-id="${c.id}"><td>${c.apt}</td>${showGu ? `<td>${c.gu}</td>` : ""}
+      html += `<tr data-id="${c.id}"><td>${esc(c.apt)}</td>${showGu ? `<td>${c.gu}</td>` : ""}
         <td>${c.umd || "-"}</td><td>${c.build_year}</td><td>${nowY - c.build_year}년</td>
         <td>${c.households ? c.households.toLocaleString() : "-"}</td>
         <td>${SeoulCharts.fmt(c.sale_median)}</td>
@@ -445,7 +450,7 @@
       <th>중앙값</th><th>할인</th><th>계약일</th></tr></thead><tbody>`;
     list.forEach((b) => {
       html += `<tr data-id="${b.id}">
-        <td>${guName(b.lawd_cd)}</td><td>${b.apt}</td>
+        <td>${guName(b.lawd_cd)}</td><td>${esc(b.apt)}</td>
         <td>${b.area}㎡</td><td>${b.floor || "-"}</td>
         <td>${SeoulCharts.fmt(b.amount)}</td><td>${SeoulCharts.fmt(b.med)}</td>
         <td><span class="mgn neg">${b.disc}%</span></td>
@@ -711,7 +716,7 @@
       if (q.length < 2 || q.includes("#")) return;
       const hits = mkAll.filter((m) => m.apt.includes(q)).slice(0, 20);
       $("cmp-datalist").innerHTML = hits.map((m) =>
-        `<option value="${m.apt} · ${GU_NAME[m.lawd_cd] || m.lawd_cd} #${m.id}">`).join("");
+        `<option value="${esc(m.apt)} · ${GU_NAME[m.lawd_cd] || m.lawd_cd} #${m.id}">`).join("");
     });
     inp.addEventListener("change", () => {
       const mch = inp.value.match(/#(\d+)$/);
@@ -772,7 +777,7 @@
     // 칩
     chips.innerHTML = mks.map((m, i) =>
       `<span class="cmp-chip" style="border-color:${COLORS[i % COLORS.length]}">
-        <i style="background:${COLORS[i % COLORS.length]}"></i>${m.apt}
+        <i style="background:${COLORS[i % COLORS.length]}"></i>${esc(m.apt)}
         <b data-del="${m.id}">✕</b></span>`).join("")
       || '<span class="sel-hint">단지를 검색해 추가하세요 (지도에서 관심단지 ★ 등록 후 불러오기도 가능)</span>';
     chips.querySelectorAll("[data-del]").forEach((b) =>
@@ -818,7 +823,7 @@
     ];
     let html = `<table class="rank-table cmp-table"><thead><tr><th></th>`
       + mks.map((m, i) => `<th class="cmp-head" data-id="${m.id}">
-          <i style="background:${COLORS[i % COLORS.length]}"></i>${m.apt}</th>`).join("")
+          <i style="background:${COLORS[i % COLORS.length]}"></i>${esc(m.apt)}</th>`).join("")
       + "</tr></thead><tbody>";
     rows.forEach(([label, fn]) => {
       html += `<tr><td class="cmp-label">${label}</td>`
@@ -832,7 +837,6 @@
   }
 
   // ── 5g) 실구매 비용 계산(드래그로 단지 추가 → 필요현금 비교) ──────────
-  const M2_PER_PY = 3.305785;
   const COST_BUCKET_ORDER = ["~60㎡", "60~85㎡", "85~135㎡", "135㎡~"];
   let costIds = [], costHomes = 1, costLtv = 40;
   const costPrice = {};    // id -> 사용자 편집 매수가(만원). 없으면 선택 평형 최근매매가
@@ -874,8 +878,8 @@
     const b = costSelBucket(mk);
     const o = b && mk.sale_area ? mk.sale_area[b] : null;
     const price = o ? o.p : (mk.sale || null);
-    const m2 = o && o.py ? o.py * M2_PER_PY : null;
-    return { price, m2, py: o ? o.py : null, bucket: b };
+    // 농특세 판정은 버킷으로(app.js calcCost) — py 는 정수 반올림이라 ㎡ 역환산 금지
+    return { price, py: o ? o.py : null, bucket: b };
   }
 
   async function renderCost() {
@@ -892,9 +896,11 @@
 
   function renderCostNotice() {
     $("cost-notice").innerHTML =
-      `<b>2026-07 규제 반영</b> · 서울 전역 규제지역 — 주담대 <b>LTV 40%</b>,
-       한도 <b>15억↓ 6억 / 15~25억 4억 / 25억↑ 2억</b>. 취득세 서울 전역 조정지역
-       (2주택 8%·3주택+ 12%). 토지거래허가구역은 <b>2년 실거주 의무</b>(갭투자 제한),
+      `<b>2026-07 규제 반영</b> · 서울 전역 규제지역 — 무주택·1주택 주담대 <b>LTV 40%</b>,
+       한도 <b>15억↓ 6억 / 15~25억 4억 / 25억↑ 2억</b>.
+       <b>2주택 이상은 구입 목적 주담대 금지</b>(대출 0 · 전액 현금).
+       취득세 서울 전역 조정지역(2주택 8%·3주택+ 12%).
+       토지거래허가구역은 <b>2년 실거주 의무</b>(갭투자 제한),
        1주택 전세대출도 DSR 반영(스트레스금리 3%).<br>
        <span class="muted">참고용 · 국민주택채권·보유세·DSR 개인한도·생애최초 우대 등은
        미반영. 실제 세액·대출은 개인 조건·정책 변경에 따라 다를 수 있습니다.</span>`;
@@ -934,13 +940,15 @@
       ["중개보수", (m, c) => c ? `${costWon(c.brok)} <span class="muted">(${c.brokRate}%+VAT)</span>` : "-"],
       ["기타(인지·법무)", (m, c) => c ? costWon(c.etc) : "-"],
       ["부대비용 합계", (m, c) => c ? `<b>${costWon(c.costs)}</b>` : "-"],
-      ["대출금", (m, c) => c
-        ? `−${costWon(c.loan)}${c.loanCapped ? ` <span class="cost-cap">한도 ${costWon(c.loanCap)}</span>` : ""}` : "-"],
+      ["대출금", (m, c) => !c ? "-"
+        : c.loanBanned
+          ? `−0 <span class="cost-cap">다주택 구입 주담대 금지</span>`
+          : `−${costWon(c.loan)}${c.loanCapped ? ` <span class="cost-cap">한도 ${costWon(c.loanCap)}</span>` : ""}`],
       ["필요 현금", (m, c) => c ? `<b class="cost-cash">${costWon(c.cash)}</b>` : "-"],
     ];
     let html = `<table class="rank-table cmp-table cost-table2"><thead><tr><th></th>`
       + mks.map((m, i) => `<th class="cmp-head" data-id="${m.id}">
-          <i style="background:${COLORS[i % COLORS.length]}"></i>${m.apt}
+          <i style="background:${COLORS[i % COLORS.length]}"></i>${esc(m.apt)}
           <b class="cost-del" data-del="${m.id}" title="제거">✕</b></th>`).join("")
       + "</tr></thead><tbody>";
     rows.forEach(([label, fn]) => {
@@ -948,7 +956,7 @@
         + mks.map((m) => {
           const def = costDefaults(m);
           const price = costPrice[m.id] != null ? costPrice[m.id] : (def.price || 0);
-          const c = calc && price ? calc(price, costHomes, costLtv, def.m2) : null;
+          const c = calc && price ? calc(price, costHomes, costLtv, def.bucket) : null;
           return `<td>${fn(m, c, def)}</td>`;
         }).join("") + "</tr>";
     });
@@ -992,7 +1000,7 @@
       if (q.length < 2 || q.includes("#")) return;
       const hits = mkAll.filter((m) => m.apt.includes(q)).slice(0, 20);
       $("cost-datalist").innerHTML = hits.map((m) =>
-        `<option value="${m.apt} · ${GU_NAME[m.lawd_cd] || m.lawd_cd} #${m.id}">`).join("");
+        `<option value="${esc(m.apt)} · ${GU_NAME[m.lawd_cd] || m.lawd_cd} #${m.id}">`).join("");
     });
     inp.addEventListener("change", () => {
       const mch = inp.value.match(/#(\d+)$/);
@@ -1118,7 +1126,7 @@
         html += `<div class="sub-card" data-lat="${it.lat || ""}" data-lon="${it.lon || ""}">
           <div class="sc-top">
             <span class="badge sub-badge-${st.k}">${st.label}</span>
-            <span class="sc-name">${it.name}${prov}</span>${link}
+            <span class="sc-name">${esc(it.name)}${prov}</span>${link}
           </div>
           <div class="sc-meta">
             ${subTypeTag(it)}
@@ -1155,7 +1163,7 @@
       const link = it.url
         ? `<a class="sub-link" href="${it.url}" target="_blank" rel="noopener" title="청약홈 공고 보기">↗</a>` : "-";
       ch += `<tr data-lat="${it.lat || ""}" data-lon="${it.lon || ""}">
-        <td>${it.name}</td><td>${it.gu || "-"}</td>
+        <td>${esc(it.name)}</td><td>${it.gu || "-"}</td>
         <td>${it.rcept_end || "-"}</td><td>${best.toLocaleString()} : 1</td>
         <td>${link}</td></tr>`;
     });

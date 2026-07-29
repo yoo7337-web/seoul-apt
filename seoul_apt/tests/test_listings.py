@@ -232,3 +232,27 @@ def test_complex_articles_no_log_when_genuinely_empty(capsys):
     out = client.complex_articles("999")
     assert out == []
     assert "네이버 노출제한" not in capsys.readouterr().out
+
+
+def test_gone_scope_limited_to_fresh_sources():
+    """조회 성공한 소스만 gone 판정 — 직방 폴백이 네이버 매물을 지우면 안 된다.
+
+    네이버가 '집계는 있는데 상세 0건'(관측된 현상)이라 0건을 반환한 사이에
+    직방이 1건만 주면, 범위를 안 좁혔을 때 멀쩡한 네이버 매물이 통째로 사라진다.
+    """
+    conn = db.connect(":memory:")
+    cid = _seed_complex(conn)
+    nv = [_rec("n1", 340000), _rec("n2", 350000)]
+    listings.upsert_listings(conn, cid, nv, "t1")          # 네이버 2건 open
+    zb = dict(_rec("z1", 341000), source="zigbang")
+    # 이번엔 직방만 조회 성공 → 네이버 매물은 손대지 않아야 한다
+    listings.upsert_listings(conn, cid, [zb], "t2", fresh_sources={"zigbang"})
+    still = conn.execute(
+        "SELECT COUNT(*) FROM listing WHERE source='naver' AND status='open'").fetchone()[0]
+    assert still == 2
+    # 반대로 네이버가 성공해 0건이면 네이버분만 gone (직방은 유지)
+    out = listings.upsert_listings(conn, cid, [], "t3", fresh_sources={"naver"})
+    assert out["gone"] == 2
+    assert conn.execute(
+        "SELECT status FROM listing WHERE item_id='z1'").fetchone()[0] == "open"
+    conn.close()

@@ -93,13 +93,15 @@ def cmd_reb(conn, args):
         return
     start = args.from_ym or config.BACKFILL_START_YM
     end = args.to_ym or _kst_now_ym()
-    n = reb_api.collect_reb(conn, key, start, end)
+    # --from 을 직접 준 경우엔 증분 시작점(DB 최신 기준)을 무시하고 그 시점부터 재수집
+    n = reb_api.collect_reb(conn, key, start, end, force_start=bool(args.from_ym))
     print(f"[reb] 부동산원 지수 {n}건 적재")
 
 
 def cmd_export(conn, args):
     js_key = config.get_key(config.ENV_KAKAO_JS, required=False)
-    stats = export.export_all(conn, js_key)
+    stats = export.export_all(conn, js_key,
+                              allow_stale=getattr(args, "allow_stale", False))
     print(f"[export] 마커 {stats['markers']} / 매매 {stats['sale']} "
           f"/ 전월세 {stats['rent']} / 단지 {stats['complex']}")
 
@@ -228,6 +230,8 @@ def build_parser() -> argparse.ArgumentParser:
     r.set_defaults(func=cmd_reb)
 
     e = sub.add_parser("export", help="docs/data JSON 생성")
+    e.add_argument("--allow-stale", action="store_true",
+                   help="DB가 배포본보다 낡아도 강행(기본은 사고 방지를 위해 중단)")
     e.set_defaults(func=cmd_export)
 
     al = sub.add_parser("alerts", help="관심지역 알림+다이제스트 발송")

@@ -157,7 +157,11 @@ class NaverLandClient:
 
         같은 물건을 여러 중개사가 올린 중복은 대표매물 1건으로 취급.
         건물별 매물수(building/article/count)로 0인 동은 건너뛰어 요청 절약.
+
+        `self.last_incomplete` 에 '집계는 있는데 상세가 안 온' 상태를 남긴다 —
+        호출부가 이걸 보고 gone 처리(스냅샷 반영)를 건너뛴다(멀쩡한 매물 오삭제 방지).
         """
+        self.last_incomplete = False
         bcount = self._fin("/complex/building/article/count", {"complexNumber": no}) or []
         active_bnos = [b["buildingNumber"] for b in bcount if b.get("articleCount")]
         expected = sum(b.get("articleCount") or 0 for b in bcount)
@@ -179,6 +183,7 @@ class NaverLandClient:
                             seen.add(rec["item_id"])
                             out.append(rec)
         if expected and not out:
+            self.last_incomplete = True
             # 집계 API(건별 카운트)는 매물이 있다는데 상세 목록은 항상 비어 온다 -
             # 약 40개 표본 중 3곳(~7.5%)에서 재현된 네이버 쪽 현상(광진구 현대프라임
             # 등). 매칭 오류나 우리 쪽 차단이 아니라 이 단지에 한정된 응답이므로,
@@ -340,8 +345,15 @@ def save_state(state: dict) -> None:
 
 
 # ── 저장(스냅샷 diff → gone 처리) ────────────────────────────────────────
-def upsert_listings(conn, complex_id: int, records: list[dict], now: str) -> dict:
-    """이번 수집 스냅샷을 반영. 이전에 open 이었는데 이번에 없는 매물은 gone."""
+def upsert_listings(conn, complex_id: int, records: list[dict], now: str,
+                    fresh_sources: set | None = None) -> dict:
+    """이번 수집 스냅샷을 반영. 이전에 open 이었는데 이번에 없는 매물은 gone.
+
+    ⚠ gone 처리는 **이번에 실제로 조회에 성공한 소스**(fresh_sources)로 한정한다.
+    네이버가 실패/불완전한 사이에 직방 폴백이 1~2건만 주면, 범위를 안 좁혔을 때
+    멀쩡한 네이버 매물 수백 건이 통째로 gone 처리된다.
+    None 이면 전체 소스를 대상으로(= 완전한 스냅샷이라는 뜻).
+    """
     seen_ids = set()
     for r in records:
         seen_ids.add((r["source"], r["item_id"]))
@@ -367,12 +379,14 @@ def upsert_listings(conn, complex_id: int, records: list[dict], now: str) -> dic
                  r["price_manwon"], r["monthly_manwon"], r["area_m2"], r["floor"],
                  r["floor_total"], r["dong"], r["direction"], r["description"],
                  r["confirm_date"], r["url"], now, now))
-    # 이번 스냅샷에 없는 기존 open 매물 → gone
+    # 이번 스냅샷에 없는 기존 open 매물 → gone (조회 성공한 소스에 한해)
     gone = 0
     existing = conn.execute(
         "SELECT id, source, item_id FROM listing "
         "WHERE complex_id=? AND status='open'", (complex_id,)).fetchall()
     for e in existing:
+        if fresh_sources is not None and e["source"] not in fresh_sources:
+            continue
         if (e["source"], e["item_id"]) not in seen_ids:
             conn.execute("UPDATE listing SET status='gone', last_seen=? WHERE id=?",
                          (now, e["id"]))
@@ -460,6 +474,9 @@ def collect(conn, scope="watch", source="auto", limit=None, resume=True,
             break
         records = []
         used = None
+        # 이번에 '조회에 성공한' 소스 — 이 소스의 매물만 gone 판정 대상이 된다.
+        # (실패·불완전한 소스의 기존 매물을 다른 소스 결과로 지우면 안 됨)
+        fresh = set()
         # 1) 네이버
         if naver is not None:
             no = row["naver_no"]
@@ -473,6 +490,9 @@ def collect(conn, scope="watch", source="auto", limit=None, resume=True,
                 try:
                     records = naver.complex_articles(no)
                     used = "naver"
+                    # 집계는 있는데 상세가 안 온 단지는 '0건 확정'이 아니므로 제외
+                    if not naver.last_incomplete:
+                        fresh.add("naver")
                 except NaverBlockedError:
                     stats["blocked"] = True
                     save_state({"done_complex_ids": list(done)})
@@ -492,13 +512,18 @@ def collect(conn, scope="watch", source="auto", limit=None, resume=True,
                     for tt in ("sale", "jeonse"):
                         records += zig.danji_items(best["id"], tt)
                     used = "zigbang"
+                    fresh.add("zigbang")
             except Exception:
                 pass
-        if records:
-            upsert_listings(conn, cid, records, now)
+        # 0건이어도 조회에 성공했으면 반영해야 '내려간 매물'이 gone 으로 정리된다.
+        # (예전엔 `if records:` 라 매물이 0이 된 단지는 옛 매물이 영영 노출됐다)
+        if records or fresh:
+            upsert_listings(conn, cid, records, now, fresh_sources=fresh)
             stats["listings"] += len(records)
-            stats[used] = stats.get(used, 0) + len(records)
-            stats["complexes"] += 1
+            if used:
+                stats[used] = stats.get(used, 0) + len(records)
+            if records:
+                stats["complexes"] += 1
         done.add(cid)
         processed += 1
     save_state({"done_complex_ids": list(done)})
