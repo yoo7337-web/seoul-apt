@@ -12,7 +12,8 @@ from . import config
 
 GEMINI_URL = ("https://generativelanguage.googleapis.com/v1beta/models/"
               "{model}:generateContent")
-MODEL = "gemini-2.0-flash"
+# ⚠2.0-flash는 신규 키에서 무료 쿼터 0(429) — 2026-08-01 교체
+MODEL = "gemini-3.5-flash"
 TIMEOUT = 60
 
 PROMPT = """당신은 서울 아파트 시장 분석가입니다. 아래는 최근 4주 실거래 중
@@ -35,7 +36,9 @@ def gemini_generate(prompt: str, api_key: str, model: str = MODEL) -> str:
     url = GEMINI_URL.format(model=model)
     resp = requests.post(
         url, params={"key": api_key},
-        json={"contents": [{"parts": [{"text": prompt}]}]},
+        json={"contents": [{"parts": [{"text": prompt}]}],
+              "generationConfig": {"maxOutputTokens": 2048,
+                                   "thinkingConfig": {"thinkingBudget": 0}}},
         timeout=TIMEOUT)
     resp.raise_for_status()
     data = resp.json()
