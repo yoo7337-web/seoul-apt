@@ -1210,6 +1210,12 @@
   const SC_PTS = {
     sw:   [[300, 100], [500, 85], [800, 65], [1200, 40], [2000, 15]],
     el:   [[300, 100], [600, 80], [1000, 55], [1500, 25]],
+    // 직주근접: 3대 업무지구(강남·시청/광화문·여의도) 최단 직선거리(km).
+    // '강남 역세권 vs 강북 역세권' 차이를 잡는 핵심 지표.
+    cbd:  [[2, 100], [4, 85], [7, 65], [11, 45], [15, 28], [20, 15]],
+    // 학원 밀집도(반경 1km, 카카오 AC5 전 종류): 실측 보정 -
+    // 대치 1,689 / 목동 596 / 중계 338 / 일반 활발지 150~250
+    ac:   [[5, 15], [20, 40], [60, 60], [150, 75], [300, 85], [600, 95], [1200, 100]],
     hh:   [[0, 25], [300, 45], [500, 60], [1000, 75], [1500, 88], [3000, 100]],
     age:  [[5, 100], [10, 85], [15, 70], [25, 50], [35, 35], [50, 25]],
     pos:  [[20, 100], [35, 85], [50, 65], [65, 45], [80, 30], [100, 15]],
@@ -1224,6 +1230,21 @@
   const SC_AXIS_KO = { loc: "입지", cx: "단지", price: "가격", liq: "유동성" };
   const PHASE_ICON = { boom: "🔥", recovery: "🌱", slowdown: "🌥️",
                        recession: "❄️", neutral: "⚪" };
+
+  // 3대 업무지구(직주근접 기준점): 강남역 · 시청(광화문 생활권) · 여의도역
+  const SC_CBD = [[37.4979, 127.0276], [37.5657, 126.9769], [37.5216, 126.9243]];
+  function scCbdKm(lat, lon) {
+    const R = 6371, rad = Math.PI / 180;
+    let best = null;
+    SC_CBD.forEach(([la, lo]) => {
+      const dLa = (la - lat) * rad, dLo = (lo - lon) * rad;
+      const a = Math.sin(dLa / 2) ** 2
+        + Math.cos(lat * rad) * Math.cos(la * rad) * Math.sin(dLo / 2) ** 2;
+      const d = 2 * R * Math.asin(Math.sqrt(a));
+      if (best == null || d < best) best = d;
+    });
+    return best;
+  }
 
   function scInterp(v, pts) {
     if (v == null || !isFinite(v)) return null;
@@ -1252,10 +1273,18 @@
   function scoreComplex(m, val, prem, preset, bucket) {
     const P = SC_PRESETS[preset];
     const nowYear = new Date().getFullYear();
-    // 입지: null = 상한 밖 확정(결측 아님) → 최저점
+    // 입지: 거리(sw/el null = 상한 밖 확정 → 최저점) + 퀄리티 보정 3종.
+    //  · 지하철 = 거리점수 × 노선계수(환승 프리미엄: 2노선 ×1.05, 3+ ×1.10)
+    //  · 직주근접 = 3대 업무지구 최단거리 - '강남 역세권 vs 강북 역세권' 차별화
+    //  · 학원가 = 반경 1km 학원 수(학군 프록시, 수집 전 단지는 제외·재가중)
+    const lineMul = 1 + 0.05 * (Math.min(m.swl || 1, 3) - 1);
+    const swScore = Math.min(100,
+      scInterp(m.sw == null ? 9999 : m.sw, SC_PTS.sw) * lineMul);
     const loc = scAxis([
-      [scInterp(m.sw == null ? 9999 : m.sw, SC_PTS.sw), 60],
-      [scInterp(m.el == null ? 9999 : m.el, SC_PTS.el), 40],
+      [swScore, 35],
+      [scInterp(scCbdKm(m.lat, m.lon), SC_PTS.cbd), 25],
+      [m.ac != null ? scInterp(m.ac, SC_PTS.ac) : null, 25],
+      [scInterp(m.el == null ? 9999 : m.el, SC_PTS.el), 15],
     ]);
     // 단지: 건축물대장 미수집(hh/by null)은 제외·재가중
     let cx = scAxis([
@@ -1406,7 +1435,8 @@
           `<span class="sc-ax">${SC_AXIS_KO[k]} ${bar(r.axes[k])}</span>`).join("")}</div>
         <div class="sc-meta">${GU_NAME[m.lawd_cd] || ""}${ph ? ` ${PHASE_ICON[ph]}${PHASE_LABEL[ph]}` : ""}
           ${m.hh ? ` · ${m.hh.toLocaleString()}세대` : ""}${m.by ? ` · ${new Date().getFullYear() - m.by}년차` : ""}
-          ${m.sw != null ? ` · 역 ${m.sw}m` : ""}</div>
+          ${m.sw != null ? ` · 역 ${m.sw}m${m.swl > 1 ? `(${m.swl}노선)` : ""}` : ""}
+          ${m.ac != null ? ` · 학원 ${m.ac}` : ""}</div>
       </div>`;
     }).join("") || '<div class="empty">조건에 맞는 단지 없음</div>';
 

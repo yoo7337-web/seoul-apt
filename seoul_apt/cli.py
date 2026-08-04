@@ -164,7 +164,11 @@ def cmd_listings(conn, args):
 
 def cmd_poi(conn, args):
     from . import poi
-    out = poi.run(conn, refresh=args.refresh)
+    kakao_key = None
+    if not getattr(args, "no_academy", False):
+        kakao_key = config.get_key(config.ENV_KAKAO_REST, required=False)
+    out = poi.run(conn, refresh=args.refresh, kakao_key=kakao_key,
+                  academy_limit=getattr(args, "academy_limit", None))
     ld = out["loaded"]
     nr = out["nearest"]
     print(f"[poi] 적재 지하철 {ld['subway']} / 초등 {ld['elem']}")
@@ -173,6 +177,10 @@ def cmd_poi(conn, args):
     else:
         print(f"[poi] 최근접 계산 단지 {nr['updated']}건 "
               f"(역 {nr.get('subways', 0)} · 학교 {nr.get('elems', 0)})")
+    ac = out.get("academy")
+    if ac:
+        print(f"[poi] 학원 밀집도 {ac['academies']}건 수집 "
+              f"(실패 {ac['failed']} · 남은 {ac['remaining']})")
 
 
 def cmd_all(conn, args):
@@ -247,9 +255,13 @@ def build_parser() -> argparse.ArgumentParser:
                     help="발송 없이 추천 텍스트 미리보기")
     ar.set_defaults(func=cmd_aireco)
 
-    po = sub.add_parser("poi", help="입지 레이어(역세권·초품아) POI 적재+최근접 계산")
+    po = sub.add_parser("poi", help="입지 레이어(역세권·초품아·학원) POI 적재+계산")
     po.add_argument("--refresh", action="store_true",
                     help="이미 계산된 단지도 다시 계산(기본은 미계산분만)")
+    po.add_argument("--no-academy", action="store_true",
+                    help="학원 밀집도 수집(카카오 API 호출) 건너뛰기")
+    po.add_argument("--academy-limit", type=int, default=None,
+                    help="학원 수집 단지 수 제한(테스트용)")
     po.set_defaults(func=cmd_poi)
 
     ls = sub.add_parser("listings", help="현재 매물(호가) 수집 - 네이버부동산+직방")

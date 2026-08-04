@@ -17,3 +17,4 @@ data/seoul_apt.sqlite-*
 data/listings_state.json
 
 AUDIT-*.md
+data/*.sqlite

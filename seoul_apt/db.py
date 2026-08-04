@@ -211,6 +211,10 @@ def _migrate(conn: sqlite3.Connection) -> None:
         ("subway_nm", "TEXT"),           # 최근접 역명(+노선)
         ("school_m", "INTEGER"),         # 최근접 초등학교 직선거리(m)
         ("poi_fetched_at", "TEXT"),      # POI 최근접 계산 시각(증분 skip용)
+        # 입지 '퀄리티' 지표(2026-08 종합점수 보강)
+        ("subway_lines", "INTEGER"),     # 최근접 역의 노선 수(환승 프리미엄)
+        ("academy_cnt", "INTEGER"),      # 반경 1km 학원 수(카카오 AC5, 학군 프록시)
+        ("academy_at", "TEXT"),          # 학원 수집 시각(증분 skip용)
         # 매물(네이버·직방) 단지번호 매핑 캐시(1회 매칭 후 재사용)
         ("naver_no", "TEXT"),            # 네이버부동산 complexNo
         ("zigbang_id", "INTEGER"),       # 직방 danji id

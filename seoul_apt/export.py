@@ -151,7 +151,9 @@ def export_all(conn, kakao_js_key: str | None = None,
                     "ax": c["area_max"],         # 전용면적 최대(㎡)
                     "sw": c["subway_m"],         # 최근접 지하철역 거리(m)
                     "swn": c["subway_nm"],       # 최근접 역명(+노선)
+                    "swl": c["subway_lines"],    # 최근접 역 노선 수(환승 프리미엄)
                     "el": c["school_m"],         # 최근접 초등학교 거리(m)
+                    "ac": c["academy_cnt"],      # 반경 1km 학원 수(학군 프록시)
                     **_marker_listing(listing_summary.get(c["id"])),
                 })
 
