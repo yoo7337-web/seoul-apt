@@ -168,6 +168,8 @@
     $("buy-close").addEventListener("click", () => toggleBuy(false));
     $("btn-cost").addEventListener("click", toggleCost);
     $("cost-close").addEventListener("click", () => toggleCost(false));
+    $("btn-score").addEventListener("click", () => togglePanel("score"));
+    $("score-close").addEventListener("click", () => togglePanel("score", false));
     bindDashResizer();
     bindFilterUI();
     $("panel-close").addEventListener("click", () => $("panel").classList.add("hidden"));
@@ -656,7 +658,7 @@
 
   // 왼쪽 팝업 패널 토글. 대시보드·매수후보·비용계산·청약·필터가 같은 슬롯을
   // 공유해 하나만 열린다(지도 위에 겹쳐 뜨므로 동시에 열면 서로 가린다).
-  const LEFT_PANELS = ["dash", "buy", "cost", "subs", "filter"];
+  const LEFT_PANELS = ["dash", "buy", "cost", "subs", "score", "filter"];
   function togglePanel(which, force) {
     const panel = $(which + "-panel");
     const willOpen = typeof force === "boolean" ? force
@@ -673,6 +675,7 @@
       else if (which === "buy") SeoulDash.openBuy();
       else if (which === "cost") SeoulDash.openCost();
       else if (which === "subs") SeoulDash.openSubs();
+      else if (which === "score") SeoulDash.openScore();
     }
     if (which === "subs" && willOpen && $("subs-map-toggle")) {
       $("subs-map-toggle").checked = state.showSubs;   // 열 때 토글 동기화

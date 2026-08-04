@@ -407,6 +407,50 @@ table.rank-table tbody tr[data-id]:hover { background: var(--accent-soft); }
   padding: 1px 5px; border-radius: 4px; vertical-align: 1px;
   border: 1px dashed var(--muted); color: var(--muted); cursor: help;
 }
+/* ── 종합점수 패널 ─────────────────────────────────────────────────── */
+.sc-chip.on { background: var(--accent); color: #fff; border-color: var(--accent); }
+.sc-card {
+  border: 1px solid var(--border); border-radius: 10px; padding: 9px 11px;
+  margin-top: 8px; background: var(--bg); cursor: pointer;
+}
+.sc-card:hover { background: var(--accent-soft); border-color: var(--accent); }
+.sc-top { display: flex; align-items: center; gap: 6px; }
+.sc-rank {
+  min-width: 24px; text-align: center; font-weight: 800; font-size: 12px;
+  color: var(--muted);
+}
+.sc-name {
+  flex: 1; min-width: 0; font-weight: 700; font-size: 13.5px;
+  word-break: keep-all; overflow-wrap: anywhere;
+}
+.sc-grade {
+  font-weight: 800; font-size: 12.5px; padding: 2px 8px; border-radius: 7px;
+  color: #fff; white-space: nowrap;
+}
+.sc-grade.g-S { background: #7c3aed; }
+.sc-grade.g-A { background: #059669; }
+.sc-grade.g-B { background: #2563eb; }
+.sc-grade.g-C { background: #d97706; }
+.sc-grade.g-D { background: #6b7280; }
+.sc-axes {
+  display: flex; flex-wrap: wrap; gap: 3px 12px; margin-top: 6px;
+  font-size: 11px; color: var(--muted);
+}
+.sc-ax { display: inline-flex; align-items: center; gap: 4px; }
+.sc-b {
+  display: inline-block; width: 44px; height: 6px; border-radius: 3px;
+  background: var(--border); overflow: hidden;
+}
+.sc-b b { display: block; height: 100%; background: var(--accent); border-radius: 3px; }
+.sc-b.none { opacity: .35; }
+.sc-tag {
+  font-size: 10px; font-weight: 700; padding: 1px 5px; border-radius: 5px;
+  white-space: nowrap; cursor: help;
+}
+.sc-tag.redev { background: rgba(5,150,105,.12); color: #059669; }
+.sc-tag.warn { border: 1px dashed var(--muted); color: var(--muted); }
+.sc-meta { margin-top: 5px; font-size: 11px; color: var(--muted); }
+
 /* 청약 상태별 건수 요약(목록 위) */
 .subs-summary { display: flex; flex-wrap: wrap; gap: 6px; margin: 2px 0 10px; }
 .subs-summary .badge { font-size: 11.5px; }

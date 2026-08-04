@@ -65,6 +65,11 @@
       const ok = await init();
       if (ok) renderSubs();
     },
+    // 종합점수 패널(입지·단지·가격·유동성 랭킹)
+    openScore: async () => {
+      const ok = await init();
+      if (ok) renderScore();
+    },
     refresh: () => { if (inited) {                       // 관심구 별표 갱신
       renderRankTable(); renderMarketPhase();
       if (valData) renderValAll();
@@ -1182,6 +1187,233 @@
         if (window.SeoulMap) window.SeoulMap.focusLatLng(+el.dataset.lat, +el.dataset.lon);
       });
     });
+  }
+
+  // ── 7) 종합점수 — 입지·단지·가격·유동성 절대 기준 채점 랭킹 ─────────────
+  // 설계 원칙(2026-07-30 사용자 확정):
+  //  · 지표별 절대 구간표 + 선형 보간(경계 점프 방지) → 0~100 지표점수
+  //  · 축 내 가중평균 → 프리셋 축 가중합 = 총점. 등급 S85/A75/B60/C45/D
+  //  · 결측은 감점이 아니라 제외 후 재가중(데이터 유무가 점수를 왜곡하면 안 됨)
+  //    단, 지하철/초등 null 은 '상한(2km/1.5km) 밖 확정'이라 결측이 아닌 최저점
+  //  · 가격 축은 선택 평형 기준(전 평형 혼합 금지 - 프로젝트 대원칙)
+  //  · 구 시장국면은 점수에 넣지 않고 배지로만(단지 자체 평가와 분리)
+  const SC_PRESETS = {
+    live:   { label: "🏠 실거주형", axes: { loc: 35, cx: 25, price: 25, liq: 15 },
+              price: { pos: 40, jr: 30, drop: 15, prem: 15 } },
+    invest: { label: "📈 투자형",   axes: { loc: 25, cx: 15, price: 35, liq: 25 },
+              price: { pos: 40, jr: 30, drop: 15, prem: 15 } },
+    // 갭투자는 '현금이 얼마나 묶이나'가 핵심 → 절대 갭 금액이 주 지표
+    gap:    { label: "🔁 갭투자형", axes: { loc: 20, cx: 15, price: 40, liq: 25 },
+              price: { gap: 45, jr: 20, pos: 20, prem: 15 } },
+  };
+  // 지표별 구간표 [x, 점수] — x 오름차순, 사이는 선형 보간, 양끝은 고정
+  const SC_PTS = {
+    sw:   [[300, 100], [500, 85], [800, 65], [1200, 40], [2000, 15]],
+    el:   [[300, 100], [600, 80], [1000, 55], [1500, 25]],
+    hh:   [[0, 25], [300, 45], [500, 60], [1000, 75], [1500, 88], [3000, 100]],
+    age:  [[5, 100], [10, 85], [15, 70], [25, 50], [35, 35], [50, 25]],
+    pos:  [[20, 100], [35, 85], [50, 65], [65, 45], [80, 30], [100, 15]],
+    jr:   [[30, 25], [40, 45], [50, 65], [60, 85], [70, 100]],
+    drop: [[-15, 100], [-10, 85], [-5, 60], [0, 25]],   // drop은 음수(하락)
+    prem: [[-5, 100], [-2, 80], [2, 55], [5, 35], [10, 15]],
+    gap:  [[1, 100], [2, 85], [3, 70], [5, 50], [8, 30], [12, 15]],  // 억
+    turn: [[0, 15], [0.7, 30], [1.5, 45], [2.5, 65], [4, 85], [6, 100]],  // %
+    lst:  [[1, 70], [5, 100]],                          // open 매물 건수
+  };
+  const SC_GRADES = [[85, "S"], [75, "A"], [60, "B"], [45, "C"], [-1, "D"]];
+  const SC_AXIS_KO = { loc: "입지", cx: "단지", price: "가격", liq: "유동성" };
+  const PHASE_ICON = { boom: "🔥", recovery: "🌱", slowdown: "🌥️",
+                       recession: "❄️", neutral: "⚪" };
+
+  function scInterp(v, pts) {
+    if (v == null || !isFinite(v)) return null;
+    if (v <= pts[0][0]) return pts[0][1];
+    if (v >= pts[pts.length - 1][0]) return pts[pts.length - 1][1];
+    for (let i = 1; i < pts.length; i++) {
+      if (v <= pts[i][0]) {
+        const [x0, s0] = pts[i - 1], [x1, s1] = pts[i];
+        return s0 + (s1 - s0) * (v - x0) / (x1 - x0);
+      }
+    }
+    return pts[pts.length - 1][1];
+  }
+  // 축 점수 = 있는 지표만으로 가중평균(결측 제외·재가중). 전부 없으면 null.
+  function scAxis(parts) {
+    let ws = 0, acc = 0;
+    parts.forEach(([s, w]) => { if (s != null) { acc += s * w; ws += w; } });
+    return ws ? acc / ws : null;
+  }
+  const scMedian = (a) => {
+    if (!a.length) return null;
+    const s = [...a].sort((x, y) => x - y), m = s.length >> 1;
+    return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
+  };
+
+  function scoreComplex(m, val, prem, preset, bucket) {
+    const P = SC_PRESETS[preset];
+    const nowYear = new Date().getFullYear();
+    // 입지: null = 상한 밖 확정(결측 아님) → 최저점
+    const loc = scAxis([
+      [scInterp(m.sw == null ? 9999 : m.sw, SC_PTS.sw), 60],
+      [scInterp(m.el == null ? 9999 : m.el, SC_PTS.el), 40],
+    ]);
+    // 단지: 건축물대장 미수집(hh/by null)은 제외·재가중
+    let cx = scAxis([
+      [m.hh != null ? scInterp(m.hh, SC_PTS.hh) : null, 55],
+      [m.by ? scInterp(nowYear - m.by, SC_PTS.age) : null, 45],
+    ]);
+    // ♻ 재건축 잠재 보너스: 연차 30+ & 용적률<160% (그냥 늙은 단지는 만회 불가)
+    const redev = !!(m.by && (nowYear - m.by) >= 30 && m.far != null && m.far < 160);
+    if (redev && cx != null) cx = Math.min(100, cx + 20);
+    // 가격: 선택 평형 기준. v=밸류에이션(버킷 스코프), gap=같은 평형 매매-전세
+    const b = bucket || m.rep;
+    const v = val ? (bucket ? (val.areas || {})[bucket] : val.all) : null;
+    const jrVal = bucket ? (v ? v.jr : null) : (m.jeonse_ratio != null ? m.jeonse_ratio : (v ? v.jr : null));
+    const s = b && m.sale_area ? m.sale_area[b] : null;
+    const j = b && m.jeonse_area ? m.jeonse_area[b] : null;
+    const gapEok = (s && j) ? (s.p - j.p) / 10000 : null;
+    const priceParts = [];
+    if (P.price.pos)  priceParts.push([v ? scInterp(v.pos, SC_PTS.pos) : null, P.price.pos]);
+    if (P.price.jr)   priceParts.push([scInterp(jrVal, SC_PTS.jr), P.price.jr]);
+    if (P.price.drop) priceParts.push([m.drop != null ? scInterp(m.drop, SC_PTS.drop) : null, P.price.drop]);
+    if (P.price.gap)  priceParts.push([scInterp(gapEok, SC_PTS.gap), P.price.gap]);
+    if (P.price.prem) priceParts.push([prem != null ? scInterp(prem, SC_PTS.prem) : null, P.price.prem]);
+    const price = scAxis(priceParts);
+    // 유동성: 회전율(세대수 필요) + 매물 활발도(미수집 단지는 제외 - 수집 여부로 벌점 금지)
+    const nls = (m.ls || 0) + (m.lj || 0);
+    const liq = scAxis([
+      [(m.hh && m.n1y != null) ? scInterp(m.n1y / m.hh * 100, SC_PTS.turn) : null, 70],
+      [nls > 0 ? scInterp(nls, SC_PTS.lst) : null, 30],
+    ]);
+    const axes = { loc, cx, price, liq };
+    let ws = 0, acc = 0, used = 0;
+    Object.keys(P.axes).forEach((k) => {
+      if (axes[k] != null) { acc += axes[k] * P.axes[k]; ws += P.axes[k]; used++; }
+    });
+    if (!ws) return null;
+    const total = acc / ws;
+    return {
+      total, axes, redev, usedAxes: used,
+      grade: SC_GRADES.find(([t]) => total >= t)[1],
+      lowSample: m.n1y != null && m.n1y < 3,
+    };
+  }
+
+  // ── 종합점수 패널 렌더 ──
+  let scLst = null, scValById = null, scPhaseByGu = null;
+  const SC_LS_KEY = "seoul_apt_score_v1";
+  let scState = (() => {
+    try { return JSON.parse(localStorage.getItem(SC_LS_KEY)) || {}; }
+    catch { return {}; }
+  })();
+  scState = Object.assign({ preset: "live", bucket: "", gu: "" }, scState);
+  const scSave = () => localStorage.setItem(SC_LS_KEY, JSON.stringify(scState));
+
+  async function renderScore() {
+    const list = $("sc-list");
+    if (!list) return;                       // 독립 dashboard.html 에는 없음
+    await loadMk();
+    if (!valData) {
+      try { valData = await fetchJSON(DATA + "valuation.json"); } catch { valData = { items: [] }; }
+    }
+    if (!scLst) {
+      try { scLst = (await fetchJSON(DATA + "listings.json")).complexes || {}; }
+      catch { scLst = {}; }
+    }
+    if (!scValById) {
+      scValById = {};
+      (valData.items || []).forEach((it) => { scValById[it.id] = it; });
+    }
+    if (!scPhaseByGu && dash && dash.market_phase) {
+      scPhaseByGu = {};
+      dash.market_phase.forEach((r) => { scPhaseByGu[r.lawd_cd] = r.phase; });
+    }
+    (meta.districts || []).forEach((d) => { GU_NAME[d.lawd_cd] = d.name; });
+
+    // 컨트롤(프리셋·평형·구) — 매 렌더 재생성(상태 반영)
+    $("sc-presets").innerHTML = Object.entries(SC_PRESETS).map(([k, p]) =>
+      `<button class="d-chip sc-chip${scState.preset === k ? " on" : ""}" data-preset="${k}">${p.label}</button>`).join("");
+    const buckets = ["", "~60㎡", "60~85㎡", "85~135㎡", "135㎡~"];
+    $("sc-buckets").innerHTML = buckets.map((b) =>
+      `<button class="d-chip sc-chip${scState.bucket === b ? " on" : ""}" data-bucket="${b}">${b || "전체(대표평형)"}</button>`).join("");
+    const guSel = $("sc-gu");
+    if (guSel.options.length <= 1) {
+      (meta.districts || []).forEach((d) => {
+        const o = document.createElement("option");
+        o.value = d.lawd_cd; o.textContent = d.name;
+        guSel.appendChild(o);
+      });
+    }
+    guSel.value = scState.gu;
+    $("sc-presets").querySelectorAll("[data-preset]").forEach((btn) =>
+      btn.addEventListener("click", () => { scState.preset = btn.dataset.preset; scSave(); renderScore(); }));
+    $("sc-buckets").querySelectorAll("[data-bucket]").forEach((btn) =>
+      btn.addEventListener("click", () => { scState.bucket = btn.dataset.bucket; scSave(); renderScore(); }));
+    if (!guSel._scBound) {
+      guSel._scBound = true;
+      guSel.addEventListener("change", () => { scState.gu = guSel.value; scSave(); renderScore(); });
+    }
+
+    // 단지별 매물 호가 괴리(중앙값) — 선택 평형이 있으면 그 평형 매물만
+    const premOf = (id) => {
+      const g = scLst[String(id)];
+      if (!g) return null;
+      const rows = (g.sale || []).filter((r) => r.prem != null
+        && (!scState.bucket || r.b === scState.bucket));
+      return rows.length ? scMedian(rows.map((r) => r.prem)) : null;
+    };
+
+    // 채점: 특정 평형 선택 시 그 평형 매매 데이터가 있는 단지만(매수후보와 동일 규칙)
+    const target = mkAll.filter((m) =>
+      (!scState.gu || m.lawd_cd === scState.gu)
+      && (!scState.bucket || (m.sale_area && m.sale_area[scState.bucket])));
+    // 최소 3축 요건: 결측은 감점하지 않되, 축이 2개 이하면 '판단 불가'로 순위 제외.
+    // (안 그러면 가격·유동성 데이터가 없는 나홀로 신축이 입지+단지 2축 만점으로
+    //  상위권을 오염 - 실측에서 1~3위가 전부 2/4축 단지였음)
+    const scored = [];
+    let thin = 0;
+    target.forEach((m) => {
+      const r = scoreComplex(m, scValById[m.id], premOf(m.id), scState.preset, scState.bucket);
+      if (!r) return;
+      if (r.usedAxes < 3) { thin++; return; }
+      scored.push({ m, r });
+    });
+    scored.sort((a, b) => b.r.total - a.r.total);
+
+    const TOP = 100;
+    $("sc-note").textContent =
+      `${SC_PRESETS[scState.preset].label} 기준 ${scored.length.toLocaleString()}개 단지 채점 · 상위 ${Math.min(TOP, scored.length)}개 표시`
+      + (scState.bucket ? ` · ${scState.bucket} 매매 데이터 보유 단지만` : "")
+      + (thin ? ` · 데이터 2축 이하 ${thin.toLocaleString()}개 제외` : "");
+
+    const bar = (v) => v == null
+      ? '<i class="sc-b none"></i>'
+      : `<i class="sc-b"><b style="width:${Math.round(v)}%"></b></i>${Math.round(v)}`;
+    list.innerHTML = scored.slice(0, TOP).map(({ m, r }, i) => {
+      const ph = scPhaseByGu && scPhaseByGu[m.lawd_cd];
+      const badges = [
+        r.redev ? '<span class="sc-tag redev" title="연차 30년+ · 용적률 160% 미만 → 단지 축 +20">♻재건축</span>' : "",
+        r.lowSample ? '<span class="sc-tag warn" title="최근 1년 매매 3건 미만 - 통계 신뢰도 낮음">⚠표본</span>' : "",
+        r.usedAxes < 4 ? `<span class="sc-tag warn" title="데이터 없는 축은 제외하고 재가중">${r.usedAxes}/4축</span>` : "",
+      ].join("");
+      return `<div class="sc-card" data-id="${m.id}">
+        <div class="sc-top">
+          <span class="sc-rank">${i + 1}</span>
+          <span class="sc-name">${esc(m.apt)}</span>${badges}
+          <span class="sc-grade g-${r.grade}">${r.grade} ${Math.round(r.total)}</span>
+        </div>
+        <div class="sc-axes">${Object.keys(SC_AXIS_KO).map((k) =>
+          `<span class="sc-ax">${SC_AXIS_KO[k]} ${bar(r.axes[k])}</span>`).join("")}</div>
+        <div class="sc-meta">${GU_NAME[m.lawd_cd] || ""}${ph ? ` ${PHASE_ICON[ph]}${PHASE_LABEL[ph]}` : ""}
+          ${m.hh ? ` · ${m.hh.toLocaleString()}세대` : ""}${m.by ? ` · ${new Date().getFullYear() - m.by}년차` : ""}
+          ${m.sw != null ? ` · 역 ${m.sw}m` : ""}</div>
+      </div>`;
+    }).join("") || '<div class="empty">조건에 맞는 단지 없음</div>';
+
+    list.querySelectorAll(".sc-card").forEach((c) =>
+      c.addEventListener("click", () => {
+        if (window.SeoulMap) SeoulMap.focusComplex(+c.dataset.id, scState.bucket || undefined);
+      }));
   }
 
   async function fetchJSON(url) {
