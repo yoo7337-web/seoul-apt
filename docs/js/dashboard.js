@@ -1270,7 +1270,43 @@
     return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
   };
 
-  function scoreComplex(m, val, prem, preset, bucket) {
+  // ── 가격 매력의 '동급 대비' 보정 ──
+  // 가격 지표는 품질과 역상관이다: 입지가 나쁘면 랠리에서 소외돼 5년위치가 낮고,
+  // 전세가율은 강북이 구조적으로 높고, 갭은 싼 단지가 당연히 작다. 절대 구간표로
+  // 두면 '나빠서 싼' 단지가 가격 만점으로 종합점수를 끌어올린다(가치 함정 오인 -
+  // 사용자 지적). → 품질 종합 Q(입지60·단지40)로 전체를 5분위로 나누고,
+  // pos/jr/drop 은 **같은 분위 안 백분위**로 점수화("이 급치고 싼가?").
+  // 호가괴리(자기 실거래 대비 - 이미 오염 없음)와 갭 금액(갭투자는 실제 묶이는
+  // 현금이 본질)은 절대값 유지.
+  function scBuildPeers(recs) {
+    const withQ = recs.filter((r) => r.q != null);
+    if (withQ.length < 50) return null;              // 표본 부족 시 절대 구간표 폴백
+    const qs = withQ.map((r) => r.q).sort((a, b) => a - b);
+    const bounds = [1, 2, 3, 4].map((i) => qs[Math.floor(qs.length * i / 5)]);
+    const grpOf = (q) => bounds.findIndex((b) => q < b) === -1
+      ? 4 : bounds.findIndex((b) => q < b);
+    const groups = [[], [], [], [], []].map(() => ({ pos: [], jr: [], drop: [] }));
+    withQ.forEach((r) => {
+      const g = groups[grpOf(r.q)];
+      ["pos", "jr", "drop"].forEach((k) => {
+        if (r.raw[k] != null) g[k].push(r.raw[k]);
+      });
+    });
+    groups.forEach((g) => Object.values(g).forEach((a) => a.sort((x, y) => x - y)));
+    // 백분위(0~100, midrank): 동급 분포에서 v 이하 비율
+    const pct = (gi, key, v) => {
+      const a = groups[gi][key];
+      if (!a || a.length < 20 || v == null) return null;
+      let lo = 0, hi = a.length;
+      while (lo < hi) { const m = (lo + hi) >> 1; (a[m] < v) ? lo = m + 1 : hi = m; }
+      let lo2 = lo, hi2 = a.length;
+      while (lo2 < hi2) { const m = (lo2 + hi2) >> 1; (a[m] <= v) ? lo2 = m + 1 : hi2 = m; }
+      return (lo + lo2) / 2 / a.length * 100;
+    };
+    return { grpOf, pct };
+  }
+
+  function scoreComplex(m, val, prem, preset, bucket, peers) {
     const P = SC_PRESETS[preset];
     const nowYear = new Date().getFullYear();
     // 입지: 거리(sw/el null = 상한 밖 확정 → 최저점) + 퀄리티 보정 3종.
@@ -1301,10 +1337,32 @@
     const s = b && m.sale_area ? m.sale_area[b] : null;
     const j = b && m.jeonse_area ? m.jeonse_area[b] : null;
     const gapEok = (s && j) ? (s.p - j.p) / 10000 : null;
+    // 품질 종합 Q(입지60·단지40) — 가격 상대화의 분위 기준(1패스에서 수집)
+    const q = scAxis([[loc, 60], [cx, 40]]);
+    const posRaw = (v && v.pos != null) ? v.pos : null;
+    const dropRaw = m.drop != null ? m.drop : null;
+    // 동급(품질 분위) 내 백분위 점수. invert=낮을수록 좋은 지표.
+    // 피어 통계가 없으면 null → 절대 구간표 폴백
+    const rel = (key, vRaw, invert) => {
+      if (!peers || q == null || vRaw == null) return null;
+      const p = peers.pct(peers.grpOf(q), key, vRaw);
+      return p == null ? null : (invert ? 100 - p : p);
+    };
     const priceParts = [];
-    if (P.price.pos)  priceParts.push([v ? scInterp(v.pos, SC_PTS.pos) : null, P.price.pos]);
-    if (P.price.jr)   priceParts.push([scInterp(jrVal, SC_PTS.jr), P.price.jr]);
-    if (P.price.drop) priceParts.push([m.drop != null ? scInterp(m.drop, SC_PTS.drop) : null, P.price.drop]);
+    if (P.price.pos) {
+      const rs = rel("pos", posRaw, true);
+      priceParts.push([rs != null ? rs
+        : (posRaw != null ? scInterp(posRaw, SC_PTS.pos) : null), P.price.pos]);
+    }
+    if (P.price.jr) {
+      const rs = rel("jr", jrVal, false);
+      priceParts.push([rs != null ? rs : scInterp(jrVal, SC_PTS.jr), P.price.jr]);
+    }
+    if (P.price.drop) {
+      const rs = rel("drop", dropRaw, true);
+      priceParts.push([rs != null ? rs
+        : (dropRaw != null ? scInterp(dropRaw, SC_PTS.drop) : null), P.price.drop]);
+    }
     if (P.price.gap)  priceParts.push([scInterp(gapEok, SC_PTS.gap), P.price.gap]);
     if (P.price.prem) priceParts.push([prem != null ? scInterp(prem, SC_PTS.prem) : null, P.price.prem]);
     const price = scAxis(priceParts);
@@ -1325,6 +1383,7 @@
       total, axes, redev, usedAxes: used,
       grade: SC_GRADES.find(([t]) => total >= t)[1],
       lowSample: m.n1y != null && m.n1y < 3,
+      q, raw: { pos: posRaw, jr: jrVal, drop: dropRaw },
     };
   }
 
@@ -1393,16 +1452,22 @@
     };
 
     // 채점: 특정 평형 선택 시 그 평형 매매 데이터가 있는 단지만(매수후보와 동일 규칙)
-    const target = mkAll.filter((m) =>
-      (!scState.gu || m.lawd_cd === scState.gu)
-      && (!scState.bucket || (m.sale_area && m.sale_area[scState.bucket])));
+    // 1패스: 전체 서울(버킷 적격)에서 품질 Q·가격 원시값 수집 → 품질 5분위 피어 분포.
+    // 구 필터는 표시만 거르고 피어 통계는 전체 서울로 고정(구를 좁혀도 채점 기준 불변).
+    const pool = mkAll.filter((m) =>
+      !scState.bucket || (m.sale_area && m.sale_area[scState.bucket]));
+    const pre = pool.map((m) =>
+      scoreComplex(m, scValById[m.id], premOf(m.id), scState.preset, scState.bucket, null));
+    const peers = scBuildPeers(pre.filter(Boolean).map((r) => ({ q: r.q, raw: r.raw })));
+    // 2패스: 동급 상대화 점수로 확정
     // 최소 3축 요건: 결측은 감점하지 않되, 축이 2개 이하면 '판단 불가'로 순위 제외.
     // (안 그러면 가격·유동성 데이터가 없는 나홀로 신축이 입지+단지 2축 만점으로
     //  상위권을 오염 - 실측에서 1~3위가 전부 2/4축 단지였음)
     const scored = [];
     let thin = 0;
-    target.forEach((m) => {
-      const r = scoreComplex(m, scValById[m.id], premOf(m.id), scState.preset, scState.bucket);
+    pool.forEach((m) => {
+      if (scState.gu && m.lawd_cd !== scState.gu) return;
+      const r = scoreComplex(m, scValById[m.id], premOf(m.id), scState.preset, scState.bucket, peers);
       if (!r) return;
       if (r.usedAxes < 3) { thin++; return; }
       scored.push({ m, r });
@@ -1413,7 +1478,8 @@
     $("sc-note").textContent =
       `${SC_PRESETS[scState.preset].label} 기준 ${scored.length.toLocaleString()}개 단지 채점 · 상위 ${Math.min(TOP, scored.length)}개 표시`
       + (scState.bucket ? ` · ${scState.bucket} 매매 데이터 보유 단지만` : "")
-      + (thin ? ` · 데이터 2축 이하 ${thin.toLocaleString()}개 제외` : "");
+      + (thin ? ` · 데이터 2축 이하 ${thin.toLocaleString()}개 제외` : "")
+      + (peers ? " · 가격축=품질 동급(5분위) 상대평가" : "");
 
     const bar = (v) => v == null
       ? '<i class="sc-b none"></i>'
