@@ -40,8 +40,23 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: bash scripts/db_release.sh pull
 
+      # data.go.kr 는 러너(해외 IP) 접속을 차단하는 경우가 있다(2026-08-05~06
+      # 이틀 연속 전 요청 connect timeout → 재시도 지연 누적으로 60분 취소).
+      # 불통이면 의존 단계(실거래·공시·청약·건축물대장)만 건너뛰고 나머지
+      # (지수·export·알림·push)는 계속 진행 - 데이터는 로컬 수집으로 보충.
+      - name: Check data.go.kr reachability
+        id: apicheck
+        run: |
+          if curl -s -o /dev/null --connect-timeout 10 --max-time 20 "https://apis.data.go.kr/"; then
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::apis.data.go.kr 접속 불가(러너 IP 차단 추정) - 실거래·청약 수집 건너뜀"
+          fi
+
       # 핵심 데이터(실거래·지수·청약) - 빠르게 끝남. 이게 export/commit 되어야 함.
       - name: Collect core data
+        if: steps.apicheck.outputs.ok == 'true'
         env:
           DATA_GO_KR_KEY: ${{ secrets.DATA_GO_KR_KEY }}
           REB_API_KEY: ${{ secrets.REB_API_KEY }}
@@ -57,17 +72,25 @@ jobs:
           else
             python -m seoul_apt.cli collect
           fi
+          python -m seoul_apt.cli gongsi
+          python -m seoul_apt.cli subscription || echo "청약 수집 실패(계속 진행)"
+
+      # data.go.kr 무관 수집(카카오·부동산원)은 불통이어도 항상 실행
+      - name: Collect non-data.go.kr data
+        env:
+          REB_API_KEY: ${{ secrets.REB_API_KEY }}
+          KAKAO_REST_KEY: ${{ secrets.KAKAO_REST_KEY }}
+        run: |
           python -m seoul_apt.cli geocode
           python -m seoul_apt.cli poi
-          python -m seoul_apt.cli gongsi
           python -m seoul_apt.cli reb
-          python -m seoul_apt.cli subscription || echo "청약 수집 실패(계속 진행)"
 
       # 건축물대장은 남은 단지가 수천 개라 느림 → 별도 스텝 + 20분 하드 타임아웃
       # + continue-on-error. 20분 안에 처리한 만큼만 DB에 남고(부분진척 보존),
       # 실패/타임아웃해도 아래 export/commit 은 그대로 진행돼 실거래가 유실 안 됨.
       # 매 실행 800개씩 → 며칠에 걸쳐 backlog(약 6천개) 소진.
       - name: Building info (best-effort batch)
+        if: steps.apicheck.outputs.ok == 'true'
         timeout-minutes: 20
         continue-on-error: true
         env:
