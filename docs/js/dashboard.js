@@ -1314,8 +1314,12 @@
     //  · 직주근접 = 3대 업무지구 최단거리 - '강남 역세권 vs 강북 역세권' 차별화
     //  · 학원가 = 반경 1km 학원 수(학군 프록시, 수집 전 단지는 제외·재가중)
     const lineMul = 1 + 0.05 * (Math.min(m.swl || 1, 3) - 1);
-    const swScore = Math.min(100,
-      scInterp(m.sw == null ? 9999 : m.sw, SC_PTS.sw) * lineMul);
+    let swScore = scInterp(m.sw == null ? 9999 : m.sw, SC_PTS.sw) * lineMul;
+    // 경전철(우이신설·신림 등)은 수송력·속도·간선 연결성이 지하철보다 낮다
+    // → 역세권 프리미엄 25% 할인(벽산라이브파크가 우이신설 257m 로 지하철급
+    //   92점을 받아 전체 상위권에 오르던 왜곡 - 사용자 정성 지적으로 교정)
+    if (m.swn && /우이신설|신림선|경량/.test(m.swn)) swScore *= 0.75;
+    swScore = Math.min(100, swScore);
     const loc = scAxis([
       [swScore, 35],
       [scInterp(scCbdKm(m.lat, m.lon), SC_PTS.cbd), 25],
@@ -1365,7 +1369,14 @@
     }
     if (P.price.gap)  priceParts.push([scInterp(gapEok, SC_PTS.gap), P.price.gap]);
     if (P.price.prem) priceParts.push([prem != null ? scInterp(prem, SC_PTS.prem) : null, P.price.prem]);
-    const price = scAxis(priceParts);
+    let price = scAxis(priceParts);
+    // 신뢰도 수축: 재가중만 하면 지표 1개(예: 고점대비)만으로 가격 98점이 된다
+    // (실측 - 에비뉴나인티가 drop 단독으로 1위). 결측 비중만큼 중립(50)으로 수축.
+    if (price != null) {
+      const totW = priceParts.reduce((a, [, wt]) => a + wt, 0);
+      const usedW = priceParts.reduce((a, [s, wt]) => a + (s != null ? wt : 0), 0);
+      price = 50 + (price - 50) * Math.sqrt(usedW / totW);
+    }
     // 유동성: 회전율(세대수 필요) + 매물 활발도(미수집 단지는 제외 - 수집 여부로 벌점 금지)
     const nls = (m.ls || 0) + (m.lj || 0);
     const liq = scAxis([
@@ -1378,9 +1389,14 @@
       if (axes[k] != null) { acc += axes[k] * P.axes[k]; ws += P.axes[k]; used++; }
     });
     if (!ws) return null;
-    const total = acc / ws;
+    let total = acc / ws;
+    // 품질 연동 상한: 가격·유동성만으로는 품질(Q) 대비 +15점을 넘을 수 없다.
+    // "나머지 점수는 낮은데 가격 점수가 높아 종합점수가 너무 높은" 왜곡 차단
+    // (사용자 정성 지적). S등급(85+)이 되려면 최소 Q 70(상위 2분위)이 필요해진다.
+    const qcap = q != null && total > q + 15;
+    if (qcap) total = q + 15;
     return {
-      total, axes, redev, usedAxes: used,
+      total, axes, redev, qcap, usedAxes: used,
       grade: SC_GRADES.find(([t]) => total >= t)[1],
       lowSample: m.n1y != null && m.n1y < 3,
       q, raw: { pos: posRaw, jr: jrVal, drop: dropRaw },
@@ -1488,6 +1504,7 @@
       const ph = scPhaseByGu && scPhaseByGu[m.lawd_cd];
       const badges = [
         r.redev ? '<span class="sc-tag redev" title="연차 30년+ · 용적률 160% 미만 → 단지 축 +20">♻재건축</span>' : "",
+        r.qcap ? '<span class="sc-tag warn" title="가격·유동성 점수가 품질(입지·단지) 대비 과도해 총점을 품질+15로 제한">💰상한</span>' : "",
         r.lowSample ? '<span class="sc-tag warn" title="최근 1년 매매 3건 미만 - 통계 신뢰도 낮음">⚠표본</span>' : "",
         r.usedAxes < 4 ? `<span class="sc-tag warn" title="데이터 없는 축은 제외하고 재가중">${r.usedAxes}/4축</span>` : "",
       ].join("");
