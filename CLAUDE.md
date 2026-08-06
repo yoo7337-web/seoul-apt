@@ -43,6 +43,20 @@
      수행 불가) 빌드 상태 확인으로 대체.
   3. 로컬 프리뷰(8511, 게이트 스킵)에서 먼저 검증 후 push하는 기존 절차는 그대로 유지.
 
+## ⚠ data.go.kr 는 GitHub 러너(해외 IP)를 차단할 수 있다 (2026-08-05~06 실사고)
+
+- 증상: daily Actions 에서 apis.data.go.kr 전 요청이 connect timeout →
+  요청당 재시도 4회×30s ≈ 2분씩 소모하며 '건너뜀'만 반복하다 60분 워크플로
+  타임아웃으로 취소(이틀 연속). 로컬(한국 IP)은 같은 시각 1초 내 정상 응답.
+- 대응(daily 워크플로): **preflight 접속 체크**(`Check data.go.kr reachability`,
+  curl 10s) — 불통이면 data.go.kr 의존 단계(collect·gongsi·subscription·building)만
+  건너뛰고 geocode/poi/reb·export·alerts·push 는 계속 진행. export 의 낡은-DB
+  가드는 `cur >= prev`(같으면 통과)라 수집 스킵 실행에서도 export 가 막히지 않는다.
+- 클라우드 수집이 며칠 계속 스킵되면 **로컬에서 daily 와 같은 순서로 수집**
+  (collect→geocode→poi→gongsi→reb→subscription)→export→커밋/push→
+  `scripts/db_release.sh push` 로 공백을 메운다(2026-08-07 새벽 수행 패턴).
+  로컬 DB에 매물·학원 데이터가 있으면 그대로 Release 에 올라가 클라우드가 이어받는다.
+
 ## 현재 매물(호가) 수집 (`listings` 명령, 2026-07-17 구축)
 
 ⭐ 트리거: **"매물 수집해줘"** → `.venv\Scripts\python.exe -m seoul_apt.cli listings`
