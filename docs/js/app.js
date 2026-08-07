@@ -94,7 +94,7 @@
     dealType: "sale",   // 지도 말풍선 기준: 'sale'(매매) | 'jeonse'(전세)
     // 슬라이더 범위 {lo,hi} + 토글. lo==min && hi==max 이면 미적용
     range: Object.fromEntries(F_SLIDERS.map((s) => [s.key, { lo: s.min, hi: s.max }])),
-    minusGap: false, peak: false,
+    minusGap: false, peak: false, park: false,
     favorites: loadFavorites(), currentDetail: null, chartMode: "sale",
     detailArea: "",   // 상세 패널 면적(평형) 선택 ("" = 전체)
     favDistricts: loadFavDistricts(),   // 관심구(lawd_cd Set)
@@ -432,6 +432,9 @@
         if (!inR("gap", g == null ? null : g / 10000)) return false;
       }
       if (state.peak && !m.is_peak) return false;
+      // 지하주차장: 옥내 주차대수>0(대장에 '지하주차장' 항목이 없어 이걸 프록시로).
+      // 미수집(null)은 '없음'이 아니라 '모름'이지만, 필터는 확인된 단지만 남긴다.
+      if (state.park && !(m.pki > 0)) return false;
       // 고점대비 하락(%): drop은 음수(하락)/0(신고가) → 하락폭 -drop 으로 비교
       if (active("drop") && !inR("drop", m.drop == null ? null : -m.drop)) return false;
       // 입지: 역까지·초등학교까지 거리(m). 상한(역 2km/초등 1.5km) 밖은 null → 제외
@@ -449,6 +452,7 @@
     });
     if (state.minusGap) n++;
     if (state.peak) n++;
+    if (state.park) n++;
     return n;
   }
 
@@ -511,10 +515,12 @@
     html += F_SLIDERS.map(rangeHtml).join("");
     html += `<label class="fs-toggle"><input type="checkbox" id="f-minusgap"> 마이너스 갭 보기 (전세>매매)</label>`;
     html += `<label class="fs-toggle"><input type="checkbox" id="f-peak"> 신고가 단지만</label>`;
+    html += `<label class="fs-toggle" title="건축물대장의 옥내 주차대수>0 인 단지만(아파트에서 옥내 주차=사실상 지하주차장). 주차 정보가 아직 수집 안 된 단지는 제외됩니다."><input type="checkbox" id="f-park"> 지하주차장 있는 단지만</label>`;
     $("filter-body").innerHTML = html;
     F_SLIDERS.forEach(bindRange);
     $("f-minusgap").addEventListener("change", (e) => { state.minusGap = e.target.checked; clearThemeMark(); onFilterChange(); });
     $("f-peak").addEventListener("change", (e) => { state.peak = e.target.checked; clearThemeMark(); onFilterChange(); });
+    $("f-park").addEventListener("change", (e) => { state.park = e.target.checked; clearThemeMark(); onFilterChange(); });
     document.querySelectorAll(".theme-chip").forEach((b) =>
       b.addEventListener("click", () => applyTheme(b.dataset.theme)));
   }
@@ -541,8 +547,10 @@
     });
     state.minusGap = !!t.minusGap;
     state.peak = !!t.peak;
+    state.park = !!t.park;
     if ($("f-minusgap")) $("f-minusgap").checked = state.minusGap;
     if ($("f-peak")) $("f-peak").checked = state.peak;
+    if ($("f-park")) $("f-park").checked = state.park;
     state.themeKey = key;
     paintThemeChips();
     onFilterChange();
@@ -566,9 +574,10 @@
       if (lo) { lo.value = s.min; hi.value = s.max; }
       paintRange(s);
     });
-    state.minusGap = state.peak = false;
+    state.minusGap = state.peak = state.park = false;
     if ($("f-minusgap")) $("f-minusgap").checked = false;
     if ($("f-peak")) $("f-peak").checked = false;
+    if ($("f-park")) $("f-park").checked = false;
     clearThemeMark();
     onFilterChange();
   }
@@ -598,7 +607,7 @@
       v: 1, savedAt: new Date().toISOString().slice(0, 10),
       range: state.range, area: state.area,
       districts: [...state.districts], dealType: state.dealType,
-      minusGap: state.minusGap, peak: state.peak,
+      minusGap: state.minusGap, peak: state.peak, park: state.park,
     };
     localStorage.setItem("seoul_apt_profile", JSON.stringify(p));
     state.profileOn = false;   // 저장만. 적용 상태는 [💼] 토글로만 관리
@@ -612,9 +621,10 @@
       const lo = $("rlo-" + s.key), hi = $("rhi-" + s.key);
       if (lo) { lo.value = r.lo; hi.value = r.hi; paintRange(s); }
     });
-    state.minusGap = !!p.minusGap; state.peak = !!p.peak;
+    state.minusGap = !!p.minusGap; state.peak = !!p.peak; state.park = !!p.park;
     if ($("f-minusgap")) $("f-minusgap").checked = state.minusGap;
     if ($("f-peak")) $("f-peak").checked = state.peak;
+    if ($("f-park")) $("f-park").checked = state.park;
     state.area = p.area || "";
     if ($("area-filter")) $("area-filter").value = state.area;
     state.dealType = p.dealType || "sale";
@@ -1373,14 +1383,30 @@ ${b.axesText}${b.flags ? "\n" + b.flags : ""}">${b.grade} ${Math.round(b.total)}
   }
 
   // 건축물대장 부가정보(세대수/용적률/건폐율). 값 하나라도 있으면 표시.
-  // 세대수·용적률·건폐율 - 헤더(구·준공연차) 바로 아래 컴팩트 한 줄
+  // 세대수·용적률·건폐율·주차 - 헤더(구·준공연차) 바로 아래 컴팩트 한 줄
   function buildingInfo(d) {
-    if (!d.households && !d.far && !d.bcr) return "";
-    const item = (label, val) => `<span class="binfo-item">${label} <b>${val}</b></span>`;
+    if (!d.households && !d.far && !d.bcr && !d.park_total) return "";
+    const item = (label, val, title) =>
+      `<span class="binfo-item"${title ? ` title="${title}"` : ""}>${label} <b>${val}</b></span>`;
+    let park = "";
+    if (d.park_total || d.park_indr != null) {
+      const per = (d.park_total && d.households)
+        ? (d.park_total / d.households).toFixed(2) : null;
+      // 지하주차장 유무는 대장에 항목이 없어 옥내 주차대수>0 을 프록시로 쓴다
+      const indr = d.park_indr > 0;
+      park = item("주차",
+        `${per ? per + "대/세대" : (d.park_total || 0).toLocaleString() + "대"}`
+        + `<span class="binfo-park ${indr ? "yes" : "no"}">${indr ? "지하O" : "지상만"}</span>`,
+        `총 ${(d.park_total || 0).toLocaleString()}대`
+        + ` · 옥내(지하) ${(d.park_indr || 0).toLocaleString()}대`
+        + ` · 옥외(지상) ${(d.park_oudr || 0).toLocaleString()}대`
+        + `\n건축물대장 기준 · 옥내 주차대수를 지하주차장 유무의 근거로 사용`);
+    }
     return `<div class="binfo-row">
       ${item("세대수", d.households ? d.households.toLocaleString() + "세대" : "-")}
       ${item("용적률", d.far ? d.far + "%" : "-")}
       ${item("건폐율", d.bcr ? d.bcr + "%" : "-")}
+      ${park}
     </div>`;
   }
 

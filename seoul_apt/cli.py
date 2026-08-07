@@ -66,10 +66,13 @@ def cmd_building(conn, args):
     if not kakao_key:
         print("[building] KAKAO_REST_KEY 없음 - 건너뜀(주소→법정동 변환 불가)")
         return
+    field = "park" if getattr(args, "parking", False) else "bldg"
     stats = building.collect_buildings(conn, data_key, kakao_key,
                                        args.district, args.limit,
-                                       max_workers=getattr(args, "workers", 10))
-    print(f"[building] 조회 {stats['tried']} / 정보확보 {stats['filled']} "
+                                       max_workers=getattr(args, "workers", 10),
+                                       field=field)
+    tag = "building/주차백필" if field == "park" else "building"
+    print(f"[{tag}] 조회 {stats['tried']} / 정보확보 {stats['filled']} "
           f"/ 실패(재시도예정) {stats['failed']}")
 
 
@@ -224,6 +227,9 @@ def build_parser() -> argparse.ArgumentParser:
     bd.add_argument("--limit", type=int, default=None, help="처리 개수 제한")
     bd.add_argument("--workers", type=int, default=10,
                     help="동시 조회 스레드 수(기본 10 - 단지별 조회는 서로 독립적)")
+    bd.add_argument("--parking", action="store_true",
+                    help="주차 백필 - 이미 수집된 단지의 주차대수만 채운다"
+                         "(기존 세대수·용적률은 보존)")
     bd.set_defaults(func=cmd_building)
 
     sb = sub.add_parser("subscription", help="청약홈 분양정보·경쟁률 수집")

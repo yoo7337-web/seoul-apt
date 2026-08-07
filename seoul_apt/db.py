@@ -206,6 +206,13 @@ def _migrate(conn: sqlite3.Connection) -> None:
         ("bcr", "REAL"),                 # 건폐율(%)
         ("approval_date", "TEXT"),       # 사용승인일 'YYYY-MM-DD'
         ("bldg_fetched_at", "TEXT"),     # 건축물대장 조회 시각(재조회 skip용)
+        # 주차(2026-08 추가) — 건축물대장 주차대수. '지하주차장 유무'는 대장에
+        # 직접 항목이 없어 **옥내 주차대수>0**을 프록시로 쓴다(아파트에서 옥내
+        # 주차 = 사실상 지하주차장). 세대당 대수는 park_total/households.
+        ("park_total", "INTEGER"),       # 총 주차대수(totPkngCnt)
+        ("park_indr", "INTEGER"),        # 옥내(기계+자주) = 지하주차 프록시
+        ("park_oudr", "INTEGER"),        # 옥외(기계+자주) = 지상주차
+        ("park_fetched_at", "TEXT"),     # 주차 조회 시각(백필 대상 선별용)
         # 입지 레이어(역세권·초품아) — 최근접 POI 거리(m)와 이름
         ("subway_m", "INTEGER"),         # 최근접 지하철역 직선거리(m)
         ("subway_nm", "TEXT"),           # 최근접 역명(+노선)
@@ -352,10 +359,17 @@ def set_coords(conn, complex_id, lat, lon, geocoded_at) -> None:
 
 
 def complexes_without_building(conn, lawd_cd: str | None = None,
-                               limit: int | None = None) -> list[sqlite3.Row]:
-    """건축물대장 정보가 아직 없는 단지(지번 있는 것만) - 조회 대상."""
+                               limit: int | None = None,
+                               field: str = "bldg") -> list[sqlite3.Row]:
+    """건축물대장 조회가 아직 안 된 단지(지번 있는 것만).
+
+    field='bldg' 는 최초 수집(세대수·용적률 등), 'park' 는 주차 백필 대상이다.
+    주차 필드는 나중에 추가돼(2026-08) 기존 단지는 bldg_fetched_at 이 이미
+    차 있으므로, 같은 조건으로는 영영 재조회되지 않는다 → 별도 마커로 고른다.
+    """
+    marker = "park_fetched_at" if field == "park" else "bldg_fetched_at"
     q = ("SELECT complex_id, lawd_cd, umd_nm, apt_nm, jibun FROM complex "
-         "WHERE bldg_fetched_at IS NULL AND jibun IS NOT NULL")
+         f"WHERE {marker} IS NULL AND jibun IS NOT NULL")
     args: list = []
     if lawd_cd:
         q += " AND lawd_cd=?"
@@ -368,11 +382,30 @@ def complexes_without_building(conn, lawd_cd: str | None = None,
 
 
 def set_building(conn, complex_id, households, far, bcr, approval_date,
-                 fetched_at) -> None:
+                 fetched_at, park: dict | None = None) -> None:
+    """건축물대장 최초 수집 결과 저장(빈 값이면 그대로 NULL - 재조회 방지용 시각만)."""
+    p = park or {}
     conn.execute(
         "UPDATE complex SET households=?, far=?, bcr=?, approval_date=?, "
-        "bldg_fetched_at=? WHERE complex_id=?",
-        (households, far, bcr, approval_date, fetched_at, complex_id),
+        "bldg_fetched_at=?, park_total=?, park_indr=?, park_oudr=?, "
+        "park_fetched_at=? WHERE complex_id=?",
+        (households, far, bcr, approval_date, fetched_at,
+         p.get("total"), p.get("indr"), p.get("oudr"), fetched_at, complex_id),
+    )
+
+
+def set_parking(conn, complex_id, park: dict | None, fetched_at) -> None:
+    """주차 백필 전용 - 기존 세대수·용적률·건폐율을 절대 덮어쓰지 않는다.
+
+    백필은 **이미 수집된 단지를 재조회**하므로, 조회가 빈손으로 돌아왔을 때
+    set_building 을 쓰면 멀쩡한 기존 값이 NULL 로 날아간다(수집 6주치 소실).
+    주차 값만 쓰고, 결과가 없어도 park_fetched_at 은 찍어 재조회를 막는다.
+    """
+    p = park or {}
+    conn.execute(
+        "UPDATE complex SET park_total=?, park_indr=?, park_oudr=?, "
+        "park_fetched_at=? WHERE complex_id=?",
+        (p.get("total"), p.get("indr"), p.get("oudr"), fetched_at, complex_id),
     )
 
 

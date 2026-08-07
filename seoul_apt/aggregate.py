@@ -321,6 +321,8 @@ def complex_list(conn, lawd_cd: str) -> list[dict]:
             "subway_lines": c["subway_lines"],
             "school_m": c["school_m"],
             "academy_cnt": c["academy_cnt"],
+            "park_indr": c["park_indr"],
+            "park_total": c["park_total"],
             "last_amount": last_amount,
             "peak_amount": peak,
             "is_peak": bool(last_amount and peak and last_amount >= peak),
@@ -472,7 +474,7 @@ def complex_detail(conn, complex_id: int) -> dict:
 
     meta = conn.execute(
         "SELECT build_year, umd_nm, households, far, bcr, approval_date, "
-        "subway_m, subway_nm, school_m "
+        "subway_m, subway_nm, school_m, park_total, park_indr, park_oudr "
         "FROM complex WHERE complex_id=?", (complex_id,)).fetchone()
 
     return {
@@ -485,6 +487,9 @@ def complex_detail(conn, complex_id: int) -> dict:
         "subway_m": meta["subway_m"] if meta else None,
         "subway_nm": meta["subway_nm"] if meta else None,
         "school_m": meta["school_m"] if meta else None,
+        "park_total": meta["park_total"] if meta else None,
+        "park_indr": meta["park_indr"] if meta else None,
+        "park_oudr": meta["park_oudr"] if meta else None,
         "sale_series": _series(sale_series),
         "jeonse_series": _series(jeonse_series),
         "valuation": valuation,            # 전체(전 면적) 밸류에이션

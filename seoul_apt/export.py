@@ -154,6 +154,8 @@ def export_all(conn, kakao_js_key: str | None = None,
                     "swl": c["subway_lines"],    # 최근접 역 노선 수(환승 프리미엄)
                     "el": c["school_m"],         # 최근접 초등학교 거리(m)
                     "ac": c["academy_cnt"],      # 반경 1km 학원 수(학군 프록시)
+                    "pki": c["park_indr"],       # 옥내 주차대수(>0 = 지하주차장)
+                    "pkt": c["park_total"],      # 총 주차대수(세대당 = pkt/hh)
                     **_marker_listing(listing_summary.get(c["id"])),
                 })
 

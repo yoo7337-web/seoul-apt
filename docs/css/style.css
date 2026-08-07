@@ -626,6 +626,12 @@ table.rank-table tbody tr[data-id]:hover { background: var(--accent-soft); }
 }
 .binfo-item { white-space: nowrap; }
 .binfo-item b { color: var(--text); font-weight: 700; font-size: 12px; }
+.binfo-park {
+  margin-left: 4px; font-size: 10px; font-weight: 700; padding: 1px 5px;
+  border-radius: 5px; vertical-align: 1px;
+}
+.binfo-park.yes { background: #05966933; color: #34d399; }
+.binfo-park.no { background: var(--border); color: var(--muted); }
 
 /* ── 밸류에이션 게이지 ─────────────────────────────────────────────── */
 .valuation {

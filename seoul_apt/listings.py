@@ -152,16 +152,56 @@ class NaverLandClient:
     def article_count(self, no: str) -> dict | None:
         return self._fin("/complex/article/count", {"complexNumber": no})
 
-    def complex_articles(self, no: str) -> list[dict]:
-        """단지의 모든 매물(대표매물 기준). 동 × 평형 순회.
+    def articles_post(self, no: str) -> list[dict] | None:
+        """POST /complex/article/list 로 단지 매물을 한 번에 조회(주 경로).
 
+        동×평형 GET 순회는 단지당 최대 75회(15동×5평형)를 쏴서 차단을 자초했고,
+        일부 단지는 그렇게 훑어도 상세가 빈손으로 온다(현대프라임 - 집계 42건인데
+        동별 목록은 전부 0). 이 POST 는 **거래유형당 1~2회**로 같은 목록을 준다.
+
+        body 는 {'complexNumber': int, 'tradeTypes': ['A1'], 'page', 'size'} —
+        complexNumber 가 없거나 tradeTypes 가 빠지면 400 이다(그래서 예전에
+        '스키마가 까다로워 실패'로 남았다). 응답 항목 구조는 GET 과 동일해
+        _parse_naver_article 을 그대로 쓴다.
+
+        요청 자체가 실패하면 None(호출부가 GET 순회로 폴백), 성공했는데 매물이
+        없으면 [] 를 준다 - '실패'와 '진짜 0건'을 뭉개지 않는다.
+        """
+        ref = f"https://fin.land.naver.com/complexes/{no}"
+        out, seen, ok = [], set(), False
+        for tt in ("A1", "B1", "B2"):
+            page = 0
+            while page < 10:                    # 안전 상한(단지당 최대 300건)
+                d = self._req("POST", FIN_API + "/complex/article/list", referer=ref,
+                              json={"complexNumber": int(no), "tradeTypes": [tt],
+                                    "page": page, "size": 30})
+                res = (d or {}).get("result")
+                if res is None:
+                    break                       # 이 거래유형 조회 실패
+                ok = True
+                for item in res.get("list") or []:
+                    rec = _parse_naver_article(item, no)
+                    if rec and rec["item_id"] not in seen:
+                        seen.add(rec["item_id"])
+                        out.append(rec)
+                if not res.get("hasNextPage"):
+                    break
+                page += 1
+        return out if ok else None
+
+    def complex_articles(self, no: str) -> list[dict]:
+        """단지의 모든 매물(대표매물 기준).
+
+        1순위 POST 목록(요청 3회), 실패 시에만 동×평형 GET 순회로 폴백.
         같은 물건을 여러 중개사가 올린 중복은 대표매물 1건으로 취급.
-        건물별 매물수(building/article/count)로 0인 동은 건너뛰어 요청 절약.
 
         `self.last_incomplete` 에 '집계는 있는데 상세가 안 온' 상태를 남긴다 —
         호출부가 이걸 보고 gone 처리(스냅샷 반영)를 건너뛴다(멀쩡한 매물 오삭제 방지).
         """
         self.last_incomplete = False
+        posted = self.articles_post(no)
+        if posted:
+            return posted
         bcount = self._fin("/complex/building/article/count", {"complexNumber": no}) or []
         active_bnos = [b["buildingNumber"] for b in bcount if b.get("articleCount")]
         expected = sum(b.get("articleCount") or 0 for b in bcount)
