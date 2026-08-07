@@ -442,6 +442,13 @@ table.rank-table tbody tr[data-id]:hover { background: var(--accent-soft); }
   background: var(--border); overflow: hidden;
 }
 .sc-b b { display: block; height: 100%; background: var(--accent); border-radius: 3px; }
+.sc-more {
+  display: block; width: 100%; margin-top: 10px; padding: 9px 0;
+  border: 1px dashed var(--border); border-radius: 10px;
+  background: var(--bg); color: var(--accent); font-weight: 700; font-size: 12.5px;
+  cursor: pointer;
+}
+.sc-more:hover { background: var(--accent-soft); border-color: var(--accent); }
 .sc-b.none { opacity: .35; }
 .sc-tag {
   font-size: 10px; font-weight: 700; padding: 1px 5px; border-radius: 5px;

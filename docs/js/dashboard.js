@@ -1405,6 +1405,7 @@
 
   // ── 종합점수 패널 렌더 ──
   let scLst = null, scValById = null, scPhaseByGu = null;
+  let scLimit = 100;                 // 표시 개수(더보기로 +200씩, 조건 변경 시 리셋)
   const SC_LS_KEY = "seoul_apt_score_v1";
   let scState = (() => {
     try { return JSON.parse(localStorage.getItem(SC_LS_KEY)) || {}; }
@@ -1450,12 +1451,12 @@
     }
     guSel.value = scState.gu;
     $("sc-presets").querySelectorAll("[data-preset]").forEach((btn) =>
-      btn.addEventListener("click", () => { scState.preset = btn.dataset.preset; scSave(); renderScore(); }));
+      btn.addEventListener("click", () => { scState.preset = btn.dataset.preset; scLimit = 100; scSave(); renderScore(); }));
     $("sc-buckets").querySelectorAll("[data-bucket]").forEach((btn) =>
-      btn.addEventListener("click", () => { scState.bucket = btn.dataset.bucket; scSave(); renderScore(); }));
+      btn.addEventListener("click", () => { scState.bucket = btn.dataset.bucket; scLimit = 100; scSave(); renderScore(); }));
     if (!guSel._scBound) {
       guSel._scBound = true;
-      guSel.addEventListener("change", () => { scState.gu = guSel.value; scSave(); renderScore(); });
+      guSel.addEventListener("change", () => { scState.gu = guSel.value; scLimit = 100; scSave(); renderScore(); });
     }
 
     // 단지별 매물 호가 괴리(중앙값) — 선택 평형이 있으면 그 평형 매물만
@@ -1490,9 +1491,9 @@
     });
     scored.sort((a, b) => b.r.total - a.r.total);
 
-    const TOP = 100;
+    const shown = Math.min(scLimit, scored.length);
     $("sc-note").textContent =
-      `${SC_PRESETS[scState.preset].label} 기준 ${scored.length.toLocaleString()}개 단지 채점 · 상위 ${Math.min(TOP, scored.length)}개 표시`
+      `${SC_PRESETS[scState.preset].label} 기준 ${scored.length.toLocaleString()}개 단지 채점 · 1~${shown.toLocaleString()}위 표시`
       + (scState.bucket ? ` · ${scState.bucket} 매매 데이터 보유 단지만` : "")
       + (thin ? ` · 데이터 2축 이하 ${thin.toLocaleString()}개 제외` : "")
       + (peers ? " · 가격축=품질 동급(5분위) 상대평가" : "");
@@ -1500,7 +1501,7 @@
     const bar = (v) => v == null
       ? '<i class="sc-b none"></i>'
       : `<i class="sc-b"><b style="width:${Math.round(v)}%"></b></i>${Math.round(v)}`;
-    list.innerHTML = scored.slice(0, TOP).map(({ m, r }, i) => {
+    list.innerHTML = scored.slice(0, scLimit).map(({ m, r }, i) => {
       const ph = scPhaseByGu && scPhaseByGu[m.lawd_cd];
       const badges = [
         r.redev ? '<span class="sc-tag redev" title="연차 30년+ · 용적률 160% 미만 → 단지 축 +20">♻재건축</span>' : "",
@@ -1522,6 +1523,15 @@
           ${m.ac != null ? ` · 학원 ${m.ac}` : ""}</div>
       </div>`;
     }).join("") || '<div class="empty">조건에 맞는 단지 없음</div>';
+
+    // 101위 이후도 보기: 한 번에 다 그리면 DOM이 무거워(전체 ~9천 카드) 200개씩 추가
+    if (scored.length > scLimit) {
+      const more = document.createElement("button");
+      more.className = "sc-more";
+      more.textContent = `더보기 (${(shown + 1).toLocaleString()}~${Math.min(scLimit + 200, scored.length).toLocaleString()}위 · 전체 ${scored.length.toLocaleString()}개)`;
+      more.addEventListener("click", () => { scLimit += 200; renderScore(); });
+      list.appendChild(more);
+    }
 
     list.querySelectorAll(".sc-card").forEach((c) =>
       c.addEventListener("click", () => {
