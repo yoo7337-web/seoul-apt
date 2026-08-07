@@ -449,6 +449,14 @@ table.rank-table tbody tr[data-id]:hover { background: var(--accent-soft); }
   cursor: pointer;
 }
 .sc-more:hover { background: var(--accent-soft); border-color: var(--accent); }
+/* 상세 패널 이름 옆 관심단지 별표 */
+.fav-star {
+  background: none; border: none; padding: 0 2px; margin-left: 2px;
+  font-size: 20px; line-height: 1; color: var(--muted); cursor: pointer;
+  vertical-align: 1px;
+}
+.fav-star:hover { color: var(--accent); }
+.fav-star.on { color: var(--accent); }
 /* 상세 패널 이름 옆 종합점수 배지 */
 .p-score-badge { margin-left: 6px; vertical-align: 3px; cursor: help; white-space: nowrap; }
 .p-score-out {

@@ -1226,7 +1226,8 @@
     const gongsi = latestGongsi(d);
     const el = $("panel-content");
     el.innerHTML = `
-      <h2>${d.apt} ${d.is_peak ? '<span class="badge peak">신고가</span>' : ""}<span id="p-score"></span></h2>
+      <h2>${d.apt} <button id="fav-star" class="fav-star${isFav ? " on" : ""}"
+        title="${isFav ? "관심단지 해제" : "관심단지 등록"}">${isFav ? "★" : "☆"}</button>${d.is_peak ? '<span class="badge peak">신고가</span>' : ""}<span id="p-score"></span></h2>
       <div class="sub">${districtName(d.lawd_cd)}${d.umd ? " " + d.umd : ""} · ${buildYearText(d)}</div>
       ${locationInfo(d)}
       ${areaSelectTop(d)}
@@ -1251,12 +1252,6 @@
 
       ${listingsHtml(d)}
 
-      <div class="btn-row">
-        <button id="fav-toggle" class="${isFav ? "active" : ""}">
-          ${isFav ? "★ 관심단지" : "☆ 관심단지"}</button>
-        <button id="csv-btn">CSV 다운로드</button>
-      </div>
-
       <div class="section-title">면적별 가격 추세</div>
       <div class="chart-tabs">
         <button data-mode="sale" class="${state.chartMode === "sale" ? "active" : ""}">매매</button>
@@ -1271,19 +1266,21 @@
       ${recentRentsTable(d)}
     `;
     $("panel").classList.remove("hidden");
-    // 종합점수 배지(비동기 - 최초 1회만 전 단지 채점 후 캐시). 순위 산정에서
-    // 제외된 단지(데이터 2축 이하)는 '순위 밖'으로 명시한다.
+    // 종합점수 배지(비동기 - 채점은 점수 패널과 같은 캐시라 기준·값이 항상 일치).
+    // 순위 산정 제외 단지는 '순위 밖' + 사유. 호버 툴팁에 4축 세부점수 표시.
     if (window.SeoulDash && SeoulDash.scoreBadge) {
       SeoulDash.scoreBadge(d.id).then((b) => {
         const sEl = $("p-score");
         if (!sEl || state.currentDetail !== d) return;   // 다른 단지로 넘어갔으면 폐기
         sEl.innerHTML = b.rank
-          ? ` <span class="sc-grade g-${b.grade} p-score-badge" title="종합점수 ${b.preset} · 대표평형 기준 · 전체 ${b.n.toLocaleString()}개 단지 중 ${b.rank.toLocaleString()}위">${b.grade} ${Math.round(b.total)} · ${b.rank.toLocaleString()}위</span>`
-          : ` <span class="p-score-out" title="종합점수 순위 제외 - 채점 가능한 데이터 축이 2개 이하(${b.preset} 기준)">순위 밖</span>`;
+          ? ` <span class="sc-grade g-${b.grade} p-score-badge" title="종합점수 ${b.preset} · ${b.bucket} 기준
+전체 ${b.n.toLocaleString()}개 단지 중 ${b.rank.toLocaleString()}위 (${Math.round(b.total)}점)
+${b.axesText}${b.flags ? "\n" + b.flags : ""}">${b.grade} ${Math.round(b.total)} · ${b.rank.toLocaleString()}위</span>`
+          : ` <span class="p-score-out" title="종합점수 순위 밖 (${b.preset} · ${b.bucket} 기준)
+사유: ${b.reason}">순위 밖</span>`;
       }).catch(() => {});
     }
-    $("fav-toggle").addEventListener("click", () => toggleFavorite(d));
-    $("csv-btn").addEventListener("click", () => downloadCSV(d));
+    $("fav-star").addEventListener("click", () => toggleFavorite(d));
     bindListings();
     el.querySelectorAll(".chart-tabs button").forEach((b) =>
       b.addEventListener("click", () => { state.chartMode = b.dataset.mode; renderPanel(); }));
@@ -1533,18 +1530,6 @@
 
   // ── 구별 랭킹 + 부동산원 지수 ───────────────────────────────────────
   // ── CSV ─────────────────────────────────────────────────────────────
-  function downloadCSV(d) {
-    const rows = d.recent_sales || [];
-    const header = "계약일,단지,전용면적(㎡),층,거래금액(만원)\n";
-    const body = rows.map((r) =>
-      `${r.date},${d.apt},${r.area},${r.floor || ""},${r.amount}`).join("\n");
-    const blob = new Blob(["﻿" + header + body], { type: "text/csv;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url; a.download = `${d.apt}_실거래.csv`; a.click();
-    URL.revokeObjectURL(url);
-  }
-
   // ── 유틸 ────────────────────────────────────────────────────────────
   function latestGongsi(d) {
     if (!d.gongsi || !d.gongsi.length) return null;

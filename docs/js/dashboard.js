@@ -1433,37 +1433,74 @@
     }
   }
 
+  // ── (프리셋 × 평형) 기준 전체 서울 채점 — 점수 패널·상세 배지 공용 ──
+  // 같은 채점을 두 곳에서 따로 구현하면 기준이 어긋난다(실사고: 배지가 대표평형
+  // 고정 계산이라 패널과 68 vs 70 불일치). 채점은 반드시 이 함수 하나로.
+  // gu 필터는 표시 단계에서만 적용한다(채점·순위는 전체 서울 고정).
+  let scScoredCache = null;   // { key, scored, thin, map, hasPeers, n }
+  function scComputeAll(preset, bucket) {
+    const key = preset + "|" + bucket;
+    if (scScoredCache && scScoredCache.key === key) return scScoredCache;
+    // 단지별 매물 호가 괴리(중앙값) — 평형 선택 시 그 평형 매물만
+    const premOf = (id) => {
+      const g = scLst[String(id)];
+      if (!g) return null;
+      const rows = (g.sale || []).filter((r) => r.prem != null
+        && (!bucket || r.b === bucket));
+      return rows.length ? scMedian(rows.map((r) => r.prem)) : null;
+    };
+    // 특정 평형 선택 시 그 평형 매매 데이터가 있는 단지만(매수후보와 동일 규칙)
+    // 1패스: 전체 서울(버킷 적격)에서 품질 Q·가격 원시값 수집 → 품질 5분위 피어 분포
+    const pool = mkAll.filter((m) => !bucket || (m.sale_area && m.sale_area[bucket]));
+    const pre = pool.map((m) =>
+      scoreComplex(m, scValById[m.id], premOf(m.id), preset, bucket, null));
+    const peers = scBuildPeers(pre.filter(Boolean).map((r) => ({ q: r.q, raw: r.raw })));
+    // 2패스: 동급 상대화 점수로 확정. 축 2개 이하는 '판단 불가'로 순위 제외
+    // (안 그러면 가격·유동성 없는 나홀로 신축이 2축 만점으로 상위권 오염 - 실측)
+    const scored = [];
+    let thin = 0;
+    pool.forEach((m) => {
+      const r = scoreComplex(m, scValById[m.id], premOf(m.id), preset, bucket, peers);
+      if (!r) return;
+      if (r.usedAxes < 3) { thin++; return; }
+      scored.push({ m, r });
+    });
+    scored.sort((a, b) => b.r.total - a.r.total);
+    const map = {};
+    scored.forEach((s, i) => { map[s.m.id] = { r: s.r, rank: i + 1 }; });
+    scScoredCache = { key, scored, thin, map, hasPeers: !!peers, n: scored.length };
+    return scScoredCache;
+  }
+
   // ── 상세 패널용 종합점수 배지 ──
-  // 현재 프리셋 × 전체(대표평형) 기준 전 단지 순위를 1회 계산해 캐시.
-  // 점수 패널의 평형·구 필터와 무관하게 항상 '전체 서울 대표평형' 순위를 준다
-  // (단지 고유의 비교 가능한 한 숫자 - 필터 따라 순위가 출렁이면 배지로 부적합).
-  let scBadgeCache = null;    // { preset, map: {id: {total, grade, rank}}, n }
+  // 점수 패널과 '완전히 같은 기준'(현재 프리셋 × 평형)으로 같은 캐시를 조회한다.
   async function scBadgeOf(id) {
     await scEnsureScoreData();
-    if (!scBadgeCache || scBadgeCache.preset !== scState.preset) {
-      const premOf = (cid) => {
-        const g = scLst[String(cid)];
-        if (!g) return null;
-        const rows = (g.sale || []).filter((r) => r.prem != null);
-        return rows.length ? scMedian(rows.map((r) => r.prem)) : null;
-      };
-      const pre = mkAll.map((m) =>
-        scoreComplex(m, scValById[m.id], premOf(m.id), scState.preset, "", null));
-      const peers = scBuildPeers(pre.filter(Boolean).map((r) => ({ q: r.q, raw: r.raw })));
-      const scored = [];
-      mkAll.forEach((m) => {
-        const r = scoreComplex(m, scValById[m.id], premOf(m.id), scState.preset, "", peers);
-        if (r && r.usedAxes >= 3) scored.push({ id: m.id, total: r.total, grade: r.grade });
-      });
-      scored.sort((a, b) => b.total - a.total);
-      const map = {};
-      scored.forEach((s, i) => { map[s.id] = { total: s.total, grade: s.grade, rank: i + 1 }; });
-      scBadgeCache = { preset: scState.preset, map, n: scored.length };
-    }
-    const hit = scBadgeCache.map[id];
+    const c = scComputeAll(scState.preset, scState.bucket);
     const label = SC_PRESETS[scState.preset].label;
-    return hit ? Object.assign({ n: scBadgeCache.n, preset: label }, hit)
-      : { rank: null, n: scBadgeCache.n, preset: label };
+    const bucketLabel = scState.bucket || "대표평형";
+    const hit = c.map[id];
+    if (!hit) {
+      const m = mkAll.find((x) => x.id === id);
+      const noBucket = scState.bucket && !(m && m.sale_area && m.sale_area[scState.bucket]);
+      return {
+        rank: null, n: c.n, preset: label, bucket: bucketLabel,
+        reason: noBucket ? `${scState.bucket} 매매 데이터 없음`
+          : "채점 가능한 데이터 축이 2개 이하",
+      };
+    }
+    const r = hit.r;
+    const axesText = Object.keys(SC_AXIS_KO).map((k) =>
+      `${SC_AXIS_KO[k]} ${r.axes[k] != null ? Math.round(r.axes[k]) : "—"}`).join(" · ");
+    const flags = [
+      r.redev ? "♻재건축 보너스 +20" : "",
+      r.qcap ? "💰품질 연동 상한 적용" : "",
+      r.lowSample ? "⚠최근 1년 매매 3건 미만" : "",
+    ].filter(Boolean).join(" · ");
+    return {
+      rank: hit.rank, total: r.total, grade: r.grade, n: c.n,
+      preset: label, bucket: bucketLabel, axesText, flags,
+    };
   }
 
   async function renderScore() {
@@ -1500,49 +1537,25 @@
       guSel.addEventListener("change", () => { scState.gu = guSel.value; scLimit = 100; scSave(); renderScore(); });
     }
 
-    // 단지별 매물 호가 괴리(중앙값) — 선택 평형이 있으면 그 평형 매물만
-    const premOf = (id) => {
-      const g = scLst[String(id)];
-      if (!g) return null;
-      const rows = (g.sale || []).filter((r) => r.prem != null
-        && (!scState.bucket || r.b === scState.bucket));
-      return rows.length ? scMedian(rows.map((r) => r.prem)) : null;
-    };
-
-    // 채점: 특정 평형 선택 시 그 평형 매매 데이터가 있는 단지만(매수후보와 동일 규칙)
-    // 1패스: 전체 서울(버킷 적격)에서 품질 Q·가격 원시값 수집 → 품질 5분위 피어 분포.
-    // 구 필터는 표시만 거르고 피어 통계는 전체 서울로 고정(구를 좁혀도 채점 기준 불변).
-    const pool = mkAll.filter((m) =>
-      !scState.bucket || (m.sale_area && m.sale_area[scState.bucket]));
-    const pre = pool.map((m) =>
-      scoreComplex(m, scValById[m.id], premOf(m.id), scState.preset, scState.bucket, null));
-    const peers = scBuildPeers(pre.filter(Boolean).map((r) => ({ q: r.q, raw: r.raw })));
-    // 2패스: 동급 상대화 점수로 확정
-    // 최소 3축 요건: 결측은 감점하지 않되, 축이 2개 이하면 '판단 불가'로 순위 제외.
-    // (안 그러면 가격·유동성 데이터가 없는 나홀로 신축이 입지+단지 2축 만점으로
-    //  상위권을 오염 - 실측에서 1~3위가 전부 2/4축 단지였음)
-    const scored = [];
-    let thin = 0;
-    pool.forEach((m) => {
-      if (scState.gu && m.lawd_cd !== scState.gu) return;
-      const r = scoreComplex(m, scValById[m.id], premOf(m.id), scState.preset, scState.bucket, peers);
-      if (!r) return;
-      if (r.usedAxes < 3) { thin++; return; }
-      scored.push({ m, r });
-    });
-    scored.sort((a, b) => b.r.total - a.r.total);
+    // 채점은 패널·배지 공용 캐시(scComputeAll) 하나로 - 구 필터는 표시만 거른다
+    const comp = scComputeAll(scState.preset, scState.bucket);
+    const scored = scState.gu
+      ? comp.scored.filter(({ m }) => m.lawd_cd === scState.gu) : comp.scored;
+    const thin = comp.thin;
 
     const shown = Math.min(scLimit, scored.length);
     $("sc-note").textContent =
-      `${SC_PRESETS[scState.preset].label} 기준 ${scored.length.toLocaleString()}개 단지 채점 · 1~${shown.toLocaleString()}위 표시`
+      `${SC_PRESETS[scState.preset].label} 기준 ${scored.length.toLocaleString()}개 단지 채점`
+      + (scState.gu ? ` · 상위 ${shown.toLocaleString()}개 표시(순위는 서울 전체 기준)`
+        : ` · 1~${shown.toLocaleString()}위 표시`)
       + (scState.bucket ? ` · ${scState.bucket} 매매 데이터 보유 단지만` : "")
       + (thin ? ` · 데이터 2축 이하 ${thin.toLocaleString()}개 제외` : "")
-      + (peers ? " · 가격축=품질 동급(5분위) 상대평가" : "");
+      + (comp.hasPeers ? " · 가격축=품질 동급(5분위) 상대평가" : "");
 
     const bar = (v) => v == null
       ? '<i class="sc-b none"></i>'
       : `<i class="sc-b"><b style="width:${Math.round(v)}%"></b></i>${Math.round(v)}`;
-    list.innerHTML = scored.slice(0, scLimit).map(({ m, r }, i) => {
+    list.innerHTML = scored.slice(0, scLimit).map(({ m, r }) => {
       const ph = scPhaseByGu && scPhaseByGu[m.lawd_cd];
       const badges = [
         r.redev ? '<span class="sc-tag redev" title="연차 30년+ · 용적률 160% 미만 → 단지 축 +20">♻재건축</span>' : "",
@@ -1552,7 +1565,7 @@
       ].join("");
       return `<div class="sc-card" data-id="${m.id}">
         <div class="sc-top">
-          <span class="sc-rank">${i + 1}</span>
+          <span class="sc-rank">${comp.map[m.id].rank}</span>
           <span class="sc-name">${esc(m.apt)}</span>${badges}
           <span class="sc-grade g-${r.grade}">${r.grade} ${Math.round(r.total)}</span>
         </div>
@@ -1569,7 +1582,7 @@
     if (scored.length > scLimit) {
       const more = document.createElement("button");
       more.className = "sc-more";
-      more.textContent = `더보기 (${(shown + 1).toLocaleString()}~${Math.min(scLimit + 200, scored.length).toLocaleString()}위 · 전체 ${scored.length.toLocaleString()}개)`;
+      more.textContent = `더보기 (+200 · 현재 ${shown.toLocaleString()}/${scored.length.toLocaleString()}개 표시)`;
       more.addEventListener("click", () => { scLimit += 200; renderScore(); });
       list.appendChild(more);
     }
