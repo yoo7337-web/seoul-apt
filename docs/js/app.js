@@ -1229,6 +1229,7 @@
       <h2>${d.apt} <button id="fav-star" class="fav-star${isFav ? " on" : ""}"
         title="${isFav ? "관심단지 해제" : "관심단지 등록"}">${isFav ? "★" : "☆"}</button>${d.is_peak ? '<span class="badge peak">신고가</span>' : ""}<span id="p-score"></span></h2>
       <div class="sub">${districtName(d.lawd_cd)}${d.umd ? " " + d.umd : ""} · ${buildYearText(d)}</div>
+      ${buildingInfo(d)}
       ${locationInfo(d)}
       ${areaSelectTop(d)}
       <div class="price-cards">
@@ -1247,8 +1248,6 @@
       </div>
 
       ${valuationCard(d)}
-
-      ${buildingInfo(d)}
 
       ${listingsHtml(d)}
 
@@ -1374,15 +1373,14 @@ ${b.axesText}${b.flags ? "\n" + b.flags : ""}">${b.grade} ${Math.round(b.total)}
   }
 
   // 건축물대장 부가정보(세대수/용적률/건폐율). 값 하나라도 있으면 표시.
+  // 세대수·용적률·건폐율 - 헤더(구·준공연차) 바로 아래 컴팩트 한 줄
   function buildingInfo(d) {
     if (!d.households && !d.far && !d.bcr) return "";
-    const cell = (label, val) =>
-      `<div class="info-cell"><span class="info-label">${label}</span>` +
-      `<span class="info-value">${val}</span></div>`;
-    return `<div class="info-row">
-      ${cell("세대수", d.households ? d.households.toLocaleString() + "세대" : "-")}
-      ${cell("용적률", d.far ? d.far + "%" : "-")}
-      ${cell("건폐율", d.bcr ? d.bcr + "%" : "-")}
+    const item = (label, val) => `<span class="binfo-item">${label} <b>${val}</b></span>`;
+    return `<div class="binfo-row">
+      ${item("세대수", d.households ? d.households.toLocaleString() + "세대" : "-")}
+      ${item("용적률", d.far ? d.far + "%" : "-")}
+      ${item("건폐율", d.bcr ? d.bcr + "%" : "-")}
     </div>`;
   }
 
