@@ -70,6 +70,9 @@
       const ok = await init();
       if (ok) renderScore();
     },
+    // 단지 상세 패널의 이름 옆 종합점수 배지(app.js 에서 호출).
+    // init() 불필요 - 필요한 데이터(markers·valuation·listings)만 자체 로드.
+    scoreBadge: (id) => scBadgeOf(id),
     refresh: () => { if (inited) {                       // 관심구 별표 갱신
       renderRankTable(); renderMarketPhase();
       if (valData) renderValAll();
@@ -1414,9 +1417,8 @@
   scState = Object.assign({ preset: "live", bucket: "", gu: "" }, scState);
   const scSave = () => localStorage.setItem(SC_LS_KEY, JSON.stringify(scState));
 
-  async function renderScore() {
-    const list = $("sc-list");
-    if (!list) return;                       // 독립 dashboard.html 에는 없음
+  // 종합점수 데이터 로드(렌더·배지 공용) — markers + valuation + listings
+  async function scEnsureScoreData() {
     await loadMk();
     if (!valData) {
       try { valData = await fetchJSON(DATA + "valuation.json"); } catch { valData = { items: [] }; }
@@ -1429,6 +1431,45 @@
       scValById = {};
       (valData.items || []).forEach((it) => { scValById[it.id] = it; });
     }
+  }
+
+  // ── 상세 패널용 종합점수 배지 ──
+  // 현재 프리셋 × 전체(대표평형) 기준 전 단지 순위를 1회 계산해 캐시.
+  // 점수 패널의 평형·구 필터와 무관하게 항상 '전체 서울 대표평형' 순위를 준다
+  // (단지 고유의 비교 가능한 한 숫자 - 필터 따라 순위가 출렁이면 배지로 부적합).
+  let scBadgeCache = null;    // { preset, map: {id: {total, grade, rank}}, n }
+  async function scBadgeOf(id) {
+    await scEnsureScoreData();
+    if (!scBadgeCache || scBadgeCache.preset !== scState.preset) {
+      const premOf = (cid) => {
+        const g = scLst[String(cid)];
+        if (!g) return null;
+        const rows = (g.sale || []).filter((r) => r.prem != null);
+        return rows.length ? scMedian(rows.map((r) => r.prem)) : null;
+      };
+      const pre = mkAll.map((m) =>
+        scoreComplex(m, scValById[m.id], premOf(m.id), scState.preset, "", null));
+      const peers = scBuildPeers(pre.filter(Boolean).map((r) => ({ q: r.q, raw: r.raw })));
+      const scored = [];
+      mkAll.forEach((m) => {
+        const r = scoreComplex(m, scValById[m.id], premOf(m.id), scState.preset, "", peers);
+        if (r && r.usedAxes >= 3) scored.push({ id: m.id, total: r.total, grade: r.grade });
+      });
+      scored.sort((a, b) => b.total - a.total);
+      const map = {};
+      scored.forEach((s, i) => { map[s.id] = { total: s.total, grade: s.grade, rank: i + 1 }; });
+      scBadgeCache = { preset: scState.preset, map, n: scored.length };
+    }
+    const hit = scBadgeCache.map[id];
+    const label = SC_PRESETS[scState.preset].label;
+    return hit ? Object.assign({ n: scBadgeCache.n, preset: label }, hit)
+      : { rank: null, n: scBadgeCache.n, preset: label };
+  }
+
+  async function renderScore() {
+    const list = $("sc-list");
+    if (!list) return;                       // 독립 dashboard.html 에는 없음
+    await scEnsureScoreData();
     if (!scPhaseByGu && dash && dash.market_phase) {
       scPhaseByGu = {};
       dash.market_phase.forEach((r) => { scPhaseByGu[r.lawd_cd] = r.phase; });

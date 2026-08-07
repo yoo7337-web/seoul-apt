@@ -1226,7 +1226,7 @@
     const gongsi = latestGongsi(d);
     const el = $("panel-content");
     el.innerHTML = `
-      <h2>${d.apt} ${d.is_peak ? '<span class="badge peak">신고가</span>' : ""}</h2>
+      <h2>${d.apt} ${d.is_peak ? '<span class="badge peak">신고가</span>' : ""}<span id="p-score"></span></h2>
       <div class="sub">${districtName(d.lawd_cd)}${d.umd ? " " + d.umd : ""} · ${buildYearText(d)}</div>
       ${locationInfo(d)}
       ${areaSelectTop(d)}
@@ -1271,6 +1271,17 @@
       ${recentRentsTable(d)}
     `;
     $("panel").classList.remove("hidden");
+    // 종합점수 배지(비동기 - 최초 1회만 전 단지 채점 후 캐시). 순위 산정에서
+    // 제외된 단지(데이터 2축 이하)는 '순위 밖'으로 명시한다.
+    if (window.SeoulDash && SeoulDash.scoreBadge) {
+      SeoulDash.scoreBadge(d.id).then((b) => {
+        const sEl = $("p-score");
+        if (!sEl || state.currentDetail !== d) return;   // 다른 단지로 넘어갔으면 폐기
+        sEl.innerHTML = b.rank
+          ? ` <span class="sc-grade g-${b.grade} p-score-badge" title="종합점수 ${b.preset} · 대표평형 기준 · 전체 ${b.n.toLocaleString()}개 단지 중 ${b.rank.toLocaleString()}위">${b.grade} ${Math.round(b.total)} · ${b.rank.toLocaleString()}위</span>`
+          : ` <span class="p-score-out" title="종합점수 순위 제외 - 채점 가능한 데이터 축이 2개 이하(${b.preset} 기준)">순위 밖</span>`;
+      }).catch(() => {});
+    }
     $("fav-toggle").addEventListener("click", () => toggleFavorite(d));
     $("csv-btn").addEventListener("click", () => downloadCSV(d));
     bindListings();
