@@ -475,11 +475,20 @@
   }
 
   // ── 5e) 밸류에이션 종합(평형대 × 히트맵 + 판정별 리스트 + 산점도) ─────
+  // 판정 기준(2026-08-14 개편): 절대 컷(pos 30/80)은 시장 전체가 오르면 무너진다
+  // (실측: 저평가 2.2%·고점근접 56%로 이진화). → 선택 평형의 서울 전체 분포에서
+  // ① pos 하위/상위 20% 백분위 컷 + ② 전세가율 사분면: 하위 20%라도 전세 쿠션
+  // (서울 중앙값)이 없거나 미집계면 '하락경계'로 분리해 밸류트랩을 거른다.
+  // 백분위 기준은 구·프로필 필터와 무관하게 서울 전체 고정(종합점수 동급 상대화와
+  // 같은 원칙 — 필터를 좁혀도 채점 기준이 출렁이지 않게).
   const VAL_VERDICT = [
-    ["cheap", "저평가", (p) => p <= 30, "#059669"],
-    ["mid", "중단", (p) => p > 30 && p < 80, "#d97706"],
-    ["hot", "고점근접", (p) => p >= 80, "#ef4444"],
+    ["cheap", "저평가", "#059669"],
+    ["trap", "하락경계", "#8b5cf6"],
+    ["mid", "중단", "#d97706"],
+    ["hot", "고점근접", "#ef4444"],
   ];
+  const VAL_VERDICT_BY = Object.fromEntries(
+    VAL_VERDICT.map(([k, label, color]) => [k, { label, color }]));
   // 평형대 = 전용면적 버킷 '정확 선택'(전체 or 특정 버킷). 연속 슬라이더는
   // ~60㎡·135㎡~ 같은 넓은/무한 버킷과 겹침 계산이 어긋나(4평이 18~26평에,
   // 41평이 60~80평에 걸림) 버킷 단위로 정확히 고르게 한다.
@@ -536,21 +545,43 @@
     const mk = valMkById && valMkById[view.id];
     return mk && mk.ls != null ? mk.ls : null;
   }
+  let valCuts = null;   // 현재 버킷의 판정 컷(표시용): {p20, p80, jrMed}
+
+  function valQuantile(sorted, q) {   // 선형 보간 분위수(sorted 오름차순)
+    if (!sorted.length) return null;
+    const i = (sorted.length - 1) * q;
+    const lo = Math.floor(i), hi = Math.ceil(i);
+    return sorted[lo] + (sorted[hi] - sorted[lo]) * (i - lo);
+  }
+  // 서울 전체(선택 평형) 분포로 백분위 컷을 잡고 각 view 에 verdict 부여
+  function valAssignVerdicts(views) {
+    const poss = views.map((v) => v.pos).sort((a, b) => a - b);
+    const jrs = views.map((v) => v.jr).filter((x) => x != null).sort((a, b) => a - b);
+    const p20 = valQuantile(poss, 0.2), p80 = valQuantile(poss, 0.8);
+    const jrMed = valQuantile(jrs, 0.5);
+    views.forEach((v) => {
+      v.verdict = v.pos >= p80 ? "hot"
+        : v.pos > p20 ? "mid"
+        : (v.jr != null && jrMed != null && v.jr >= jrMed) ? "cheap" : "trap";
+    });
+    return { p20, p80, jrMed };
+  }
   function valViews() {
-    let views = valData.items.map(valView).filter(Boolean);
-    if (valProfileOn) views = views.filter(valMatchProfile);
-    return views;
+    const views = valData.items.map(valView).filter(Boolean);
+    valCuts = valAssignVerdicts(views);   // 컷은 프로필 필터 전(서울 전체) 기준
+    return valProfileOn ? views.filter(valMatchProfile) : views;
   }
 
   function valGuSummary(views) {
     const by = {};
-    views.forEach((x) => { (by[x.lawd] = by[x.lawd] || []).push(x.pos); });
-    return Object.entries(by).map(([lawd, poss]) => ({
-      lawd_cd: lawd, name: GU_NAME[lawd] || lawd, n: poss.length,
-      avg_pos: Math.round(poss.reduce((a, b) => a + b, 0) / poss.length),
-      cheap: poss.filter((p) => p <= 30).length,
-      mid: poss.filter((p) => p > 30 && p < 80).length,
-      hot: poss.filter((p) => p >= 80).length,
+    views.forEach((x) => { (by[x.lawd] = by[x.lawd] || []).push(x); });
+    return Object.entries(by).map(([lawd, xs]) => ({
+      lawd_cd: lawd, name: GU_NAME[lawd] || lawd, n: xs.length,
+      avg_pos: Math.round(xs.reduce((a, b) => a + b.pos, 0) / xs.length),
+      cheap: xs.filter((x) => x.verdict === "cheap").length,
+      trap: xs.filter((x) => x.verdict === "trap").length,
+      mid: xs.filter((x) => x.verdict === "mid").length,
+      hot: xs.filter((x) => x.verdict === "hot").length,
     })).sort((a, b) => a.avg_pos - b.avg_pos);
   }
 
@@ -602,7 +633,7 @@
       const on = valGu === g.lawd_cd ? " on" : "";
       return `<div class="phase-cell val-cell${on}" data-lawd="${g.lawd_cd}"
         style="background:${valColor(g.avg_pos, lo, hi)}"
-        title="평균 5년위치 ${g.avg_pos}% · 저평가 ${g.cheap} / 중단 ${g.mid} / 고점근접 ${g.hot}">
+        title="평균 5년위치 ${g.avg_pos}% · 저평가 ${g.cheap} / 하락경계 ${g.trap} / 중단 ${g.mid} / 고점근접 ${g.hot}">
         <div class="pc-gu">${star}${g.name}</div>
         <div class="pc-label">${g.avg_pos}%</div>
         <div class="pc-sub">저평가 ${g.cheap}</div></div>`;
@@ -619,7 +650,10 @@
     const kind = VAL_VERDICT.find((v) => v[0] === valKind);
     const hasProfile = !!(window.SeoulMap && SeoulMap.getProfile && SeoulMap.getProfile());
     chips.innerHTML = VAL_VERDICT.map(([k, label]) =>
-      `<button class="d-chip${valKind === k ? " on" : ""}" data-kind="${k}">${label}</button>`).join("")
+      `<button class="d-chip${valKind === k ? " on" : ""}" data-kind="${k}"
+        title="${k === "cheap" ? "5년위치 서울 하위 20% + 전세가율 서울 중앙값 이상(하방 쿠션 확인)"
+          : k === "trap" ? "5년위치 하위 20%지만 전세가율이 중앙값 미만이거나 미집계 - 밸류트랩 주의"
+          : k === "hot" ? "5년위치 서울 상위 20%" : "그 사이 중간 구간"}">${label}</button>`).join("")
       + `<button class="d-chip${valKind === "" ? " on" : ""}" data-kind="">전체</button>`
       + (hasProfile ? ` <button class="d-chip${valProfileOn ? " on" : ""}" data-profile="1"
           title="지도에서 저장한 매수 프로필(예산·구·평형)로 압축">💼 내 프로필만</button>` : "")
@@ -639,19 +673,27 @@
     if (clear) clear.addEventListener("click", () => { valGu = ""; renderValAll(); });
 
     const rows = views.filter((v) => (!valGu || v.lawd === valGu)
-      && (!kind || kind[2](v.pos))).sort((a, b) => a.pos - b.pos);
+      && (!kind || v.verdict === valKind)).sort((a, b) => a.pos - b.pos);
     if (!rows.length) { wrap.innerHTML = '<div class="empty">조건에 맞는 단지 없음</div>'; return; }
     const CAP = 100, shown = rows.slice(0, CAP);
-    let html = `<div class="sel-hint" style="margin:4px 0 6px">${rows.length.toLocaleString()}건${rows.length > CAP ? ` 중 상위 ${CAP}` : ""} · 5년위치 낮은 순 · 행 클릭=지도</div>
+    const cutsTxt = valCuts && valCuts.p20 != null
+      ? ` · 컷(서울 전체 기준): 하위20% ≤${Math.round(valCuts.p20)}% / 상위20% ≥${Math.round(valCuts.p80)}%`
+        + (valCuts.jrMed != null ? ` / 전세가율 중앙값 ${Math.round(valCuts.jrMed)}%` : "")
+      : "";
+    let html = `<div class="sel-hint" style="margin:4px 0 6px">${rows.length.toLocaleString()}건${rows.length > CAP ? ` 중 상위 ${CAP}` : ""} · 5년위치 낮은 순 · 행 클릭=지도${cutsTxt}</div>
       <table class="rank-table"><thead><tr>
       <th>단지</th><th>구</th><th>평</th><th>세대</th><th>5년위치</th><th>고점대비</th><th>전세가율</th><th>매물</th><th>표본</th>
       </tr></thead><tbody>`;
     shown.forEach((it) => {
-      const shield = (it.pos <= 30 && it.jr != null && it.jr >= 60)
-        ? ' <span title="전세가율 높음 - 하방 견고">🛡️</span>' : "";
+      const shield = (it.verdict === "cheap" && it.jr != null && it.jr >= 60)
+        ? ' <span title="전세가율 60%+ - 하방 쿠션 두꺼움">🛡️</span>' : "";
+      // '전체' 뷰에서는 행마다 판정을 색점으로 구분(필터 뷰에선 칩이 이미 말해줌)
+      const vd = VAL_VERDICT_BY[it.verdict];
+      const dot = (!valKind && vd)
+        ? `<span title="${vd.label}" style="color:${vd.color}">●</span> ` : "";
       const py = valPy(it), hh = valHh(it), ls = valLs(it);
       html += `<tr data-id="${it.id}">
-        <td>${it.apt}${shield}</td><td>${GU_NAME[it.lawd] || "-"}</td>
+        <td>${dot}${it.apt}${shield}</td><td>${GU_NAME[it.lawd] || "-"}</td>
         <td>${py != null ? py + "평" : "-"}</td>
         <td>${hh != null ? hh.toLocaleString() : "-"}</td>
         <td><b>${it.pos}%</b></td>
@@ -681,9 +723,9 @@
     if ($("val-scatter-note")) $("val-scatter-note").textContent =
       `· 전세가율 있는 ${base.length.toLocaleString()}개 표시`
       + (excluded ? ` (전세가율 미집계 ${excluded.toLocaleString()}개 제외)` : "");
-    const datasets = VAL_VERDICT.map(([k, label, test, color]) => ({
+    const datasets = VAL_VERDICT.map(([k, label, color]) => ({
       label, color,
-      data: base.filter((v) => test(v.pos)).map((v) => ({ x: v.pos, y: v.jr, meta: v })),
+      data: base.filter((v) => v.verdict === k).map((v) => ({ x: v.pos, y: v.jr, meta: v })),
     }));
     SeoulCharts.scatter("val-scatter", datasets, {
       xLabel: "5년 평단가 위치(%)", yLabel: "전세가율(%)",

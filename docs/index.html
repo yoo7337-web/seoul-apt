@@ -132,7 +132,10 @@
     </div>
     <section class="page-section">
       <h2>밸류에이션 종합 <span id="val-meta" style="font-weight:400;font-size:12px;color:var(--muted)"></span></h2>
-      <div class="desc">단지별 5년 평단가 위치(0%=5년저점, 100%=5년고점) — 평형대·구 선택 시 아래 전체 갱신</div>
+      <div class="desc">단지별 5년 평단가 위치(0%=5년저점, 100%=5년고점) · 판정은 서울 전체 분포 기준 상대 컷 —
+        <b>저평가</b>=5년위치 하위 20% + 전세가율 서울 중앙값 이상(하방 쿠션 확인) ·
+        <b>하락경계</b>=하위 20%지만 쿠션 미달·미집계(밸류트랩 주의) ·
+        <b>고점근접</b>=상위 20% — 평형대·구 선택 시 아래 전체 갱신</div>
       <div class="val-area" id="val-area">
         <span class="fs-label">평형대(전용면적) 선택 — 해당 평형 밸류에이션으로 갱신</span>
         <div class="chip-row" id="val-area-chips" style="margin-top:8px"></div>
@@ -140,7 +143,7 @@
       <div id="val-grid" class="phase-grid"></div>
       <div class="chip-row" id="val-chips" style="margin-top:14px"></div>
       <div class="table-scroll" id="val-list-wrap"></div>
-      <div class="desc" style="margin-top:14px">산점도: 좌상=저평가+전세가율 높음(기회) · 우하=고점근접+전세 낮음(주의) · 점 클릭=지도 이동 <span id="val-scatter-note" style="color:var(--muted)"></span></div>
+      <div class="desc" style="margin-top:14px">산점도: 좌상=저평가(저점권+쿠션, 기회) · 좌하=하락경계(저점권인데 쿠션 없음, 주의) · 우측=고점근접 · 점 클릭=지도 이동 <span id="val-scatter-note" style="color:var(--muted)"></span></div>
       <div class="chart-tall"><canvas id="val-scatter"></canvas></div>
     </section>
     <section class="page-section">
@@ -281,7 +284,7 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
   <script src="js/charts.js?v=7"></script>
-  <script src="js/dashboard.js?v=85"></script>
+  <script src="js/dashboard.js?v=91"></script>
   <script src="js/app.js?v=115"></script>
 </body>
 </html>
