@@ -6,9 +6,19 @@
   - jeonse_ratio : 단지 전세가율(최근 전세 중앙값 / 최근 매매 중앙값)
   - volume_x : 단지 거래량 배율(최근 3개월 / 이전 3개월)
 
-후보 조건: 1년 중앙값보다 5% 이상 싸게 거래됐거나 전세가율 70% 이상(갭 작음).
+후보 조건: 1년 중앙값보다 5% 이상 싸게 거래됐거나 전세가율 70~90%(갭 작음).
 점수 = 저가폭*2 + 전세가율*0.3 + 고점하락*0.5 (높을수록 유망 후보).
 날짜 앵커는 DB의 최신 계약일(max deal_date)을 쓴다(재현 가능·데이터 지연 무관).
+
+안전 필터(2026-08-16, 외부 검토 지적 반영):
+  - 전세가율 90% 이상은 후보에서 통째로 제외한다(저가 조건 충족이어도).
+    전세가율은 높을수록 좋은 게 아니다 — 100% 초과는 매매가보다 전세가가 높은
+    깡통 위험이고, 90%대도 갭투자 관점에선 이미 위험 신호다. 상한 없이
+    score 에 단조 가산하면 위험 물건일수록 고득점이 되는 역설이 생긴다
+    (실측: 솔리스타 jr 98.8%·신촌포스빌 95.9%가 상위권 진입).
+  - 전용 30㎡ 미만 거래는 제외한다. MOLIT 아파트 실거래 API 에 도시형생활주택·
+    오피스텔류(전용 12~15㎡, 예: 청광플러스원큐브·비즈트위트·신길레전드힐스)가
+    아파트로 섞여 들어온다. 대장 주용도 데이터가 없어 면적을 프록시로 쓴다.
 """
 
 import json
@@ -20,6 +30,8 @@ from .aggregate import _median, _pyeong
 RECENT_DAYS = 28          # 후보 대상: 최근 4주 거래
 MIN_DISCOUNT_PCT = -5.0   # 1년 중앙값 대비 이만큼 싸면 후보
 MIN_JEONSE_RATIO = 70.0   # 전세가율 이 이상이면 후보(갭투자 관점)
+MAX_JEONSE_RATIO = 90.0   # 이 이상은 깡통 위험 - 후보 제외(저가 조건이어도)
+MIN_AREA_M2 = 30.0        # 전용 이 미만은 도시형생활주택·오피스텔 혼입 의심 - 제외
 MIN_CX_SAMPLES = 5        # 단지 1년 매매 표본 최소치(중앙값 신뢰용)
 MAX_CANDIDATES = 40
 AREA_TOL = 0.12           # 같은 크기로 볼 전용면적 허용오차(±12%)
@@ -73,6 +85,8 @@ def build_candidates(conn, path=None, lawd_cds=None) -> int:
         for d in deals:
             cid = d["complex_id"]
             area = d["exclu_area"]
+            if not area or area < MIN_AREA_M2:   # 비아파트(도생·오피스텔) 혼입 방지
+                continue
             year_rows = conn.execute(
                 """SELECT exclu_area, amount_manwon FROM sale_txn
                    WHERE complex_id=? AND canceled=0 AND deal_date >= ?""",
@@ -130,6 +144,10 @@ def build_candidates(conn, path=None, lawd_cds=None) -> int:
                 (cid, m6, m3)).fetchone()["n"]
             volume_x = round(recent_vol / prior_vol, 2) if prior_vol else None
 
+            # 전세가율 90%+ = 깡통 위험. 저가 조건을 충족해도 추천에서 뺀다 -
+            # score 가 전세가율에 단조 가산이라 상한 없이는 위험할수록 고득점.
+            if jeonse_ratio is not None and jeonse_ratio >= MAX_JEONSE_RATIO:
+                continue
             is_cheap = discount <= MIN_DISCOUNT_PCT
             is_low_gap = jeonse_ratio is not None and jeonse_ratio >= MIN_JEONSE_RATIO
             if not (is_cheap or is_low_gap):
@@ -175,6 +193,8 @@ def _write(path, anchor, candidates) -> None:
         "criteria": {
             "min_discount_pct": MIN_DISCOUNT_PCT,
             "min_jeonse_ratio": MIN_JEONSE_RATIO,
+            "max_jeonse_ratio": MAX_JEONSE_RATIO,
+            "min_area_m2": MIN_AREA_M2,
             "min_cx_samples": MIN_CX_SAMPLES,
         },
         "candidates": candidates,

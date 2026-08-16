@@ -1056,9 +1056,14 @@
       ? `<span class="val-scope">${state.detailArea}</span>`
       : (state.detailArea ? `<span class="val-scope">전체 평형</span>` : "");
     const pos = Math.max(0, Math.min(100, v.pos));
-    const jrStrong = v.jr != null && v.jr >= 60;   // 전세가율 60%+ = 하방 쿠션 두꺼움
+    // 전세가율 60~90% = 하방 쿠션. 90%+ 는 쿠션이 아니라 깡통 위험(100% 초과는
+    // 매매가<전세가)이라 별도 경고한다(2026-08-16 외부 검토 지적 반영).
+    const jrRisk = v.jr != null && v.jr >= 90;
+    const jrStrong = v.jr != null && v.jr >= 60 && !jrRisk;
     let verdict, cls;
-    if (pos <= 30 && jrStrong) {
+    if (jrRisk) {
+      verdict = `⚠ 전세가율 ${v.jr}% · 깡통(역전세) 위험 주의`; cls = "hot";
+    } else if (pos <= 30 && jrStrong) {
       verdict = "저평가 구간 · 전세가율 높아 하방 견고"; cls = "cheap";
     } else if (pos <= 30) {
       verdict = "5년 범위 하단 · 상대적 저가"; cls = "cheap";

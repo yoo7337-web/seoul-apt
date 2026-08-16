@@ -133,9 +133,9 @@
     <section class="page-section">
       <h2>밸류에이션 종합 <span id="val-meta" style="font-weight:400;font-size:12px;color:var(--muted)"></span></h2>
       <div class="desc">단지별 5년 평단가 위치(0%=5년저점, 100%=5년고점) · 판정은 서울 전체 분포 기준 상대 컷 —
-        <b>저평가</b>=5년위치 하위 20% + 전세가율 서울 중앙값 이상(하방 쿠션 확인) ·
-        <b>하락경계</b>=하위 20%지만 쿠션 미달·미집계(밸류트랩 주의) ·
-        <b>고점근접</b>=상위 20% — 평형대·구 선택 시 아래 전체 갱신</div>
+        <b>저평가</b>=5년위치 하위 20% + 전세가율 서울 중앙값~90%(90%+는 깡통 위험이라 쿠션 불인정) ·
+        <b>하락경계</b>=하위 20%지만 쿠션 미달·미집계·깡통 위험(밸류트랩 주의) ·
+        <b>고점근접</b>=상위 20% · 전용 30㎡ 미만(도시형생활주택·오피스텔 혼입 의심)은 판정 제외 — 평형대·구 선택 시 아래 전체 갱신</div>
       <div class="val-area" id="val-area">
         <span class="fs-label">평형대(전용면적) 선택 — 해당 평형 밸류에이션으로 갱신</span>
         <div class="chip-row" id="val-area-chips" style="margin-top:8px"></div>
@@ -284,7 +284,7 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
   <script src="js/charts.js?v=7"></script>
-  <script src="js/dashboard.js?v=91"></script>
-  <script src="js/app.js?v=115"></script>
+  <script src="js/dashboard.js?v=94"></script>
+  <script src="js/app.js?v=116"></script>
 </body>
 </html>

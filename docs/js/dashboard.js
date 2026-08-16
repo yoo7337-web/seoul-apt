@@ -545,7 +545,15 @@
     const mk = valMkById && valMkById[view.id];
     return mk && mk.ls != null ? mk.ls : null;
   }
-  let valCuts = null;   // 현재 버킷의 판정 컷(표시용): {p20, p80, jrMed}
+  let valCuts = null;   // 현재 버킷의 판정 컷(표시용): {p20, p80, jrMed, tiny}
+  // 전세가율은 높을수록 좋은 게 아니다(2026-08-16 외부 검토 지적) — 100% 초과는
+  // 매매가보다 전세가가 높은 깡통이고 90%대도 위험 신호. 이 이상은 '쿠션'이
+  // 아니라 하락경계로 보낸다(실측: jr 116% 단지 70건이 저평가로 분류되던 결함).
+  const VAL_JR_RISK = 90;
+  // 전용 30㎡(약 9평) 미만 대표평형은 MOLIT 아파트 API 에 섞여 들어온
+  // 도시형생활주택·오피스텔류(12~15㎡)일 가능성이 높아 판정에서 제외한다
+  // (대장 주용도 데이터가 없어 면적이 프록시 - reco.py 와 같은 기준).
+  const VAL_MIN_PY = 9;
 
   function valQuantile(sorted, q) {   // 선형 보간 분위수(sorted 오름차순)
     if (!sorted.length) return null;
@@ -562,13 +570,20 @@
     views.forEach((v) => {
       v.verdict = v.pos >= p80 ? "hot"
         : v.pos > p20 ? "mid"
-        : (v.jr != null && jrMed != null && v.jr >= jrMed) ? "cheap" : "trap";
+        : (v.jr != null && jrMed != null && v.jr >= jrMed && v.jr < VAL_JR_RISK)
+          ? "cheap" : "trap";
     });
     return { p20, p80, jrMed };
   }
   function valViews() {
-    const views = valData.items.map(valView).filter(Boolean);
+    let views = valData.items.map(valView).filter(Boolean);
+    const before = views.length;
+    views = views.filter((v) => {   // 초소형(비아파트 의심) 제외
+      const py = valPy(v);
+      return py == null || py >= VAL_MIN_PY;
+    });
     valCuts = valAssignVerdicts(views);   // 컷은 프로필 필터 전(서울 전체) 기준
+    valCuts.tiny = before - views.length;
     return valProfileOn ? views.filter(valMatchProfile) : views;
   }
 
@@ -601,7 +616,8 @@
     renderValAreaChips();                 // 선택 버킷 활성 상태 반영
     const views = valViews();
     if ($("val-meta")) $("val-meta").textContent =
-      `(선택 평형대 ${views.length.toLocaleString()}개 단지)`;
+      `(선택 평형대 ${views.length.toLocaleString()}개 단지`
+      + (valCuts && valCuts.tiny ? ` · 초소형 30㎡ 미만 ${valCuts.tiny.toLocaleString()}개 제외` : "") + ")";
     renderValGrid(views);
     renderValList(views);
     renderValScatter(views);
@@ -651,8 +667,8 @@
     const hasProfile = !!(window.SeoulMap && SeoulMap.getProfile && SeoulMap.getProfile());
     chips.innerHTML = VAL_VERDICT.map(([k, label]) =>
       `<button class="d-chip${valKind === k ? " on" : ""}" data-kind="${k}"
-        title="${k === "cheap" ? "5년위치 서울 하위 20% + 전세가율 서울 중앙값 이상(하방 쿠션 확인)"
-          : k === "trap" ? "5년위치 하위 20%지만 전세가율이 중앙값 미만이거나 미집계 - 밸류트랩 주의"
+        title="${k === "cheap" ? "5년위치 서울 하위 20% + 전세가율 서울 중앙값~90%(하방 쿠션 확인, 90%+ 깡통 위험은 제외)"
+          : k === "trap" ? "5년위치 하위 20%지만 전세가율이 중앙값 미만·미집계이거나 90%+(깡통 위험) - 밸류트랩 주의"
           : k === "hot" ? "5년위치 서울 상위 20%" : "그 사이 중간 구간"}">${label}</button>`).join("")
       + `<button class="d-chip${valKind === "" ? " on" : ""}" data-kind="">전체</button>`
       + (hasProfile ? ` <button class="d-chip${valProfileOn ? " on" : ""}" data-profile="1"
