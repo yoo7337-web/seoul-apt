@@ -1,5 +1,5 @@
 {
- "anchor_date": "2026-08-21",
+ "anchor_date": "2026-08-28",
  "window_days": 28,
  "criteria": {
   "min_discount_pct": -5.0,
@@ -47,12 +47,128 @@
    "discount_pct": -26.3,
    "peak_amount": 240000,
    "drop_from_peak_pct": -31.7,
-   "jeonse_ratio": 30.7,
+   "jeonse_ratio": 31.7,
    "sale_count_1y": 32,
-   "volume_x_3m": 0.9,
-   "score": 77.6,
+   "volume_x_3m": 1.0,
+   "score": 77.9,
    "reasons": [
     "1년 평단가 대비 -26.3%"
+   ]
+  },
+  {
+   "gu": "마포구",
+   "lawd_cd": "11440",
+   "umd": "망원동",
+   "apt": "성원2",
+   "build_year": 1999,
+   "deal_date": "2026-08-05",
+   "area_sqm": 114.74,
+   "floor": 9,
+   "amount_manwon": 118000,
+   "deal_ppy": 3400,
+   "cx_ppy_median_1y": 3782,
+   "discount_pct": -10.1,
+   "peak_amount": 118000,
+   "drop_from_peak_pct": 0.0,
+   "jeonse_ratio": 86.8,
+   "sale_count_1y": 5,
+   "volume_x_3m": 0.33,
+   "score": 46.3,
+   "reasons": [
+    "1년 평단가 대비 -10.1%",
+    "전세가율 86.8%"
+   ]
+  },
+  {
+   "gu": "강남구",
+   "lawd_cd": "11680",
+   "umd": "삼성동",
+   "apt": "LG선릉에클라트(B)",
+   "build_year": 2004,
+   "deal_date": "2026-08-14",
+   "area_sqm": 36.35,
+   "floor": 13,
+   "amount_manwon": 33500,
+   "deal_ppy": 3047,
+   "cx_ppy_median_1y": 3183,
+   "discount_pct": -4.3,
+   "peak_amount": 42000,
+   "drop_from_peak_pct": -20.2,
+   "jeonse_ratio": 85.0,
+   "sale_count_1y": 12,
+   "volume_x_3m": 0.17,
+   "score": 44.2,
+   "reasons": [
+    "전세가율 85.0%"
+   ]
+  },
+  {
+   "gu": "마포구",
+   "lawd_cd": "11440",
+   "umd": "아현동",
+   "apt": "마포래미안푸르지오2단지",
+   "build_year": 2014,
+   "deal_date": "2026-08-22",
+   "area_sqm": 59.9656,
+   "floor": 2,
+   "amount_manwon": 195000,
+   "deal_ppy": 10750,
+   "cx_ppy_median_1y": 11960,
+   "discount_pct": -10.1,
+   "peak_amount": 235000,
+   "drop_from_peak_pct": -17.0,
+   "jeonse_ratio": 36.9,
+   "sale_count_1y": 21,
+   "volume_x_3m": 1.0,
+   "score": 39.8,
+   "reasons": [
+    "1년 평단가 대비 -10.1%"
+   ]
+  },
+  {
+   "gu": "강남구",
+   "lawd_cd": "11680",
+   "umd": "도곡동",
+   "apt": "대우디오빌",
+   "build_year": 2004,
+   "deal_date": "2026-07-31",
+   "area_sqm": 31.81,
+   "floor": 4,
+   "amount_manwon": 29000,
+   "deal_ppy": 3014,
+   "cx_ppy_median_1y": 3118,
+   "discount_pct": -3.3,
+   "peak_amount": 32000,
+   "drop_from_peak_pct": -9.4,
+   "jeonse_ratio": 88.2,
+   "sale_count_1y": 8,
+   "volume_x_3m": 0.2,
+   "score": 37.8,
+   "reasons": [
+    "전세가율 88.2%"
+   ]
+  },
+  {
+   "gu": "마포구",
+   "lawd_cd": "11440",
+   "umd": "망원동",
+   "apt": "미원2",
+   "build_year": 1997,
+   "deal_date": "2026-08-18",
+   "area_sqm": 79.74,
+   "floor": 6,
+   "amount_manwon": 82000,
+   "deal_ppy": 3399,
+   "cx_ppy_median_1y": 3689,
+   "discount_pct": -7.8,
+   "peak_amount": 82000,
+   "drop_from_peak_pct": 0.0,
+   "jeonse_ratio": 66.2,
+   "sale_count_1y": 9,
+   "volume_x_3m": 0.5,
+   "score": 35.6,
+   "reasons": [
+    "1년 평단가 대비 -7.8%"
    ]
   },
   {
@@ -82,23 +198,23 @@
    "gu": "강남구",
    "lawd_cd": "11680",
    "umd": "압구정동",
-   "apt": "신현대12차",
-   "build_year": 1982,
-   "deal_date": "2026-07-25",
-   "area_sqm": 155.52,
-   "floor": 1,
-   "amount_manwon": 779000,
-   "deal_ppy": 16559,
-   "cx_ppy_median_1y": 17899,
-   "discount_pct": -7.5,
-   "peak_amount": 990000,
-   "drop_from_peak_pct": -21.3,
-   "jeonse_ratio": 17.6,
-   "sale_count_1y": 24,
-   "volume_x_3m": 1.0,
-   "score": 30.9,
+   "apt": "한양3",
+   "build_year": 1978,
+   "deal_date": "2026-08-20",
+   "area_sqm": 161.9,
+   "floor": 9,
+   "amount_manwon": 685000,
+   "deal_ppy": 13987,
+   "cx_ppy_median_1y": 15314,
+   "discount_pct": -8.7,
+   "peak_amount": 775000,
+   "drop_from_peak_pct": -11.6,
+   "jeonse_ratio": 18.0,
+   "sale_count_1y": 6,
+   "volume_x_3m": 4.0,
+   "score": 28.5,
    "reasons": [
-    "1년 평단가 대비 -7.5%"
+    "1년 평단가 대비 -8.7%"
    ]
   },
   {
@@ -112,16 +228,16 @@
    "floor": 3,
    "amount_manwon": 334000,
    "deal_ppy": 14379,
-   "cx_ppy_median_1y": 15388,
-   "discount_pct": -6.6,
+   "cx_ppy_median_1y": 15270,
+   "discount_pct": -5.8,
    "peak_amount": 428000,
    "drop_from_peak_pct": -22.0,
-   "jeonse_ratio": 18.9,
-   "sale_count_1y": 37,
-   "volume_x_3m": 1.0,
-   "score": 29.8,
+   "jeonse_ratio": 18.0,
+   "sale_count_1y": 39,
+   "volume_x_3m": 1.33,
+   "score": 28.1,
    "reasons": [
-    "1년 평단가 대비 -6.6%"
+    "1년 평단가 대비 -5.8%"
    ]
   },
   {
@@ -139,10 +255,10 @@
    "discount_pct": -5.2,
    "peak_amount": 378000,
    "drop_from_peak_pct": 0.0,
-   "jeonse_ratio": 56.0,
+   "jeonse_ratio": 57.1,
    "sale_count_1y": 22,
-   "volume_x_3m": 0.29,
-   "score": 27.1,
+   "volume_x_3m": 0.2,
+   "score": 27.5,
    "reasons": [
     "1년 평단가 대비 -5.2%"
    ]
@@ -163,11 +279,34 @@
    "peak_amount": 31700,
    "drop_from_peak_pct": -0.9,
    "jeonse_ratio": 84.4,
-   "sale_count_1y": 20,
+   "sale_count_1y": 21,
    "volume_x_3m": 2.0,
    "score": 22.9,
    "reasons": [
     "전세가율 84.4%"
+   ]
+  },
+  {
+   "gu": "강남구",
+   "lawd_cd": "11680",
+   "umd": "도곡동",
+   "apt": "현대비젼21",
+   "build_year": 1999,
+   "deal_date": "2026-08-10",
+   "area_sqm": 34.995,
+   "floor": 26,
+   "amount_manwon": 45000,
+   "deal_ppy": 4251,
+   "cx_ppy_median_1y": 3957,
+   "discount_pct": 7.4,
+   "peak_amount": 54500,
+   "drop_from_peak_pct": -17.4,
+   "jeonse_ratio": 84.1,
+   "sale_count_1y": 14,
+   "volume_x_3m": 0.17,
+   "score": 19.1,
+   "reasons": [
+    "전세가율 84.1%"
    ]
   },
   {
@@ -187,7 +326,7 @@
    "drop_from_peak_pct": -4.5,
    "jeonse_ratio": 71.9,
    "sale_count_1y": 9,
-   "volume_x_3m": 1.0,
+   "volume_x_3m": 0.5,
    "score": 13.6,
    "reasons": [
     "전세가율 71.9%"
@@ -214,6 +353,29 @@
    "score": 11.6,
    "reasons": [
     "전세가율 73.7%"
+   ]
+  },
+  {
+   "gu": "마포구",
+   "lawd_cd": "11440",
+   "umd": "서교동",
+   "apt": "대우미래사랑",
+   "build_year": 2005,
+   "deal_date": "2026-08-20",
+   "area_sqm": 57.36,
+   "floor": 5,
+   "amount_manwon": 62300,
+   "deal_ppy": 3590,
+   "cx_ppy_median_1y": 3386,
+   "discount_pct": 6.0,
+   "peak_amount": 62300,
+   "drop_from_peak_pct": 0.0,
+   "jeonse_ratio": 72.3,
+   "sale_count_1y": 21,
+   "volume_x_3m": 2.0,
+   "score": 9.6,
+   "reasons": [
+    "전세가율 72.3%"
    ]
   }
  ]
