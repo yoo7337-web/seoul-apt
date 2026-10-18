@@ -1,5 +1,5 @@
 {
- "anchor_date": "2026-10-09",
+ "anchor_date": "2026-10-16",
  "window_days": 28,
  "criteria": {
   "min_discount_pct": -5.0,
@@ -35,47 +35,24 @@
   {
    "gu": "강남구",
    "lawd_cd": "11680",
-   "umd": "대치동",
-   "apt": "은마",
-   "build_year": 1979,
-   "deal_date": "2026-09-11",
-   "area_sqm": 76.79,
-   "floor": 2,
-   "amount_manwon": 302000,
-   "deal_ppy": 13001,
-   "cx_ppy_median_1y": 14895,
-   "discount_pct": -12.7,
-   "peak_amount": 428000,
-   "drop_from_peak_pct": -29.4,
-   "jeonse_ratio": 16.7,
-   "sale_count_1y": 47,
-   "volume_x_3m": 2.0,
-   "score": 45.2,
+   "umd": "압구정동",
+   "apt": "신현대9차",
+   "build_year": 1982,
+   "deal_date": "2026-09-19",
+   "area_sqm": 108.88,
+   "floor": 8,
+   "amount_manwon": 555000,
+   "deal_ppy": 16851,
+   "cx_ppy_median_1y": 19667,
+   "discount_pct": -14.3,
+   "peak_amount": 720000,
+   "drop_from_peak_pct": -22.9,
+   "jeonse_ratio": 13.4,
+   "sale_count_1y": 16,
+   "volume_x_3m": 0.67,
+   "score": 44.1,
    "reasons": [
-    "1년 평단가 대비 -12.7%"
-   ]
-  },
-  {
-   "gu": "강남구",
-   "lawd_cd": "11680",
-   "umd": "대치동",
-   "apt": "한보미도맨션2",
-   "build_year": 1985,
-   "deal_date": "2026-09-17",
-   "area_sqm": 159.15,
-   "floor": 10,
-   "amount_manwon": 469500,
-   "deal_ppy": 9752,
-   "cx_ppy_median_1y": 11352,
-   "discount_pct": -14.1,
-   "peak_amount": 555000,
-   "drop_from_peak_pct": -15.4,
-   "jeonse_ratio": 28.4,
-   "sale_count_1y": 15,
-   "volume_x_3m": 0.75,
-   "score": 44.4,
-   "reasons": [
-    "1년 평단가 대비 -14.1%"
+    "1년 평단가 대비 -14.3%"
    ]
   },
   {
@@ -95,7 +72,7 @@
    "drop_from_peak_pct": -21.9,
    "jeonse_ratio": 40.9,
    "sale_count_1y": 42,
-   "volume_x_3m": 0.19,
+   "volume_x_3m": 0.14,
    "score": 43.6,
    "reasons": [
     "1년 평단가 대비 -10.2%"
@@ -112,85 +89,39 @@
    "floor": 1,
    "amount_manwon": 305000,
    "deal_ppy": 13130,
-   "cx_ppy_median_1y": 14895,
-   "discount_pct": -11.8,
+   "cx_ppy_median_1y": 14852,
+   "discount_pct": -11.6,
    "peak_amount": 428000,
    "drop_from_peak_pct": -28.7,
    "jeonse_ratio": 16.7,
    "sale_count_1y": 47,
-   "volume_x_3m": 2.0,
-   "score": 43.1,
+   "volume_x_3m": 1.82,
+   "score": 42.6,
    "reasons": [
-    "1년 평단가 대비 -11.8%"
+    "1년 평단가 대비 -11.6%"
    ]
   },
   {
    "gu": "강남구",
    "lawd_cd": "11680",
-   "umd": "개포동",
-   "apt": "래미안블레스티지",
-   "build_year": 2019,
-   "deal_date": "2026-09-12",
-   "area_sqm": 126.928,
+   "umd": "압구정동",
+   "apt": "신현대12차",
+   "build_year": 1982,
+   "deal_date": "2026-10-14",
+   "area_sqm": 182.95,
    "floor": 6,
-   "amount_manwon": 399000,
-   "deal_ppy": 10392,
-   "cx_ppy_median_1y": 11586,
-   "discount_pct": -10.3,
-   "peak_amount": 460000,
-   "drop_from_peak_pct": -13.3,
-   "jeonse_ratio": 52.0,
-   "sale_count_1y": 42,
-   "volume_x_3m": 0.19,
-   "score": 42.8,
+   "amount_manwon": 880000,
+   "deal_ppy": 15901,
+   "cx_ppy_median_1y": 18044,
+   "discount_pct": -11.9,
+   "peak_amount": 1125000,
+   "drop_from_peak_pct": -21.8,
+   "jeonse_ratio": 19.4,
+   "sale_count_1y": 27,
+   "volume_x_3m": 0.5,
+   "score": 40.5,
    "reasons": [
-    "1년 평단가 대비 -10.3%"
-   ]
-  },
-  {
-   "gu": "강남구",
-   "lawd_cd": "11680",
-   "umd": "역삼동",
-   "apt": "테헤란아이파크",
-   "build_year": 2014,
-   "deal_date": "2026-09-15",
-   "area_sqm": 92.6232,
-   "floor": 16,
-   "amount_manwon": 330000,
-   "deal_ppy": 11778,
-   "cx_ppy_median_1y": 13348,
-   "discount_pct": -11.8,
-   "peak_amount": 340000,
-   "drop_from_peak_pct": -2.9,
-   "jeonse_ratio": 49.3,
-   "sale_count_1y": 9,
-   "volume_x_3m": 0.33,
-   "score": 39.8,
-   "reasons": [
-    "1년 평단가 대비 -11.8%"
-   ]
-  },
-  {
-   "gu": "강남구",
-   "lawd_cd": "11680",
-   "umd": "대치동",
-   "apt": "은마",
-   "build_year": 1979,
-   "deal_date": "2026-09-11",
-   "area_sqm": 76.79,
-   "floor": 14,
-   "amount_manwon": 312000,
-   "deal_ppy": 13432,
-   "cx_ppy_median_1y": 14895,
-   "discount_pct": -9.8,
-   "peak_amount": 428000,
-   "drop_from_peak_pct": -27.1,
-   "jeonse_ratio": 16.7,
-   "sale_count_1y": 47,
-   "volume_x_3m": 2.0,
-   "score": 38.2,
-   "reasons": [
-    "1년 평단가 대비 -9.8%"
+    "1년 평단가 대비 -11.9%"
    ]
   },
   {
@@ -204,39 +135,16 @@
    "floor": 11,
    "amount_manwon": 211000,
    "deal_ppy": 6842,
-   "cx_ppy_median_1y": 7369,
-   "discount_pct": -7.2,
+   "cx_ppy_median_1y": 7423,
+   "discount_pct": -7.8,
    "peak_amount": 257000,
    "drop_from_peak_pct": -17.9,
-   "jeonse_ratio": 47.7,
-   "sale_count_1y": 41,
+   "jeonse_ratio": 47.5,
+   "sale_count_1y": 38,
    "volume_x_3m": 0.22,
-   "score": 37.6,
+   "score": 38.8,
    "reasons": [
-    "1년 평단가 대비 -7.2%"
-   ]
-  },
-  {
-   "gu": "강남구",
-   "lawd_cd": "11680",
-   "umd": "대치동",
-   "apt": "은마",
-   "build_year": 1979,
-   "deal_date": "2026-09-14",
-   "area_sqm": 76.79,
-   "floor": 11,
-   "amount_manwon": 313000,
-   "deal_ppy": 13475,
-   "cx_ppy_median_1y": 14895,
-   "discount_pct": -9.5,
-   "peak_amount": 428000,
-   "drop_from_peak_pct": -26.9,
-   "jeonse_ratio": 16.7,
-   "sale_count_1y": 47,
-   "volume_x_3m": 2.0,
-   "score": 37.5,
-   "reasons": [
-    "1년 평단가 대비 -9.5%"
+    "1년 평단가 대비 -7.8%"
    ]
   },
   {
@@ -250,16 +158,16 @@
    "floor": 14,
    "amount_manwon": 313000,
    "deal_ppy": 13475,
-   "cx_ppy_median_1y": 14895,
-   "discount_pct": -9.5,
+   "cx_ppy_median_1y": 14852,
+   "discount_pct": -9.3,
    "peak_amount": 428000,
    "drop_from_peak_pct": -26.9,
    "jeonse_ratio": 16.7,
    "sale_count_1y": 47,
-   "volume_x_3m": 2.0,
-   "score": 37.5,
+   "volume_x_3m": 1.82,
+   "score": 37.0,
    "reasons": [
-    "1년 평단가 대비 -9.5%"
+    "1년 평단가 대비 -9.3%"
    ]
   },
   {
@@ -291,21 +199,44 @@
    "umd": "대치동",
    "apt": "은마",
    "build_year": 1979,
+   "deal_date": "2026-09-29",
+   "area_sqm": 76.79,
+   "floor": 8,
+   "amount_manwon": 315000,
+   "deal_ppy": 13561,
+   "cx_ppy_median_1y": 14852,
+   "discount_pct": -8.7,
+   "peak_amount": 428000,
+   "drop_from_peak_pct": -26.4,
+   "jeonse_ratio": 16.7,
+   "sale_count_1y": 47,
+   "volume_x_3m": 1.82,
+   "score": 35.6,
+   "reasons": [
+    "1년 평단가 대비 -8.7%"
+   ]
+  },
+  {
+   "gu": "강남구",
+   "lawd_cd": "11680",
+   "umd": "대치동",
+   "apt": "은마",
+   "build_year": 1979,
    "deal_date": "2026-09-19",
    "area_sqm": 76.79,
    "floor": 13,
    "amount_manwon": 316000,
    "deal_ppy": 13604,
-   "cx_ppy_median_1y": 14895,
-   "discount_pct": -8.7,
+   "cx_ppy_median_1y": 14852,
+   "discount_pct": -8.4,
    "peak_amount": 428000,
    "drop_from_peak_pct": -26.2,
    "jeonse_ratio": 16.7,
    "sale_count_1y": 47,
-   "volume_x_3m": 2.0,
-   "score": 35.4,
+   "volume_x_3m": 1.82,
+   "score": 34.9,
    "reasons": [
-    "1년 평단가 대비 -8.7%"
+    "1년 평단가 대비 -8.4%"
    ]
   },
   {
@@ -319,16 +250,62 @@
    "floor": 11,
    "amount_manwon": 317000,
    "deal_ppy": 13647,
-   "cx_ppy_median_1y": 14895,
-   "discount_pct": -8.4,
+   "cx_ppy_median_1y": 14852,
+   "discount_pct": -8.1,
    "peak_amount": 428000,
    "drop_from_peak_pct": -25.9,
    "jeonse_ratio": 16.7,
    "sale_count_1y": 47,
-   "volume_x_3m": 2.0,
-   "score": 34.7,
+   "volume_x_3m": 1.82,
+   "score": 34.2,
    "reasons": [
-    "1년 평단가 대비 -8.4%"
+    "1년 평단가 대비 -8.1%"
+   ]
+  },
+  {
+   "gu": "마포구",
+   "lawd_cd": "11440",
+   "umd": "중동",
+   "apt": "중동계룡아파트",
+   "build_year": 2000,
+   "deal_date": "2026-09-29",
+   "area_sqm": 113.94,
+   "floor": 3,
+   "amount_manwon": 122000,
+   "deal_ppy": 3540,
+   "cx_ppy_median_1y": 3908,
+   "discount_pct": -9.4,
+   "peak_amount": 122000,
+   "drop_from_peak_pct": 0.0,
+   "jeonse_ratio": 50.5,
+   "sale_count_1y": 11,
+   "volume_x_3m": 0.4,
+   "score": 34.0,
+   "reasons": [
+    "1년 평단가 대비 -9.4%"
+   ]
+  },
+  {
+   "gu": "강남구",
+   "lawd_cd": "11680",
+   "umd": "압구정동",
+   "apt": "한양3",
+   "build_year": 1978,
+   "deal_date": "2026-09-30",
+   "area_sqm": 116.94,
+   "floor": 4,
+   "amount_manwon": 530000,
+   "deal_ppy": 14983,
+   "cx_ppy_median_1y": 16594,
+   "discount_pct": -9.7,
+   "peak_amount": 645000,
+   "drop_from_peak_pct": -17.8,
+   "jeonse_ratio": 17.0,
+   "sale_count_1y": 7,
+   "volume_x_3m": 1.0,
+   "score": 33.4,
+   "reasons": [
+    "1년 평단가 대비 -9.7%"
    ]
   },
   {
@@ -342,39 +319,16 @@
    "floor": 8,
    "amount_manwon": 325000,
    "deal_ppy": 14714,
-   "cx_ppy_median_1y": 16253,
-   "discount_pct": -9.5,
+   "cx_ppy_median_1y": 16298,
+   "discount_pct": -9.7,
    "peak_amount": 377000,
    "drop_from_peak_pct": -13.8,
    "jeonse_ratio": 13.1,
-   "sale_count_1y": 21,
+   "sale_count_1y": 19,
    "volume_x_3m": 8.0,
-   "score": 29.8,
+   "score": 30.3,
    "reasons": [
-    "1년 평단가 대비 -9.5%"
-   ]
-  },
-  {
-   "gu": "강남구",
-   "lawd_cd": "11680",
-   "umd": "대치동",
-   "apt": "은마",
-   "build_year": 1979,
-   "deal_date": "2026-09-14",
-   "area_sqm": 84.43,
-   "floor": 13,
-   "amount_manwon": 355000,
-   "deal_ppy": 13900,
-   "cx_ppy_median_1y": 14895,
-   "discount_pct": -6.7,
-   "peak_amount": 428000,
-   "drop_from_peak_pct": -17.1,
-   "jeonse_ratio": 16.7,
-   "sale_count_1y": 47,
-   "volume_x_3m": 2.0,
-   "score": 26.9,
-   "reasons": [
-    "1년 평단가 대비 -6.7%"
+    "1년 평단가 대비 -9.7%"
    ]
   },
   {
@@ -393,34 +347,34 @@
    "peak_amount": 405000,
    "drop_from_peak_pct": -16.0,
    "jeonse_ratio": 14.8,
-   "sale_count_1y": 19,
-   "volume_x_3m": 1.5,
+   "sale_count_1y": 20,
+   "volume_x_3m": 2.33,
    "score": 26.9,
    "reasons": [
     "1년 평단가 대비 -7.2%"
    ]
   },
   {
-   "gu": "강남구",
-   "lawd_cd": "11680",
-   "umd": "개포동",
-   "apt": "개포주공6단지",
-   "build_year": 1983,
-   "deal_date": "2026-10-01",
-   "area_sqm": 60.13,
-   "floor": 3,
-   "amount_manwon": 302000,
-   "deal_ppy": 16603,
-   "cx_ppy_median_1y": 18142,
-   "discount_pct": -8.5,
-   "peak_amount": 337000,
-   "drop_from_peak_pct": -10.4,
-   "jeonse_ratio": 12.4,
-   "sale_count_1y": 21,
-   "volume_x_3m": 8.0,
-   "score": 25.9,
+   "gu": "마포구",
+   "lawd_cd": "11440",
+   "umd": "아현동",
+   "apt": "마포푸르지오더센트럴",
+   "build_year": 2023,
+   "deal_date": "2026-10-12",
+   "area_sqm": 41.59,
+   "floor": 10,
+   "amount_manwon": 87000,
+   "deal_ppy": 6915,
+   "cx_ppy_median_1y": 6818,
+   "discount_pct": 1.4,
+   "peak_amount": 103000,
+   "drop_from_peak_pct": -15.5,
+   "jeonse_ratio": 72.0,
+   "sale_count_1y": 17,
+   "volume_x_3m": 0.22,
+   "score": 26.5,
    "reasons": [
-    "1년 평단가 대비 -8.5%"
+    "전세가율 72.0%"
    ]
   },
   {
@@ -438,10 +392,10 @@
    "discount_pct": -6.8,
    "peak_amount": 318000,
    "drop_from_peak_pct": -15.7,
-   "jeonse_ratio": 13.4,
-   "sale_count_1y": 21,
+   "jeonse_ratio": 13.6,
+   "sale_count_1y": 19,
    "volume_x_3m": 8.0,
-   "score": 25.4,
+   "score": 25.5,
    "reasons": [
     "1년 평단가 대비 -6.8%"
    ]
@@ -462,34 +416,11 @@
    "peak_amount": 850000,
    "drop_from_peak_pct": -11.8,
    "jeonse_ratio": 18.8,
-   "sale_count_1y": 15,
-   "volume_x_3m": 0.8,
+   "sale_count_1y": 16,
+   "volume_x_3m": 0.67,
    "score": 24.0,
    "reasons": [
     "1년 평단가 대비 -6.2%"
-   ]
-  },
-  {
-   "gu": "강남구",
-   "lawd_cd": "11680",
-   "umd": "대치동",
-   "apt": "은마",
-   "build_year": 1979,
-   "deal_date": "2026-09-21",
-   "area_sqm": 84.43,
-   "floor": 9,
-   "amount_manwon": 360000,
-   "deal_ppy": 14095,
-   "cx_ppy_median_1y": 14895,
-   "discount_pct": -5.4,
-   "peak_amount": 428000,
-   "drop_from_peak_pct": -15.9,
-   "jeonse_ratio": 16.7,
-   "sale_count_1y": 47,
-   "volume_x_3m": 2.0,
-   "score": 23.7,
-   "reasons": [
-    "1년 평단가 대비 -5.4%"
    ]
   },
   {
@@ -507,12 +438,58 @@
    "discount_pct": -6.1,
    "peak_amount": 318000,
    "drop_from_peak_pct": -15.1,
-   "jeonse_ratio": 13.4,
-   "sale_count_1y": 21,
+   "jeonse_ratio": 13.6,
+   "sale_count_1y": 19,
    "volume_x_3m": 8.0,
-   "score": 23.7,
+   "score": 23.8,
    "reasons": [
     "1년 평단가 대비 -6.1%"
+   ]
+  },
+  {
+   "gu": "강남구",
+   "lawd_cd": "11680",
+   "umd": "대치동",
+   "apt": "은마",
+   "build_year": 1979,
+   "deal_date": "2026-09-21",
+   "area_sqm": 84.43,
+   "floor": 9,
+   "amount_manwon": 360000,
+   "deal_ppy": 14095,
+   "cx_ppy_median_1y": 14852,
+   "discount_pct": -5.1,
+   "peak_amount": 428000,
+   "drop_from_peak_pct": -15.9,
+   "jeonse_ratio": 16.7,
+   "sale_count_1y": 47,
+   "volume_x_3m": 1.82,
+   "score": 23.1,
+   "reasons": [
+    "1년 평단가 대비 -5.1%"
+   ]
+  },
+  {
+   "gu": "강남구",
+   "lawd_cd": "11680",
+   "umd": "개포동",
+   "apt": "개포주공6단지",
+   "build_year": 1983,
+   "deal_date": "2026-10-01",
+   "area_sqm": 60.13,
+   "floor": 3,
+   "amount_manwon": 302000,
+   "deal_ppy": 16603,
+   "cx_ppy_median_1y": 17868,
+   "discount_pct": -7.1,
+   "peak_amount": 337000,
+   "drop_from_peak_pct": -10.4,
+   "jeonse_ratio": 12.5,
+   "sale_count_1y": 19,
+   "volume_x_3m": 8.0,
+   "score": 23.1,
+   "reasons": [
+    "1년 평단가 대비 -7.1%"
    ]
   },
   {
@@ -531,34 +508,11 @@
    "peak_amount": 64800,
    "drop_from_peak_pct": -9.0,
    "jeonse_ratio": 70.2,
-   "sale_count_1y": 76,
-   "volume_x_3m": 0.52,
+   "sale_count_1y": 75,
+   "volume_x_3m": 0.35,
    "score": 17.6,
    "reasons": [
     "전세가율 70.2%"
-   ]
-  },
-  {
-   "gu": "마포구",
-   "lawd_cd": "11440",
-   "umd": "신공덕동",
-   "apt": "대우메트로디오빌",
-   "build_year": 2005,
-   "deal_date": "2026-09-15",
-   "area_sqm": 34.39,
-   "floor": 22,
-   "amount_manwon": 41500,
-   "deal_ppy": 3989,
-   "cx_ppy_median_1y": 3669,
-   "discount_pct": 8.7,
-   "peak_amount": 45500,
-   "drop_from_peak_pct": -8.8,
-   "jeonse_ratio": 83.1,
-   "sale_count_1y": 11,
-   "volume_x_3m": 1.0,
-   "score": 11.9,
-   "reasons": [
-    "전세가율 83.1%"
    ]
   },
   {
@@ -577,8 +531,8 @@
    "peak_amount": 62500,
    "drop_from_peak_pct": -4.5,
    "jeonse_ratio": 70.2,
-   "sale_count_1y": 76,
-   "volume_x_3m": 0.52,
+   "sale_count_1y": 75,
+   "volume_x_3m": 0.35,
    "score": 3.8,
    "reasons": [
     "전세가율 70.2%"
